@@ -721,7 +721,13 @@ class TestAnyOptionQuestion:
     ) -> None:
         """The plot was only the example. Tick two activity types, answer the
         plot once, confirm -- two rows, split by activity type.
+
+        Runs unscoped (PLOT_SCOPE_MODE=all): the plot is answered from
+        Kotlin's global list, whose only entry belongs to another farmer, and
+        under farmer scoping (US2-13) that is correctly refused. This test is
+        about the fan-out, not scoping -- test_choice_scoping covers that.
         """
+        line_settings.PLOT_SCOPE_MODE = "all"  # restored by the autouse fixture
         fixture, conversation_id, form_response = await _seed_activity_type_form(db_session)
         plot_a = fixture.plot_ids[0]
 
