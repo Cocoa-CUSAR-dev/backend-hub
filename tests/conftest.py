@@ -19,6 +19,10 @@ os.environ.setdefault("CHATBOT_SERVICE_KEY", "test-service-key")
 os.environ.setdefault("CRON_SECRET", "test-cron-secret")
 os.environ.setdefault("LINE_CHANNEL_SECRET", "test-secret")
 os.environ.setdefault("LINE_CHANNEL_ACCESS_TOKEN", "test-token")
+# Most tests use fake farm/plot choices with no agriculture.farmer_farm rows
+# behind them, so they run unscoped; the US2-13 scoping tests switch to
+# "farmer" explicitly. Production defaults to "farmer" (src/line/config.py).
+os.environ.setdefault("PLOT_SCOPE_MODE", "all")
 
 from src.main import app  # noqa: E402 -- must come after the env vars above
 

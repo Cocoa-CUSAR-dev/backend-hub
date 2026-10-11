@@ -144,9 +144,12 @@ async def start_task(
         return StartTaskResponse(pushed=True)
 
     form = await get_form(str(body.task_form_id))
-    parent_kind = parent_picker.kind_for_handler(body.handler)
+    parent_kind = await parent_picker.kind_for_handler(session, body.handler)
     parent_choices = None
     if parent_kind is not None:
+        if not parent_picker.has_picker(parent_kind):
+            await push_text(to, parent_picker.UNSUPPORTED_PROMPT)
+            return StartTaskResponse(pushed=True)
         parent_choices = await parent_picker.choices_for(session, parent_kind, user_id)
         if not parent_choices:
             await push_text(to, parent_picker.EMPTY_PROMPT[parent_kind])

@@ -60,6 +60,10 @@ logger = logging.getLogger(__name__)
 class Choice:
     id: str
     label: str
+    # US2-13: the parent row this choice belongs to (a plot's farm_id), set
+    # only on a dependent question's choices -- Kotlin sends it as parentId.
+    # See _scope_question.
+    parent_id: str | None = None
 
 
 # BOOLEAN questions target a real `boolean` column (e.g.
@@ -150,6 +154,10 @@ class Question:
     # answer from the row just submitted instead of asking it again -- e.g.
     # the plot on a farm_activity form, where only the activity changes.
     carry_forward: bool = False
+    # US2-13 (form.field_dependency, sent by Kotlin as dependsOn): the field
+    # whose answer this question's choices are filtered by -- "farm_id" on
+    # the plot question. None for every independent question.
+    depends_on: str | None = None
 
 
 @dataclass(frozen=True)
@@ -205,7 +213,14 @@ class ConversationReply:
 
 def _constrained_choices_for(q: dict[str, Any]) -> list[Choice] | None:
     if q.get("choices"):
-        return [Choice(id=str(c["id"]), label=str(c.get("name") or "")) for c in q["choices"]]
+        return [
+            Choice(
+                id=str(c["id"]),
+                label=str(c.get("name") or ""),
+                parent_id=str(c["parent_id"]) if c.get("parent_id") is not None else None,
+            )
+            for c in q["choices"]
+        ]
     if q.get("input_type") == "BOOLEAN":
         return _BOOLEAN_CHOICES
     return None
@@ -306,6 +321,7 @@ def _question_from_dict(q: dict[str, Any]) -> Question:
         validation_rule=q.get("validation_rule"),
         all_real_choices=_constrained_choices_for(q),
         carry_forward=bool(q.get("carry_forward", False)),
+        depends_on=str(q["depends_on"]) if q.get("depends_on") else None,
     )
 
 
@@ -670,6 +686,81 @@ def _multi_choice_reply(
     )
 
 
+def _answered_value(
+    answer_rows: list[ConversationAnswer], questions: list[Question], field_name: str
+) -> str | None:
+    """The single chosen value for `field_name` in this conversation, or None
+    if it isn't answered yet, was skipped, or holds several answers (then no
+    single parent narrows anything)."""
+    question_ids = {q.question_id for q in questions if q.field_name == field_name}
+    for row in answer_rows:
+        if row.question_id not in question_ids:
+            continue
+        answer = row.answer
+        if answer.get("skipped") or answer.get("selecting") or answer.get("multi"):
+            return None
+        value = answer.get("value")
+        return str(value) if value is not None else None
+    return None
+
+
+def _with_real_choices(question: Question, real: list[Choice]) -> Question:
+    """`question` offering exactly `real`, with the same pause(/skip) prefix
+    and page-0 slicing _choices_for would have produced for that list."""
+    leading = _leading_choices_for(question)
+    room = _QUICK_REPLY_LIMIT - len(leading)
+    return replace(question, all_real_choices=real, choices=[*leading, *real[:room]])
+
+
+async def _scope_question(
+    session: AsyncSession,
+    *,
+    conversation: Conversation,
+    question: Question,
+    form: FormDetail,
+) -> Question:
+    """`question` with its choices narrowed to what this farmer, in this
+    conversation, can actually pick (US2-13, docs-and-plan#242). Two steps,
+    in this order:
+
+    1. Farmer scoping (PLOT_SCOPE_MODE=farmer): a farm or plot question
+       offers only the farmer's own farms/plots. Kotlin sends the global
+       ref.farm_constant / ref.plot_constant lists -- every farm in the
+       system -- which until now reached the farmer as-is everywhere except
+       the multi-choice plot picker.
+    2. Parent filtering: a dependent question (Kotlin's dependsOn, from
+       form.field_dependency) offers only the choices whose parent_id is the
+       answer already given to its parent -- the plots of the farm just
+       picked. Skipped when the parent isn't answered (or holds several
+       answers), so nothing is hidden on a guess.
+
+    Applied wherever an ordinary question is put in front of the farmer AND
+    wherever their answer to it is matched, so the buttons they see and the
+    labels their answer is checked against are always the same list.
+    Deterministic for a given conversation state, which keeps
+    conversation.current_page meaningful between asking and answering.
+    Questions without choices pass through untouched.
+    """
+    real = question.all_real_choices
+    if question.input_type != "OPTION" or not real:
+        return question
+
+    narrowed = real
+    owned = await plot_picker.farmer_owned_ids(session, conversation.user_id, question.field_name)
+    if owned is not None:
+        narrowed = [choice for choice in narrowed if choice.id in owned]
+
+    if question.depends_on:
+        answer_rows = await _answered_rows(session, conversation.conversation_id)
+        parent_value = _answered_value(answer_rows, questions_from_form(form), question.depends_on)
+        if parent_value is not None:
+            narrowed = [choice for choice in narrowed if choice.parent_id == parent_value]
+
+    if narrowed == real:
+        return question
+    return _with_real_choices(question, narrowed)
+
+
 async def _ask_question(
     session: AsyncSession,
     *,
@@ -687,6 +778,9 @@ async def _ask_question(
     gets -- a farmer who paused mid-selection and resumed into plain Quick
     Reply buttons would lose the selection they could no longer see.
     """
+    question = await _scope_question(
+        session, conversation=conversation, question=question, form=form
+    )
     options = await multi_choice_options_for(
         session, conversation=conversation, question=question, form=form
     )
@@ -1198,7 +1292,7 @@ async def _handle_parent_answer(
         )
 
     conversation.parent_answer = {
-        "field_name": parent_picker.FIELD_NAME[parent_kind],
+        "field_name": await parent_picker.field_name_for(session, parent_kind),
         "value": matched.id,
     }
 
@@ -1405,6 +1499,13 @@ async def handle_answer(
     questions = questions_from_form(form)
     question_by_id = {q.question_id: q for q in questions}
     current_question = question_by_id.get(conversation.current_question_id)
+    if current_question is not None:
+        # Matched against exactly the list the farmer was shown (see
+        # _scope_question) -- a farm or plot that isn't theirs, or a plot of
+        # another farm, can't be accepted by typing its name either.
+        current_question = await _scope_question(
+            session, conversation=conversation, question=current_question, form=form
+        )
 
     # The multi-choice picker owns this question while it is open: its answer
     # is built by tapping, so typed text is interpreted against the picker's
@@ -2282,6 +2383,10 @@ async def resume_conversation(
             f"Resumed conversation_id={conversation.conversation_id}'s current question "
             "is no longer part of the form"
         )
+    # Same list the farmer will be matched against (see _scope_question).
+    current_question = await _scope_question(
+        session, conversation=conversation, question=current_question, form=form
+    )
     picker_options = await multi_choice_options_for(
         session, conversation=conversation, question=current_question, form=form
     )
