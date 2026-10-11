@@ -8,6 +8,7 @@ from linebot.v3.messaging import (
     Configuration,
     FlexContainer,
     FlexMessage,
+    LocationAction,
     MessageAction,
     MulticastRequest,
     PostbackAction,
@@ -19,6 +20,7 @@ from linebot.v3.messaging import (
 )
 
 from src.line.config import line_settings
+from src.line.flex_builders import build_multi_choice_flex
 from src.line.schemas import QuickReplyOption
 
 if TYPE_CHECKING:
@@ -35,12 +37,16 @@ _configuration = Configuration(access_token=line_settings.LINE_CHANNEL_ACCESS_TO
 _QUICK_REPLY_LABEL_MAX = 20  # LINE's own platform limit on a button's label
 
 
+def _quick_reply_action(option: QuickReplyOption) -> MessageAction | LocationAction:
+    if option.kind == "location":
+        # LINE's native location sheet (map + "Share") -- the result arrives
+        # at the webhook as a LocationMessageContent, never as text.
+        return LocationAction(label=option.label)
+    return MessageAction(label=option.label, text=option.text)
+
+
 def _build_quick_reply(options: list[QuickReplyOption]) -> QuickReply:
-    return QuickReply(
-        items=[
-            QuickReplyItem(action=MessageAction(label=opt.label, text=opt.text)) for opt in options
-        ]
-    )
+    return QuickReply(items=[QuickReplyItem(action=_quick_reply_action(opt)) for opt in options])
 
 
 async def reply_text(
@@ -92,27 +98,7 @@ async def reply_task_choices(reply_token: str, text: str, tasks: list["PendingTa
         )
 
 
-async def reply_confirm_prompt(reply_token: str, text: str, conversation_id: UUID) -> None:
-    """Three Quick Reply buttons: "confirm", "edit", and "cancel" Postbacks.
-
-    Without this, AWAITING_CONFIRMATION has no way for a farmer to actually
-    confirm via real LINE -- typing free text at that point raises
-    ConversationNotFound in handle_answer (no open question left to answer
-    against). Same Postback convention reply_task_choices already
-    established for "start"; router.py's _handle_postback already knows
-    how to handle "confirm:<conversation_id>", "edit:<conversation_id>",
-    and "cancel:<conversation_id>".
-
-    Edit (US2-6) exists so a farmer who spots a mistake in the summary can
-    fix just that one field instead of cancelling and starting the whole
-    form over.
-
-    Cancel exists because this same prompt is re-shown on a failed
-    submission (CB-1) -- for a handler Go can't save yet, retrying can
-    never succeed, and a farmer needs a way out other than retrying
-    forever (live-reported 2026-08-09: 3 retries in a row, all the same
-    honest failure, no escape).
-    """
+def _build_confirm_prompt_message(text: str, conversation_id: UUID) -> TextMessage:
     quick_reply = QuickReply(
         items=[
             QuickReplyItem(
@@ -138,11 +124,46 @@ async def reply_confirm_prompt(reply_token: str, text: str, conversation_id: UUI
             ),
         ]
     )
-    message = TextMessage(text=text, quickReply=quick_reply)
+    return TextMessage(text=text, quickReply=quick_reply)
+
+
+async def reply_confirm_prompt(reply_token: str, text: str, conversation_id: UUID) -> None:
+    """Three Quick Reply buttons: "confirm", "edit", and "cancel" Postbacks.
+
+    Without this, AWAITING_CONFIRMATION has no way for a farmer to actually
+    confirm via real LINE -- typing free text at that point raises
+    ConversationNotFound in handle_answer (no open question left to answer
+    against). Same Postback convention reply_task_choices already
+    established for "start"; router.py's _handle_postback already knows
+    how to handle "confirm:<conversation_id>", "edit:<conversation_id>",
+    and "cancel:<conversation_id>".
+
+    Edit (US2-6) exists so a farmer who spots a mistake in the summary can
+    fix just that one field instead of cancelling and starting the whole
+    form over.
+
+    Cancel exists because this same prompt is re-shown on a failed
+    submission (CB-1) -- for a handler Go can't save yet, retrying can
+    never succeed, and a farmer needs a way out other than retrying
+    forever (live-reported 2026-08-09: 3 retries in a row, all the same
+    honest failure, no escape).
+    """
+    message = _build_confirm_prompt_message(text, conversation_id)
     async with AsyncApiClient(_configuration) as client:
         await AsyncMessagingApi(client).reply_message(
             ReplyMessageRequest(replyToken=reply_token, messages=[message])
         )
+
+
+async def push_confirm_prompt(to: str, text: str, conversation_id: UUID) -> None:
+    """push_text's counterpart to reply_confirm_prompt -- for a conversation
+    started/resumed from outside a reply-token window (docs-and-plan#176:
+    the LIFF to-do list's "one-tap open," which resumes via a plain HTTP
+    call, not a LINE event). COSTED send, same as push_text.
+    """
+    message = _build_confirm_prompt_message(text, conversation_id)
+    async with AsyncApiClient(_configuration) as client:
+        await AsyncMessagingApi(client).push_message(PushMessageRequest(to=to, messages=[message]))
 
 
 async def reply_add_another_prompt(reply_token: str, text: str, conversation_id: UUID) -> None:
@@ -180,6 +201,37 @@ async def reply_add_another_prompt(reply_token: str, text: str, conversation_id:
         )
 
 
+def _build_autofill_offer_message(
+    *, task_id: str, task_form_id: str, handler: str, preview: str = ""
+) -> TextMessage:
+    quick_reply = QuickReply(
+        items=[
+            QuickReplyItem(
+                action=PostbackAction(
+                    label="ใช้ข้อมูลเดิม",
+                    data=f"start_autofill:yes:{task_id}:{task_form_id}:{handler}",
+                    displayText="ใช้ข้อมูลเดิม (แก้ไขเพิ่มเติมได้ทีหลัง)",
+                )
+            ),
+            QuickReplyItem(
+                action=PostbackAction(
+                    label="กรอกใหม่",
+                    data=f"start_autofill:no:{task_id}:{task_form_id}:{handler}",
+                    displayText="กรอกใหม่",
+                )
+            ),
+        ]
+    )
+    prefix = f"พบข้อมูลที่เคยกรอกไว้ก่อนหน้านี้:\n{preview}\n\n" if preview else "พบข้อมูลที่เคยกรอกไว้ก่อนหน้านี้ "
+    return TextMessage(
+        text=(
+            f"{prefix}ต้องการนำมาใช้กรอกให้อัตโนมัติหรือไม่? "
+            '(เลือก "ใช้ข้อมูลเดิม" แล้วยังกลับมาแก้ไขทีละข้อได้ทีหลัง ผ่านปุ่ม "แก้ไข" ตอนสรุปคำตอบ)'
+        ),
+        quickReply=quick_reply,
+    )
+
+
 async def reply_autofill_offer(
     reply_token: str, *, task_id: str, task_form_id: str, handler: str, preview: str = ""
 ) -> None:
@@ -200,36 +252,29 @@ async def reply_autofill_offer(
     prompt with no content until AFTER agreeing left a farmer unable to
     make an informed choice.
     """
-    quick_reply = QuickReply(
-        items=[
-            QuickReplyItem(
-                action=PostbackAction(
-                    label="ใช้ข้อมูลเดิม",
-                    data=f"start_autofill:yes:{task_id}:{task_form_id}:{handler}",
-                    displayText="ใช้ข้อมูลเดิม (แก้ไขเพิ่มเติมได้ทีหลัง)",
-                )
-            ),
-            QuickReplyItem(
-                action=PostbackAction(
-                    label="กรอกใหม่",
-                    data=f"start_autofill:no:{task_id}:{task_form_id}:{handler}",
-                    displayText="กรอกใหม่",
-                )
-            ),
-        ]
-    )
-    prefix = f"พบข้อมูลที่เคยกรอกไว้ก่อนหน้านี้:\n{preview}\n\n" if preview else "พบข้อมูลที่เคยกรอกไว้ก่อนหน้านี้ "
-    message = TextMessage(
-        text=(
-            f"{prefix}ต้องการนำมาใช้กรอกให้อัตโนมัติหรือไม่? "
-            '(เลือก "ใช้ข้อมูลเดิม" แล้วยังกลับมาแก้ไขทีละข้อได้ทีหลัง ผ่านปุ่ม "แก้ไข" ตอนสรุปคำตอบ)'
-        ),
-        quickReply=quick_reply,
+    message = _build_autofill_offer_message(
+        task_id=task_id, task_form_id=task_form_id, handler=handler, preview=preview
     )
     async with AsyncApiClient(_configuration) as client:
         await AsyncMessagingApi(client).reply_message(
             ReplyMessageRequest(replyToken=reply_token, messages=[message])
         )
+
+
+async def push_autofill_offer(
+    to: str, *, task_id: str, task_form_id: str, handler: str, preview: str = ""
+) -> None:
+    """push_text's counterpart to reply_autofill_offer -- see
+    push_confirm_prompt's docstring for why this exists (docs-and-plan#176).
+    Still ends in a Postback tap ("start_autofill:..."), which router.py's
+    existing _handle_postback branch already handles via its own fresh
+    reply_token -- only the offer itself needed a push twin.
+    """
+    message = _build_autofill_offer_message(
+        task_id=task_id, task_form_id=task_form_id, handler=handler, preview=preview
+    )
+    async with AsyncApiClient(_configuration) as client:
+        await AsyncMessagingApi(client).push_message(PushMessageRequest(to=to, messages=[message]))
 
 
 async def reply_edit_picker(
@@ -261,6 +306,62 @@ async def reply_edit_picker(
         )
 
 
+async def reply_multi_choice_picker(
+    reply_token: str,
+    text: str,
+    conversation_id: UUID,
+    options: list[tuple[str, str]],
+    *,
+    selected_ids: frozenset[str] = frozenset(),
+    skip_label: str | None = None,
+) -> None:
+    """Sends the multi-choice picker bubble (see build_multi_choice_flex for
+    why this is Flex rather than Quick Reply).
+
+    altText is what shows in the farmer's notification and on any client that
+    cannot render Flex -- it is the question itself, since a notification
+    listing every option tells nobody what is being asked.
+    """
+    await reply_flex(
+        reply_token,
+        text,
+        build_multi_choice_flex(
+            text,
+            options,
+            str(conversation_id),
+            selected_ids=selected_ids,
+            skip_label=skip_label,
+        ),
+    )
+
+
+async def reply_selection_ack(reply_token: str, text: str, conversation_id: UUID) -> None:
+    """The short "เลือกแล้ว: แปลง A, แปลง C (2 รายการ)" line a farmer gets after
+    each tap, carrying a single "✅ เสร็จ" Quick Reply.
+
+    Deliberately NOT a re-sent bubble: the picker is already on screen and
+    still tappable, so re-sending it every tap would bury the chat in
+    duplicates. The Quick Reply is there because it is the one button that
+    has to be reachable without scrolling back up to the bubble.
+    """
+    quick_reply = QuickReply(
+        items=[
+            QuickReplyItem(
+                action=PostbackAction(
+                    label="✅ เสร็จ",
+                    data=f"multi_done:{conversation_id}",
+                    displayText="เสร็จ",
+                )
+            )
+        ]
+    )
+    message = TextMessage(text=text, quickReply=quick_reply)
+    async with AsyncApiClient(_configuration) as client:
+        await AsyncMessagingApi(client).reply_message(
+            ReplyMessageRequest(replyToken=reply_token, messages=[message])
+        )
+
+
 async def reply_flex(reply_token: str, alt_text: str, contents: dict[str, Any]) -> None:
     """Flex Message reply -- e.g. a confirmation summary (AwaitingConfirmation,
     target-architecture.md #4) with real layout instead of a wall of text.
@@ -279,16 +380,23 @@ async def reply_flex(reply_token: str, alt_text: str, contents: dict[str, Any]) 
         )
 
 
-async def push_text(to: str, text: str) -> None:
+async def push_text(to: str, text: str, quick_reply: list[QuickReplyOption] | None = None) -> None:
     """Proactive send outside the reply-token window -- this is a COSTED send.
 
-    Used for things like reminders (ADR 0006) and late-extraction follow-ups
-    (ADR 0004) -- never call this when a reply-token is still valid.
+    Used for things like reminders (ADR 0006), late-extraction follow-ups
+    (ADR 0004), and the LIFF to-do list's "one-tap open" (docs-and-plan#176)
+    -- never call this when a reply-token is still valid.
+
+    `quick_reply` mirrors reply_text's own param -- e.g. the plain-text/
+    choices branches of a ConversationReply started or resumed from outside
+    a LINE event (see router.py's push equivalent of `_reply`).
     """
+    message = TextMessage(
+        text=text,
+        quickReply=_build_quick_reply(quick_reply) if quick_reply else None,
+    )
     async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).push_message(
-            PushMessageRequest(to=to, messages=[TextMessage(text=text)])
-        )
+        await AsyncMessagingApi(client).push_message(PushMessageRequest(to=to, messages=[message]))
 
 
 async def push_flex(to: str, alt_text: str, contents: dict[str, Any]) -> None:

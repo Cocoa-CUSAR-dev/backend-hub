@@ -46,6 +46,51 @@ def build_text_message_event(
     return json.dumps(payload).encode()
 
 
+def build_message_event(*, line_user_id: str, message: dict[str, Any]) -> bytes:
+    """Any non-text message type (image, sticker, location, ...) -- the
+    `message` dict is passed through to LINE's own parser verbatim, so each
+    test states exactly the shape LINE would deliver (#186 item 2).
+    """
+    payload = {
+        "destination": "Udestination0000000000000000000",
+        "events": [
+            {
+                "type": "message",
+                "source": {"type": "user", "userId": line_user_id},
+                "timestamp": 1700000000000,
+                "mode": "active",
+                "webhookEventId": str(uuid.uuid4()),
+                "deliveryContext": {"isRedelivery": False},
+                "replyToken": str(uuid.uuid4()),
+                "message": message,
+            }
+        ],
+    }
+    return json.dumps(payload).encode()
+
+
+def build_follow_event(*, line_user_id: str) -> bytes:
+    """A farmer adding the OA as a friend (US2-11 / docs-and-plan#185)."""
+    payload = {
+        "destination": "Udestination0000000000000000000",
+        "events": [
+            {
+                "type": "follow",
+                "source": {"type": "user", "userId": line_user_id},
+                "timestamp": 1700000000000,
+                "mode": "active",
+                "webhookEventId": str(uuid.uuid4()),
+                "deliveryContext": {"isRedelivery": False},
+                "replyToken": str(uuid.uuid4()),
+                # Required by the SDK's own FollowEvent model: LINE sends it
+                # to say whether this is a first-time add or an unblock.
+                "follow": {"isUnblocked": False},
+            }
+        ],
+    }
+    return json.dumps(payload).encode()
+
+
 def build_postback_event(*, line_user_id: str, data: str, reply_token: str | None = None) -> bytes:
     payload = {
         "destination": "Udestination0000000000000000000",
@@ -201,14 +246,24 @@ def question_json(
 
 
 def build_form_response(
-    *, task_form_id: uuid.UUID, questions: list[dict[str, Any]]
+    *,
+    task_form_id: uuid.UUID,
+    questions: list[dict[str, Any]],
+    is_multiple_submit: bool = False,
 ) -> dict[str, Any]:
     """The full `{"value": ..., "error": null}` envelope forms/client.py's
     get_form() expects, wrapping the given questions in a single section.
+
+    `is_multiple_submit` is spelled the way Kotlin sends it (camelCase, see
+    web-backend's Form.Detail). It matters because the chatbot reads that flag
+    from THIS payload, not from the form.task_form row a test may also have
+    seeded -- so a test that only seeds the row never reaches the
+    multiple-submit (or multi-plot) code at all.
     """
     return {
         "value": {
             "formId": str(task_form_id),
+            "isMultipleSubmit": is_multiple_submit,
             "sections": [{"questions": questions}],
         },
         "error": None,
@@ -296,3 +351,40 @@ async def seed_conversation_answer(
         },
     )
     await session.commit()
+
+
+async def seed_farm_with_plots(
+    session: AsyncSession,
+    *,
+    farmer_id: uuid.UUID,
+    plot_names: list[str],
+    farm_name: str = "ไร่ทดสอบ",
+) -> tuple[uuid.UUID, list[uuid.UUID]]:
+    """One farm linked to this farmer, plus its plots -- what
+    src/line/plot_picker.py's scoped query reads. Returns (farm_id, plot_ids)
+    in the order the names were given.
+    """
+    farm_id = uuid.uuid4()
+    await session.execute(
+        text("INSERT INTO agriculture.farm (farm_id, farm_name) VALUES (:farm_id, :farm_name)"),
+        {"farm_id": farm_id, "farm_name": farm_name},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO agriculture.farmer_farm (farmer_id, farm_id) VALUES (:farmer_id, :farm_id)"
+        ),
+        {"farmer_id": farmer_id, "farm_id": farm_id},
+    )
+    plot_ids = []
+    for name in plot_names:
+        plot_id = uuid.uuid4()
+        await session.execute(
+            text(
+                "INSERT INTO agriculture.plot (plot_id, farm_id, plot_name) "
+                "VALUES (:plot_id, :farm_id, :plot_name)"
+            ),
+            {"plot_id": plot_id, "farm_id": farm_id, "plot_name": name},
+        )
+        plot_ids.append(plot_id)
+    await session.commit()
+    return farm_id, plot_ids

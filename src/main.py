@@ -1,3 +1,7 @@
+# ruff: noqa: E402 -- sentry_sdk.init() below must run before the other
+# first-party imports (router setup, Pydantic/SQLAlchemy construction, etc.
+# -- anything that could fail at import time), which is why they follow a
+# non-import statement instead of being grouped at the very top.
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -9,8 +13,26 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.config import settings
+from src.sentry_scrub import scrub_sso_token  # stdlib-only: safe to import before init
+
+# X-2d: error tracking, initialized right after `settings` -- before any
+# other first-party import -- so an import-time crash in one of those
+# modules (e.g. the reminders router's own Pydantic/SQLAlchemy setup) is
+# still captured instead of crashing invisibly before Sentry exists. An
+# empty SENTRY_DSN (the default) disables the SDK entirely -- no error, no
+# events sent -- safe in local dev/CI.
+sentry_sdk.init(
+    dsn=settings.SENTRY_DSN,
+    environment=settings.ENVIRONMENT.value,
+    traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+    # The diary card's deep link carries an SSO token, and Sentry attaches
+    # stack-frame locals to exceptions -- see src/sentry_scrub.py.
+    before_send=scrub_sso_token,
+)
+
 from src.exceptions import ServiceException
 from src.internal.router import router as internal_router
+from src.line.liff_tasks import router as liff_tasks_router
 from src.line.router import router as line_router
 from src.logging_config import configure_logging
 from src.notifications.router import router as notifications_router
@@ -26,14 +48,6 @@ configure_logging()
 
 if not settings.ENVIRONMENT.is_deployed:
     from src.conversation.router import router as conversation_test_router
-
-# X-2d: error tracking. An empty SENTRY_DSN (the default) disables the SDK
-# entirely -- no error, no events sent -- safe in local dev/CI.
-sentry_sdk.init(
-    dsn=settings.SENTRY_DSN,
-    environment=settings.SENTRY_ENVIRONMENT,
-    traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-)
 
 # Vercel sets this env var on every deployment automatically. A serverless
 # function there is frozen between requests -- APScheduler's own in-process
@@ -87,6 +101,7 @@ async def health() -> dict[str, str]:
 
 
 app.include_router(line_router)
+app.include_router(liff_tasks_router)
 app.include_router(notifications_router)
 app.include_router(reminders_router)
 app.include_router(internal_router)
