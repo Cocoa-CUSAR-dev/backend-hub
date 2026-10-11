@@ -12,8 +12,10 @@ multiple-submit form is a precondition of this feature.
 
 import json
 import uuid
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, patch
 
+import pytest
 import respx
 from httpx import AsyncClient, Response
 from sqlalchemy import text
@@ -33,6 +35,15 @@ from tests.integration.helpers import (
     seed_user_with_line_identity,
     sign_signature,
 )
+
+
+@pytest.fixture(autouse=True)
+def _farmer_scoped_plots() -> Iterator[None]:
+    """These tests are about farmer scoping, which is production's default
+    (PLOT_SCOPE_MODE=farmer) -- the test suite as a whole runs with "all"
+    (tests/conftest.py), so switch it back on here."""
+    with patch.object(line_settings, "PLOT_SCOPE_MODE", "farmer"):
+        yield
 
 
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
