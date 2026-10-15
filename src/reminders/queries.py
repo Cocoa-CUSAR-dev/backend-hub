@@ -72,6 +72,11 @@ async def users_owing_task(
     schedule created before recipients existed -- is aimed at everyone, so
     this behaves exactly as it always did for those.
 
+    US4-4: a task that has form.assignment rows is only for those people (a
+    task with none is for everyone, as before), so only they can owe it -- a
+    reminder must never name a task the person cannot see. Same rule as the
+    task list in temp_task_picker and mobile-backend.
+
     Scoped to auth.line_identity on purpose: a LINE push is the only delivery
     channel in the MVP (ADR 0006), so users with no linked LINE account are
     simply out of scope for a reminder -- not an error to report.
@@ -87,6 +92,13 @@ async def users_owing_task(
             WHERE r.response_id IS NULL
               AND (t.open_at IS NULL OR t.open_at <= :now)
               AND (t.close_at IS NULL OR t.close_at >= :now)
+              AND (
+                NOT EXISTS (SELECT 1 FROM form.assignment a WHERE a.task_id = t.task_id)
+                OR EXISTS (
+                  SELECT 1 FROM form.assignment a
+                  WHERE a.task_id = t.task_id AND a.user_id = li.user_id
+                )
+              )
               AND (
                 CAST(:schedule_id AS uuid) IS NULL
                 OR NOT EXISTS (
