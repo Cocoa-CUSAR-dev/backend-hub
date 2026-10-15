@@ -62,6 +62,12 @@ concurrency = ["greenlet", "thread"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+# docs-and-plan#247 took src/ from 91% to 96% with the DB tests included.
+# The floor sits just under that so a change that drops tests fails CI,
+# without a one-line refactor tripping it. Only meaningful where the DB
+# tests run (CI): a local run without RUN_DB_TESTS skips them and lands
+# far lower.
+fail_under = 94
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
