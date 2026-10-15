@@ -54,6 +54,10 @@ ignore_missing_imports = true
 [tool.coverage.run]
 source = ["src"]
 branch = true
+# SQLAlchemy's async engine runs every DB call through greenlet; without
+# this, coverage stops tracing a coroutine after it awaits the database and
+# reports lines that clearly ran (the webhook handlers) as missed.
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 show_missing = true
