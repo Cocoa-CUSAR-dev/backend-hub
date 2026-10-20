@@ -25,6 +25,7 @@ explicitly temporary scaffolding; this one is the actual recommended
 design, not a stand-in for something else shipping later.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -32,24 +33,18 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.line import handler_registry
+
+logger = logging.getLogger(__name__)
+
 _QUICK_REPLY_LIMIT = 13  # LINE's own cap on Quick Reply items per message
 
-_PARENT_KIND_BY_HANDLER = {
-    "farm_activity_fertilizer": "farm_activity",
-    "farm_activity_chemical": "farm_activity",
-    "harvest_grade_detail": "harvest",
-    "fermentation_batch": "batch",
-    "drying_batch": "batch",
-}
-
-# The real destination column on each handler's own table -- once picked,
-# this rides through confirm_conversation's answer payload exactly like any
-# other field (see docs' "field_name trick").
-FIELD_NAME = {
-    "farm_activity": "farm_activity_id",
-    "harvest": "harvest_id",
-    "batch": "batch_id",
-}
+# Which handlers need a parent picked first, and which column the pick is
+# stored under, used to be hard-coded here (_PARENT_KIND_BY_HANDLER and
+# FIELD_NAME). Since US2-13 they come from form.handler_registry -- see
+# src/line/handler_registry.py. What stays as code is everything below: how
+# to word "which harvest?" and how to find the farmer's own candidate rows,
+# per parent kind. That is product logic, not data.
 
 PROMPT = {
     "farm_activity": "เลือกกิจกรรมในฟาร์มที่เกี่ยวข้อง:",
@@ -70,8 +65,40 @@ class ParentOption:
     label: str
 
 
-def kind_for_handler(handler: str) -> str | None:
-    return _PARENT_KIND_BY_HANDLER.get(handler)
+# Shown when the registry names a parent kind this module has no picker
+# query for (a new child handler under a brand-new parent kind, added by
+# migration before its picker was written). Refusing honestly beats starting
+# a conversation that could never be submitted -- the same honest-failure
+# pattern as CB-1.
+UNSUPPORTED_PROMPT = "ขออภัยครับ แบบฟอร์มนี้ยังไม่รองรับการกรอกในแชท กรุณากรอกผ่านแอปนะครับ"
+
+
+async def kind_for_handler(session: AsyncSession, handler: str) -> str | None:
+    """The parent kind to pick before this handler's questions, from the
+    registry -- or None for a standalone handler."""
+    return await handler_registry.parent_kind_for(session, handler)
+
+
+def has_picker(kind: str) -> bool:
+    """Whether this module knows how to list candidate parent rows of `kind`.
+    False means the caller must refuse with UNSUPPORTED_PROMPT (and the gap
+    is logged): see handler_registry's docstring."""
+    supported = kind in _CHOICE_QUERY
+    if not supported:
+        logger.error("no parent picker query for parent kind %r -- refusing to start", kind)
+    return supported
+
+
+async def field_name_for(session: AsyncSession, kind: str) -> str:
+    """The real destination column a picked parent rides under in the answer
+    payload (see docs' "field_name trick"), from the registry."""
+    field_name = await handler_registry.parent_field_for(session, kind)
+    if field_name is None:
+        # kind came from the same registry moments ago, so this only happens
+        # if the row was deactivated in between -- fail loudly, not silently
+        # submitting without a parent.
+        raise LookupError(f"no handler_registry parent_field for parent kind {kind!r}")
+    return field_name
 
 
 def _label(prefix: str, when: datetime, place: str) -> str:

@@ -981,7 +981,11 @@ class TestHandleAnswerParentPicker:
         session = _mock_session(answers=[], conversation=conversation)
         choices = [parent_picker.ParentOption(id="batch-1", label="แบทช์ 01/08/2026 — สถานี A")]
 
-        with patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)):
+        with (
+            patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)),
+            # Since US2-13 the column comes from form.handler_registry.
+            patch("src.line.parent_picker.field_name_for", new=AsyncMock(return_value="batch_id")),
+        ):
             reply = await service.handle_answer(
                 session,
                 conversation_id=conversation_id,
@@ -1003,7 +1007,11 @@ class TestHandleAnswerParentPicker:
         session = _mock_session(answers=[], conversation=conversation)
         choices = [parent_picker.ParentOption(id="batch-1", label="แบทช์ 01/08/2026 — สถานี A")]
 
-        with patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)):
+        with (
+            patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)),
+            # Since US2-13 the column comes from form.handler_registry.
+            patch("src.line.parent_picker.field_name_for", new=AsyncMock(return_value="batch_id")),
+        ):
             reply = await service.handle_answer(
                 session, conversation_id=conversation_id, raw_text="ไม่ตรงกับตัวเลือกไหนเลย", form=form
             )
@@ -1352,7 +1360,11 @@ class TestResumeConversation:
         session = _mock_session(answers=[])
         choices = [parent_picker.ParentOption(id="batch-1", label="แบทช์ 01/08/2026 — สถานี A")]
 
-        with patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)):
+        with (
+            patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)),
+            # Since US2-13 the column comes from form.handler_registry.
+            patch("src.line.parent_picker.field_name_for", new=AsyncMock(return_value="batch_id")),
+        ):
             reply = await service.resume_conversation(session, conversation=conversation, form=form)
 
         assert conversation.status == ConversationStatus.ACTIVE

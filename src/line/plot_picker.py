@@ -28,6 +28,12 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.line.config import line_settings
+
+# Fields whose choices are scoped to the farmer's own rows (US2-13). Kotlin
+# sends both as global lists (ref.farm_constant / ref.plot_constant).
+FARMER_SCOPED_FIELDS = frozenset({"farm_id", "plot_id"})
+
 # A Flex bubble stays readable at roughly a dozen buttons, and the carousel
 # the builder falls back to is capped at 12 bubbles by LINE itself. This cap
 # is on the DATA, so the builder never has to silently drop a plot a farmer
@@ -65,20 +71,29 @@ async def list_plots(
     adding "(ไร่เหนือ)" to every button of a single-farm farmer is noise on a
     button whose text budget is already tight.
     """
+    # US2-13: PLOT_SCOPE_MODE=all drops the farmer scoping (dev/test accounts
+    # aren't linked to any farm). The farm narrowing still applies -- a plot
+    # of another farm would contradict the farm the farmer just picked.
+    scope_to_farmer = line_settings.PLOT_SCOPE_MODE == "farmer"
     rows = (
         await session.execute(
             text(
                 """
                 SELECT p.plot_id, p.plot_name, f.farm_name
                 FROM agriculture.plot p
-                JOIN agriculture.farmer_farm ff ON ff.farm_id = p.farm_id
                 JOIN agriculture.farm f ON f.farm_id = p.farm_id
-                WHERE ff.farmer_id = :user_id
+                WHERE (
+                    NOT CAST(:scope_to_farmer AS boolean)
+                    OR EXISTS (
+                        SELECT 1 FROM agriculture.farmer_farm ff
+                        WHERE ff.farm_id = p.farm_id AND ff.farmer_id = CAST(:user_id AS uuid)
+                    )
+                )
                   AND (CAST(:farm_id AS uuid) IS NULL OR p.farm_id = CAST(:farm_id AS uuid))
                 ORDER BY f.farm_name, p.plot_name
                 """
             ),
-            {"user_id": str(user_id), "farm_id": farm_id},
+            {"user_id": str(user_id), "farm_id": farm_id, "scope_to_farmer": scope_to_farmer},
         )
     ).all()
 
@@ -90,3 +105,32 @@ async def list_plots(
         label = f"{name} ({row.farm_name})" if show_farm and row.farm_name else name
         options.append(PlotOption(id=str(row.plot_id), label=label))
     return options[:MAX_PLOTS]
+
+
+async def farmer_owned_ids(
+    session: AsyncSession, user_id: UUID, field_name: str
+) -> set[str] | None:
+    """The ids of `field_name`'s choices this farmer may pick: the farms
+    they're linked to through agriculture.farmer_farm, or those farms' plots.
+
+    None means "don't narrow": PLOT_SCOPE_MODE=all, or a field this scoping
+    doesn't apply to. An empty set is a real answer -- a farmer linked to no
+    farm is offered none, rather than everyone's (US2-13; until now only the
+    multi-choice plot picker above was scoped, and every ordinary farm/plot
+    question showed every farm and plot in the system).
+    """
+    if line_settings.PLOT_SCOPE_MODE != "farmer" or field_name not in FARMER_SCOPED_FIELDS:
+        return None
+    if field_name == "farm_id":
+        query = """
+            SELECT CAST(ff.farm_id AS text) AS id FROM agriculture.farmer_farm ff
+            WHERE ff.farmer_id = CAST(:user_id AS uuid)
+        """
+    else:
+        query = """
+            SELECT CAST(p.plot_id AS text) AS id FROM agriculture.plot p
+            JOIN agriculture.farmer_farm ff ON ff.farm_id = p.farm_id
+            WHERE ff.farmer_id = CAST(:user_id AS uuid)
+        """
+    rows = await session.execute(text(query), {"user_id": str(user_id)})
+    return {row.id for row in rows}

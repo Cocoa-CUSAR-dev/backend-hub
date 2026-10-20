@@ -7,12 +7,25 @@ would happily "prove" that while the join scoped nothing at all.
 """
 
 import uuid
+from collections.abc import Iterator
+from unittest.mock import patch
 
+import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.line import plot_picker
+from src.line.config import line_settings
 from tests.integration.helpers import seed_farm_with_plots, seed_user_with_line_identity
+
+
+@pytest.fixture(autouse=True)
+def _farmer_scoped_plots() -> Iterator[None]:
+    """These tests are about farmer scoping, which is production's default
+    (PLOT_SCOPE_MODE=farmer) -- the test suite as a whole runs with "all"
+    (tests/conftest.py), so switch it back on here."""
+    with patch.object(line_settings, "PLOT_SCOPE_MODE", "farmer"):
+        yield
 
 
 async def _seed_farmer(db_session: AsyncSession) -> uuid.UUID:

@@ -663,15 +663,18 @@ async def _handle_postback(event: PostbackEvent) -> None:
                 return
 
             form = await get_form(task_form_id)
-            parent_kind = parent_picker.kind_for_handler(handler)
+            parent_kind = await parent_picker.kind_for_handler(session, handler)
             parent_choices = None
             if parent_kind is not None:
-                # One of the 5 previously-blocked handlers -- resolve the
-                # farm/station-scoped picker options before starting the
-                # conversation at all. Checked here (not left to
+                # A child handler (from form.handler_registry, US2-13) --
+                # resolve the farm/station-scoped picker options before
+                # starting the conversation at all. Checked here (not left to
                 # start_conversation) so an empty result never creates a
                 # Conversation row that would have nothing to ask -- the
                 # farmer is told to log the parent activity first instead.
+                if not parent_picker.has_picker(parent_kind):
+                    await reply_text(event.reply_token, parent_picker.UNSUPPORTED_PROMPT)
+                    return
                 parent_choices = await parent_picker.choices_for(session, parent_kind, user_id)
                 if not parent_choices:
                     await reply_text(event.reply_token, parent_picker.EMPTY_PROMPT[parent_kind])
