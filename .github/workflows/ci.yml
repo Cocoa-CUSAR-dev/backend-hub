@@ -78,9 +78,29 @@ jobs:
       # are visible in the job log rather than guessed at.
       - run: pytest tests/ -v --cov --cov-report=term-missing:skip-covered
 
+  # The farmer-facing to-do list screen (liff/, docs-and-plan#176). Its own
+  # Node toolchain, so its own job: lint, the screen's tests (#177), and a
+  # production build, which also type-checks.
+  liff:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: liff
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: liff/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
   build:
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, liff]
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t cocoa-chatbot:${{ github.sha }} .
