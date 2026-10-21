@@ -250,9 +250,12 @@ async def test_start_task_tells_farmer_when_parent_choices_are_empty(client: Asy
             AsyncMock(return_value=None),
         ),
         patch("src.line.liff_tasks.get_form", AsyncMock(return_value=MagicMock())),
-        patch("src.line.liff_tasks.parent_picker.kind_for_handler", return_value="farm"),
+        patch(
+            "src.line.liff_tasks.parent_picker.kind_for_handler",
+            AsyncMock(return_value="farm_activity"),
+        ),
         patch("src.line.liff_tasks.parent_picker.choices_for", AsyncMock(return_value=[])),
-        patch("src.line.liff_tasks.parent_picker.EMPTY_PROMPT", {"farm": "ยังไม่มีแปลง"}),
+        patch("src.line.liff_tasks.parent_picker.EMPTY_PROMPT", {"farm_activity": "ยังไม่มีแปลง"}),
         patch("src.line.liff_tasks.service.start_conversation", AsyncMock()) as start_mock,
         patch("src.line.liff_tasks.push_text", AsyncMock()) as push_text_mock,
     ):

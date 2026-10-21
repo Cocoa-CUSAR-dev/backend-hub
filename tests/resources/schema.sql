@@ -211,3 +211,27 @@ CREATE TABLE agriculture.plot (
     CONSTRAINT pk_plot PRIMARY KEY (plot_id),
     CONSTRAINT fk_plot_farm FOREIGN KEY (farm_id) REFERENCES agriculture.farm (farm_id)
 );
+
+-- form.handler_registry (database V30, US2-13) -- read by
+-- src/line/handler_registry.py to know which handlers need a parent picked
+-- first. Only the columns that module reads, seeded with V30's child rows
+-- (plus one standalone row) exactly as the migration inserts them. Static
+-- reference data: deliberately NOT in tests/integration/conftest.py's
+-- cleanup list, so every test sees it.
+CREATE TABLE form.handler_registry (
+    handler character varying NOT NULL,
+    parent_handler character varying,
+    parent_field character varying,
+    is_active boolean NOT NULL DEFAULT true,
+    CONSTRAINT pk_handler_registry PRIMARY KEY (handler)
+);
+
+INSERT INTO form.handler_registry (handler, parent_handler, parent_field) VALUES
+    ('farm_activity', NULL, NULL),
+    ('harvest', NULL, NULL),
+    ('batch', NULL, NULL),
+    ('farm_activity_fertilizer', 'farm_activity', 'farm_activity_id'),
+    ('farm_activity_chemical', 'farm_activity', 'farm_activity_id'),
+    ('harvest_grade_detail', 'harvest', 'harvest_id'),
+    ('fermentation_batch', 'batch', 'batch_id'),
+    ('drying_batch', 'batch', 'batch_id');

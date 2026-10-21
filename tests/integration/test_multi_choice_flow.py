@@ -12,8 +12,10 @@ multiple-submit form is a precondition of this feature.
 
 import json
 import uuid
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, patch
 
+import pytest
 import respx
 from httpx import AsyncClient, Response
 from sqlalchemy import text
@@ -33,6 +35,15 @@ from tests.integration.helpers import (
     seed_user_with_line_identity,
     sign_signature,
 )
+
+
+@pytest.fixture(autouse=True)
+def _farmer_scoped_plots() -> Iterator[None]:
+    """These tests are about farmer scoping, which is production's default
+    (PLOT_SCOPE_MODE=farmer) -- the test suite as a whole runs with "all"
+    (tests/conftest.py), so switch it back on here."""
+    with patch.object(line_settings, "PLOT_SCOPE_MODE", "farmer"):
+        yield
 
 
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
@@ -710,7 +721,13 @@ class TestAnyOptionQuestion:
     ) -> None:
         """The plot was only the example. Tick two activity types, answer the
         plot once, confirm -- two rows, split by activity type.
+
+        Runs unscoped (PLOT_SCOPE_MODE=all): the plot is answered from
+        Kotlin's global list, whose only entry belongs to another farmer, and
+        under farmer scoping (US2-13) that is correctly refused. This test is
+        about the fan-out, not scoping -- test_choice_scoping covers that.
         """
+        line_settings.PLOT_SCOPE_MODE = "all"  # restored by the autouse fixture
         fixture, conversation_id, form_response = await _seed_activity_type_form(db_session)
         plot_a = fixture.plot_ids[0]
 
