@@ -13,6 +13,10 @@ from sqlalchemy.orm import DeclarativeBase
 
 from src.config import settings
 
+# The type services and routers use for the session they pass to src/db/.
+# Re-exported here so only src/db/ (and this file) import sqlalchemy.
+Session = AsyncSession
+
 engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 

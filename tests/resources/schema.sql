@@ -23,12 +23,19 @@ CREATE SCHEMA form;
 CREATE SCHEMA chat;
 CREATE SCHEMA notify;
 CREATE SCHEMA agriculture;
+CREATE SCHEMA processing;
+CREATE SCHEMA research;
 
 CREATE TABLE auth.user_account (
     user_id uuid DEFAULT gen_random_uuid() NOT NULL,
     username character varying,
     password_hash character varying,
-    CONSTRAINT pk_user_account PRIMARY KEY (user_id)
+    is_password_reset boolean DEFAULT false,
+    is_requires_password_reset boolean DEFAULT false,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_user_account PRIMARY KEY (user_id),
+    CONSTRAINT uq_user_account_username UNIQUE (username)
 );
 
 CREATE TABLE auth.role (
@@ -43,6 +50,124 @@ CREATE TABLE auth.user_role (
     CONSTRAINT pk_user_role PRIMARY KEY (user_id, role_id),
     CONSTRAINT fk_user_role_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id),
     CONSTRAINT fk_user_role_role FOREIGN KEY (role_id) REFERENCES auth.role (role_id)
+);
+
+-- src/auth: permissions (V1 baseline), refresh tokens (V19), SSO jti (V27).
+CREATE TABLE auth.permission (
+    permission_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    permission_key character varying NOT NULL,
+    description character varying,
+    CONSTRAINT pk_permission PRIMARY KEY (permission_id),
+    CONSTRAINT uq_permission_key UNIQUE (permission_key)
+);
+
+CREATE TABLE auth.role_permission (
+    role_id uuid NOT NULL,
+    permission_id uuid NOT NULL,
+    CONSTRAINT pk_role_permission PRIMARY KEY (role_id, permission_id),
+    CONSTRAINT fk_role_permission_role FOREIGN KEY (role_id) REFERENCES auth.role (role_id),
+    CONSTRAINT fk_role_permission_permission FOREIGN KEY (permission_id) REFERENCES auth.permission (permission_id)
+);
+
+CREATE TABLE auth.refresh_token (
+    refresh_token_id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    token_hash character varying NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    used_at timestamp without time zone,
+    revoked_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL DEFAULT now(),
+    CONSTRAINT pk_refresh_token PRIMARY KEY (refresh_token_id),
+    CONSTRAINT fk_refresh_token_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id),
+    CONSTRAINT uq_refresh_token_hash UNIQUE (token_hash)
+);
+
+CREATE TABLE auth.sso_used_token (
+    jti uuid NOT NULL,
+    used_at timestamp without time zone NOT NULL DEFAULT now(),
+    expires_at timestamp without time zone NOT NULL,
+    CONSTRAINT pk_sso_used_token PRIMARY KEY (jti)
+);
+
+-- Role profiles: one row per user per role (multi-role). FKs to ref.* geo
+-- tables are left out -- this schema has no ref.* tables.
+CREATE TABLE agriculture.farmer (
+    user_id uuid NOT NULL,
+    first_name character varying,
+    last_name character varying,
+    nickname character varying,
+    birth_date date,
+    nationality character varying,
+    ethnicity character varying,
+    religion character varying,
+    id_card_number character varying,
+    address_detail character varying,
+    subdistrict_id uuid NOT NULL,
+    district_id uuid NOT NULL,
+    province_id uuid NOT NULL,
+    zip_code character varying,
+    phone_number character varying,
+    line character varying,
+    facebook character varying,
+    salary_income numeric,
+    family_member_count integer DEFAULT 1,
+    agri_worker_count integer DEFAULT 1,
+    agri_experience date DEFAULT CURRENT_DATE,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_farmer PRIMARY KEY (user_id),
+    CONSTRAINT fk_farmer_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id)
+);
+
+CREATE TABLE processing.processor (
+    user_id uuid NOT NULL,
+    first_name character varying,
+    last_name character varying,
+    nickname character varying,
+    birth_date date,
+    id_card_number character varying,
+    address_detail character varying,
+    subdistrict_id uuid,
+    district_id uuid,
+    province_id uuid,
+    zip_code character varying,
+    phone_number character varying,
+    line character varying,
+    facebook character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_processor PRIMARY KEY (user_id),
+    CONSTRAINT fk_processor_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id)
+);
+
+CREATE TABLE processing.hub_collector (
+    user_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hub_id uuid,
+    first_name character varying,
+    last_name character varying,
+    nickname character varying,
+    birthdate date,
+    id_card_number character varying,
+    phone_number character varying,
+    line character varying,
+    facebook character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    subdistrict_id uuid,
+    district_id uuid,
+    province_id uuid,
+    zip_code character varying,
+    CONSTRAINT pk_hub_collector PRIMARY KEY (user_id),
+    CONSTRAINT fk_hub_collector_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id)
+);
+
+CREATE TABLE research.researcher (
+    user_id uuid NOT NULL,
+    first_name character varying,
+    last_name character varying,
+    organization character varying,
+    CONSTRAINT pk_researcher PRIMARY KEY (user_id),
+    CONSTRAINT fk_researcher_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id)
 );
 
 CREATE TABLE auth.line_identity (

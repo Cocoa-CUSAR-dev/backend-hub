@@ -16,6 +16,13 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def utc_now_naive() -> datetime:
+    """UTC now without tzinfo -- for `timestamp without time zone` columns,
+    which is what every table in this database uses (they hold UTC).
+    """
+    return utc_now().replace(tzinfo=None)
+
+
 def bangkok_now() -> datetime:
     """Timezone-aware now in Bangkok -- use for "what time is it for the user"."""
     return datetime.now(BANGKOK)
