@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.db.forms import ChildHandlerRow
 from src.line import handler_registry
 from src.line.parent_picker import (
     EMPTY_PROMPT,
@@ -36,7 +37,7 @@ _LEGACY_FIELD_NAME = {
 # form.handler_registry's child rows exactly as V30 inserts them (the query
 # only selects rows with a parent_handler).
 _V30_CHILD_ROWS = [
-    SimpleNamespace(handler=h, parent_handler=kind, parent_field=_LEGACY_FIELD_NAME[kind])
+    ChildHandlerRow(handler=h, parent_handler=kind, parent_field=_LEGACY_FIELD_NAME[kind])
     for h, kind in _LEGACY_PARENT_KIND_BY_HANDLER.items()
 ]
 
@@ -46,23 +47,29 @@ def _fresh_registry_cache() -> None:
     handler_registry.reset_cache()
 
 
-def _registry_session(rows: list[SimpleNamespace] = _V30_CHILD_ROWS) -> MagicMock:
-    session = MagicMock()
-    session.execute = AsyncMock(return_value=rows)
-    return session
+@pytest.fixture
+def registry_read() -> AsyncMock:
+    """The registry rows the database would return; tests can swap them."""
+    read = AsyncMock(return_value=_V30_CHILD_ROWS)
+    with patch("src.db.forms.child_handlers", new=read):
+        yield read
 
 
-async def test_registry_reproduces_the_legacy_parent_kinds() -> None:
+def _registry_session() -> MagicMock:
+    return MagicMock()
+
+
+async def test_registry_reproduces_the_legacy_parent_kinds(registry_read: AsyncMock) -> None:
     session = _registry_session()
     for handler, kind in _LEGACY_PARENT_KIND_BY_HANDLER.items():
         assert await kind_for_handler(session, handler) == kind
 
 
-async def test_a_standalone_handler_has_no_parent_kind() -> None:
+async def test_a_standalone_handler_has_no_parent_kind(registry_read: AsyncMock) -> None:
     assert await kind_for_handler(_registry_session(), "processing_record") is None
 
 
-async def test_registry_reproduces_the_legacy_field_names() -> None:
+async def test_registry_reproduces_the_legacy_field_names(registry_read: AsyncMock) -> None:
     session = _registry_session()
     for kind, field_name in _LEGACY_FIELD_NAME.items():
         assert await field_name_for(session, kind) == field_name
@@ -75,17 +82,19 @@ def test_every_legacy_kind_has_a_picker_and_its_prompts() -> None:
         assert kind in EMPTY_PROMPT
 
 
-async def test_a_child_handler_added_by_migration_needs_no_code() -> None:
+async def test_a_child_handler_added_by_migration_needs_no_code(
+    registry_read: AsyncMock,
+) -> None:
     """Design doc §6: a new child handler under an EXISTING parent kind."""
-    rows = [
+    registry_read.return_value = [
         *_V30_CHILD_ROWS,
-        SimpleNamespace(
+        ChildHandlerRow(
             handler="farm_activity_irrigation",
             parent_handler="farm_activity",
             parent_field="farm_activity_id",
         ),
     ]
-    assert await kind_for_handler(_registry_session(rows), "farm_activity_irrigation") == (
+    assert await kind_for_handler(_registry_session(), "farm_activity_irrigation") == (
         "farm_activity"
     )
 
@@ -96,11 +105,11 @@ def test_a_brand_new_parent_kind_is_refused_honestly() -> None:
     assert "ยังไม่รองรับ" in UNSUPPORTED_PROMPT
 
 
-async def test_the_registry_is_read_once_per_ttl() -> None:
+async def test_the_registry_is_read_once_per_ttl(registry_read: AsyncMock) -> None:
     session = _registry_session()
     for handler in _LEGACY_PARENT_KIND_BY_HANDLER:
         await kind_for_handler(session, handler)
-    assert session.execute.await_count == 1
+    assert registry_read.await_count == 1
 
 
 def _mock_session(rows: list) -> MagicMock:

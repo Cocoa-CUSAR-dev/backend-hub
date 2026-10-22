@@ -7,9 +7,7 @@ lib-outside-client|src/forms/client.py|imports httpx
 lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
 sql-outside-db|src/chat/dev_queries.py|imports sqlalchemy
-sql-outside-db|src/line/handler_registry.py|imports sqlalchemy
 sql-outside-db|src/line/parent_picker.py|imports sqlalchemy
-sql-outside-db|src/line/plot_picker.py|imports sqlalchemy
 sql-outside-db|src/line/temp_task_picker.py|imports sqlalchemy
 sql-outside-db|src/reminders/queries.py|imports sqlalchemy
 table-owner|src/chat/dev_queries.py|auth.user_account (owner: src/db/auth.py)
@@ -23,7 +21,6 @@ table-owner|src/chat/service.py|form.field_dependency (owner: src/db/forms.py)
 table-owner|src/chat/service.py|ref.farm_constant (owner: src/db/ref.py)
 table-owner|src/chat/service.py|ref.plot_constant (owner: src/db/ref.py)
 table-owner|src/chat/validation.py|form.field_validation_rule (owner: src/db/forms.py)
-table-owner|src/line/handler_registry.py|form.handler_registry (owner: src/db/forms.py)
 table-owner|src/line/parent_picker.py|agriculture.farm (owner: src/db/agriculture.py)
 table-owner|src/line/parent_picker.py|agriculture.farm_activity (owner: src/db/agriculture.py)
 table-owner|src/line/parent_picker.py|agriculture.farmer_farm (owner: src/db/agriculture.py)
@@ -34,10 +31,6 @@ table-owner|src/line/parent_picker.py|processing.hub_collector (owner: src/db/pr
 table-owner|src/line/parent_picker.py|processing.processing_station (owner: src/db/processing.py)
 table-owner|src/line/parent_picker.py|processing.processor_processing_station (owner: src/db/processing.py)
 table-owner|src/line/parent_picker.py|ref.farm_activity_type_constant (owner: src/db/ref.py)
-table-owner|src/line/plot_picker.py|agriculture.farm (owner: src/db/agriculture.py)
-table-owner|src/line/plot_picker.py|agriculture.farmer_farm (owner: src/db/agriculture.py)
-table-owner|src/line/plot_picker.py|agriculture.plot (owner: src/db/agriculture.py)
-table-owner|src/line/plot_picker.py|ref.plot_constant (owner: src/db/ref.py)
 table-owner|src/line/temp_task_picker.py|chat.conversation (owner: src/db/chat.py)
 table-owner|src/line/temp_task_picker.py|form.assignment (owner: src/db/tasks.py)
 table-owner|src/line/temp_task_picker.py|form.response (owner: src/db/tasks.py)

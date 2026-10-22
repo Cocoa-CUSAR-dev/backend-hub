@@ -1,5 +1,5 @@
 """Which handlers are child handlers, and what their parent is -- read from
-form.handler_registry (database V30, US2-13 / docs-and-plan#242).
+the handler registry table (database V30, US2-13 / docs-and-plan#242).
 
 parent_picker.py used to hard-code this as _PARENT_KIND_BY_HANDLER and
 FIELD_NAME, one of four copies (web-backend, Go x2, here) the team had to keep
@@ -13,10 +13,7 @@ Read through a small in-process cache (5-minute TTL, the same as web-backend
 and Go): the rows change only by migration, so re-reading them on every
 conversation start would be pure overhead.
 
-Same deliberate exception to "the chatbot never touches form.* directly"
-(ADR 0001) that parent_picker.py and temp_task_picker.py take: Kotlin exposes
-no service endpoint for the registry, and this is a read of reviewed,
-migration-only rows.
+The read itself is src/db/forms.py's child_handlers.
 """
 
 import logging
@@ -24,8 +21,7 @@ import re
 import time
 from dataclasses import dataclass
 
-from sqlalchemy import text
-
+from src import db
 from src.database import Session
 
 logger = logging.getLogger(__name__)
@@ -61,23 +57,16 @@ async def _child_handlers(session: Session) -> dict[str, ChildHandler]:
     if _cache is not None and time.monotonic() - _cache[0] < _TTL_SECONDS:
         return _cache[1]
 
-    rows = await session.execute(
-        text(
-            """
-            SELECT handler, parent_handler, parent_field
-            FROM form.handler_registry
-            WHERE is_active AND parent_handler IS NOT NULL
-            """
-        )
-    )
     children: dict[str, ChildHandler] = {}
-    for row in rows:
+    for row in await db.forms.child_handlers(session):
         if not _IDENTIFIER.match(row.parent_field or ""):
             logger.error(
                 "handler_registry row %s has an invalid parent_field -- ignored", row.handler
             )
             continue
-        children[row.handler] = ChildHandler(row.handler, row.parent_handler, row.parent_field)
+        children[row.handler] = ChildHandler(
+            row.handler, row.parent_handler, row.parent_field or ""
+        )
 
     _cache = (time.monotonic(), children)
     return children

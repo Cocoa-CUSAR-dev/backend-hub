@@ -93,6 +93,13 @@ class PlotRow:
     updated_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class PlotWithFarmRow:
+    plot_id: UUID
+    plot_name: str | None
+    farm_name: str | None
+
+
 _FARM_COLUMNS = """
     f.farm_id, f.farm_name, f.hub_id, f.geo_id, f.found_date, f.total_area,
     f.address_detail, f.subdistrict_id, f.district_id, f.province_id, f.zip_code,
@@ -212,3 +219,55 @@ async def plots(
         {"farmer_id": farmer_id, "limit": limit, "offset": offset},
     )
     return [PlotRow(**row._mapping) for row in result]
+
+
+async def farm_ids_of_farmer(session: AsyncSession, farmer_id: UUID) -> list[UUID]:
+    """The farms this farmer is linked to."""
+    result = await session.execute(
+        text("SELECT farm_id FROM agriculture.farmer_farm WHERE farmer_id = :farmer_id"),
+        {"farmer_id": farmer_id},
+    )
+    return list(result.scalars())
+
+
+async def plot_ids_of_farmer(session: AsyncSession, farmer_id: UUID) -> list[UUID]:
+    """The plots on the farms this farmer is linked to."""
+    result = await session.execute(
+        text(
+            """
+            SELECT p.plot_id FROM agriculture.plot p
+            JOIN agriculture.farmer_farm ff ON ff.farm_id = p.farm_id
+            WHERE ff.farmer_id = :farmer_id
+            """
+        ),
+        {"farmer_id": farmer_id},
+    )
+    return list(result.scalars())
+
+
+async def plots_with_farm_name(
+    session: AsyncSession, *, farmer_id: UUID | None, farm_id: UUID | None
+) -> list[PlotWithFarmRow]:
+    """Plots with the name of their farm, ordered by farm then plot name.
+    `farmer_id` keeps only plots on that farmer's farms (None: every farm);
+    `farm_id` keeps only that farm's plots (None: all)."""
+    result = await session.execute(
+        text(
+            """
+            SELECT p.plot_id, p.plot_name, f.farm_name
+            FROM agriculture.plot p
+            JOIN agriculture.farm f ON f.farm_id = p.farm_id
+            WHERE (
+                CAST(:farmer_id AS uuid) IS NULL
+                OR EXISTS (
+                    SELECT 1 FROM agriculture.farmer_farm ff
+                    WHERE ff.farm_id = p.farm_id AND ff.farmer_id = :farmer_id
+                )
+            )
+              AND (CAST(:farm_id AS uuid) IS NULL OR p.farm_id = :farm_id)
+            ORDER BY f.farm_name, p.plot_name
+            """
+        ),
+        {"farmer_id": farmer_id, "farm_id": farm_id},
+    )
+    return [PlotWithFarmRow(**row._mapping) for row in result]
