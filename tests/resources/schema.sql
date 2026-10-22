@@ -360,3 +360,145 @@ INSERT INTO form.handler_registry (handler, parent_handler, parent_field) VALUES
     ('harvest_grade_detail', 'harvest', 'harvest_id'),
     ('fermentation_batch', 'batch', 'batch_id'),
     ('drying_batch', 'batch', 'batch_id');
+
+-- docs-and-plan#261: what src/db/tasks.py, src/db/forms.py and src/db/ref.py
+-- read for the mobile task routes (GET /api/v1/tasks...). Columns the
+-- tables above left out, plus form.section / field_validation_rule /
+-- field_dependency and a few ref tables, all shaped as in the database repo
+-- (V1 baseline, V9, V16, V21, V30). The new tables have no FKs so older
+-- tests that insert questions with made-up section ids keep working.
+ALTER TABLE form.task
+    ADD COLUMN description character varying DEFAULT ''::character varying;
+ALTER TABLE form.task_form
+    ADD COLUMN description character varying,
+    ADD COLUMN version integer NOT NULL DEFAULT 1;
+ALTER TABLE form.question
+    ADD COLUMN description character varying,
+    ADD COLUMN default_value jsonb,
+    ADD COLUMN is_active boolean DEFAULT true,
+    ADD COLUMN carry_forward boolean NOT NULL DEFAULT false;
+ALTER TABLE form.response
+    ADD COLUMN submitted_at timestamp without time zone DEFAULT now(),
+    ADD COLUMN answer jsonb,
+    ADD COLUMN status character varying,
+    ADD COLUMN task_form_id uuid;
+
+CREATE TABLE form.section (
+    section_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    form_id uuid NOT NULL,
+    title character varying,
+    description character varying,
+    sort_order integer,
+    is_active boolean DEFAULT true,
+    CONSTRAINT pk_section PRIMARY KEY (section_id)
+);
+
+CREATE TABLE form.field_validation_rule (
+    field_name character varying PRIMARY KEY,
+    validation_rule jsonb NOT NULL
+);
+
+CREATE TABLE form.field_dependency (
+    child_field character varying NOT NULL,
+    parent_field character varying NOT NULL,
+    link_table character varying NOT NULL,
+    link_column character varying NOT NULL,
+    label_th character varying NOT NULL,
+    CONSTRAINT pk_field_dependency PRIMARY KEY (child_field, parent_field)
+);
+
+CREATE SCHEMA ref;
+
+-- A synced copy of agriculture.plot, sharing plot_id: no farm_id of its own,
+-- which is why a dependent choice's parent comes from the link table.
+CREATE TABLE ref.plot_constant (
+    plot_id uuid NOT NULL,
+    plot_name character varying,
+    CONSTRAINT pk_plot_constant PRIMARY KEY (plot_id)
+);
+
+CREATE TABLE ref.province_constant (
+    province_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    province_name_th character varying,
+    CONSTRAINT pk_province_constant PRIMARY KEY (province_id)
+);
+
+CREATE TABLE ref.grade_constant (
+    grade_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    grade_name character varying NOT NULL,
+    CONSTRAINT pk_grade_constant PRIMARY KEY (grade_id)
+);
+
+-- docs-and-plan#265: what src/db/agriculture.py and src/db/storage.py read
+-- and write for the farm/plot routes. Columns as in the database repo's V1
+-- baseline (+ V7's storage.file.created_at), except that the NOT NULL
+-- province/district/subdistrict ids stay nullable here so older tests that
+-- insert a bare farm keep working.
+ALTER TABLE agriculture.farm
+    ADD COLUMN hub_id uuid,
+    ADD COLUMN geo_id uuid,
+    ADD COLUMN found_date date DEFAULT CURRENT_DATE,
+    ADD COLUMN total_area numeric,
+    ADD COLUMN address_detail character varying,
+    ADD COLUMN subdistrict_id uuid,
+    ADD COLUMN district_id uuid,
+    ADD COLUMN province_id uuid,
+    ADD COLUMN zip_code character varying,
+    ADD COLUMN contact_name character varying,
+    ADD COLUMN phone_number character varying,
+    ADD COLUMN line character varying,
+    ADD COLUMN facebook character varying,
+    ADD COLUMN created_at timestamp without time zone DEFAULT now() NOT NULL,
+    ADD COLUMN updated_at timestamp without time zone DEFAULT now() NOT NULL;
+ALTER TABLE agriculture.plot
+    ADD COLUMN total_area numeric,
+    ADD COLUMN land_ownership character varying,
+    ADD COLUMN cocoa_planted_area numeric,
+    ADD COLUMN has_chemical_use boolean DEFAULT false,
+    ADD COLUMN land_type_id uuid,
+    ADD COLUMN soil_type_id uuid,
+    ADD COLUMN water_source_id uuid,
+    ADD COLUMN watering_system_id uuid,
+    ADD COLUMN found_date date DEFAULT CURRENT_DATE,
+    ADD COLUMN created_at timestamp without time zone DEFAULT now() NOT NULL,
+    ADD COLUMN updated_at timestamp without time zone DEFAULT now() NOT NULL;
+
+CREATE SCHEMA storage;
+
+CREATE TABLE storage.file (
+    file_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    file_name character varying(255),
+    table_name character varying,
+    ref_id uuid NOT NULL,
+    code character varying,
+    original_name character varying(255),
+    file_extension character varying(20),
+    mime_type character varying(100),
+    file_size bigint,
+    storage_path character varying,
+    storage_provider character varying(50),
+    checksum character varying(128),
+    version integer DEFAULT 1,
+    is_public boolean DEFAULT false,
+    status character varying(20) DEFAULT 'active'::character varying,
+    uploaded_by uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL DEFAULT now(),
+    CONSTRAINT pk_file PRIMARY KEY (file_id)
+);
+
+-- The real geom column is PostGIS geometry(Geometry,4326). CI's Postgres has
+-- no PostGIS, so geom is text here and ST_GeomFromText is a stand-in that
+-- keeps the SRID and WKT it was given -- enough to check what was written.
+CREATE FUNCTION public.ST_GeomFromText(wkt text, srid integer) RETURNS text
+    LANGUAGE sql IMMUTABLE AS $$ SELECT 'SRID=' || srid || ';' || wkt $$;
+
+CREATE TABLE storage.geo (
+    geo_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    uploaded_by uuid NOT NULL,
+    geom text,
+    code character varying,
+    source_type character varying(20),
+    area_sq_m double precision,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_geo PRIMARY KEY (geo_id)
+);

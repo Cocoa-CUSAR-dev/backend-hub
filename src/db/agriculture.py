@@ -17,9 +17,13 @@ All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2
 Other code calls the functions here.
 """
 
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import _profiles
@@ -48,3 +52,163 @@ async def update_farmer_profile(
     session: AsyncSession, user_id: UUID, values: dict[str, Any]
 ) -> bool:
     return await _profiles.update(session, "agriculture.farmer", FARMER_COLUMNS, user_id, values)
+
+
+@dataclass(frozen=True, slots=True)
+class FarmRow:
+    farm_id: UUID
+    farm_name: str | None
+    hub_id: UUID | None
+    geo_id: UUID | None
+    found_date: date | None
+    total_area: Decimal | None
+    address_detail: str | None
+    subdistrict_id: UUID | None
+    district_id: UUID | None
+    province_id: UUID | None
+    zip_code: str | None
+    contact_name: str | None
+    phone_number: str | None
+    line: str | None
+    facebook: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class PlotRow:
+    plot_id: UUID
+    farm_id: UUID
+    plot_name: str | None
+    total_area: Decimal | None
+    land_ownership: str | None
+    cocoa_planted_area: Decimal | None
+    has_chemical_use: bool | None
+    land_type_id: UUID | None
+    soil_type_id: UUID | None
+    water_source_id: UUID | None
+    watering_system_id: UUID | None
+    found_date: date | None
+    created_at: datetime
+    updated_at: datetime
+
+
+_FARM_COLUMNS = """
+    f.farm_id, f.farm_name, f.hub_id, f.geo_id, f.found_date, f.total_area,
+    f.address_detail, f.subdistrict_id, f.district_id, f.province_id, f.zip_code,
+    f.contact_name, f.phone_number, f.line, f.facebook, f.created_at, f.updated_at
+"""
+
+_PLOT_COLUMNS = """
+    p.plot_id, p.farm_id, p.plot_name, p.total_area, p.land_ownership,
+    p.cocoa_planted_area, p.has_chemical_use, p.land_type_id, p.soil_type_id,
+    p.water_source_id, p.watering_system_id, p.found_date, p.created_at, p.updated_at
+"""
+
+
+async def _insert(session: AsyncSession, table: str, values: dict[str, Any]) -> None:
+    # `table` is one of this module's own literals, never caller input.
+    columns = ", ".join(values)
+    params = ", ".join(f":{name}" for name in values)
+    await session.execute(text(f"INSERT INTO {table} ({columns}) VALUES ({params})"), values)
+
+
+async def insert_farm(session: AsyncSession, farm_id: UUID, **columns: Any) -> None:
+    """Insert one farm row. Column names are the table's own (farm_name,
+    province_id, found_date, created_at, ...)."""
+    await _insert(session, "agriculture.farm", {"farm_id": farm_id, **columns})
+
+
+async def link_farmer(session: AsyncSession, farmer_id: UUID, farm_id: UUID) -> None:
+    """Record who owns a farm; every "my farms / my plots" read goes through it."""
+    await _insert(session, "agriculture.farmer_farm", {"farmer_id": farmer_id, "farm_id": farm_id})
+
+
+async def insert_plot(session: AsyncSession, plot_id: UUID, **columns: Any) -> None:
+    await _insert(session, "agriculture.plot", {"plot_id": plot_id, **columns})
+
+
+async def farmer_owns_farm(session: AsyncSession, farmer_id: UUID, farm_id: UUID) -> bool:
+    found = await session.execute(
+        text(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM agriculture.farmer_farm
+                WHERE farmer_id = :farmer_id AND farm_id = :farm_id
+            )
+            """
+        ),
+        {"farmer_id": farmer_id, "farm_id": farm_id},
+    )
+    return bool(found.scalar())
+
+
+async def farm_exists(session: AsyncSession, farm_id: UUID) -> bool:
+    found = await session.execute(
+        text("SELECT EXISTS (SELECT 1 FROM agriculture.farm WHERE farm_id = :farm_id)"),
+        {"farm_id": farm_id},
+    )
+    return bool(found.scalar())
+
+
+async def farms(
+    session: AsyncSession, *, farmer_id: UUID | None, limit: int, offset: int
+) -> list[FarmRow]:
+    """Farms ordered by farm_id: only `farmer_id`'s, or every farm when None."""
+    result = await session.execute(
+        text(
+            f"""
+            SELECT {_FARM_COLUMNS}
+            FROM agriculture.farm f
+            WHERE CAST(:farmer_id AS uuid) IS NULL OR EXISTS (
+                SELECT 1 FROM agriculture.farmer_farm ff
+                WHERE ff.farm_id = f.farm_id AND ff.farmer_id = :farmer_id
+            )
+            ORDER BY f.farm_id
+            LIMIT :limit OFFSET :offset
+            """
+        ),
+        {"farmer_id": farmer_id, "limit": limit, "offset": offset},
+    )
+    return [FarmRow(**row._mapping) for row in result]
+
+
+async def plots_of_farms(session: AsyncSession, farm_ids: list[UUID]) -> list[PlotRow]:
+    """Every plot of these farms, ordered by plot_id."""
+    if not farm_ids:
+        return []
+    result = await session.execute(
+        text(
+            f"""
+            SELECT {_PLOT_COLUMNS}
+            FROM agriculture.plot p
+            WHERE p.farm_id = ANY(:farm_ids)
+            ORDER BY p.plot_id
+            """
+        ),
+        {"farm_ids": farm_ids},
+    )
+    return [PlotRow(**row._mapping) for row in result]
+
+
+async def plots(
+    session: AsyncSession, *, farmer_id: UUID | None, limit: int, offset: int
+) -> list[PlotRow]:
+    """Plots ordered by plot_id: only those on `farmer_id`'s farms, or every
+    plot when None."""
+    result = await session.execute(
+        text(
+            f"""
+            SELECT {_PLOT_COLUMNS}
+            FROM agriculture.plot p
+            WHERE CAST(:farmer_id AS uuid) IS NULL OR EXISTS (
+                SELECT 1 FROM agriculture.farmer_farm ff
+                WHERE ff.farm_id = p.farm_id AND ff.farmer_id = :farmer_id
+            )
+            ORDER BY p.plot_id
+            LIMIT :limit OFFSET :offset
+            """
+        ),
+        {"farmer_id": farmer_id, "limit": limit, "offset": offset},
+    )
+    return [PlotRow(**row._mapping) for row in result]

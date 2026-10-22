@@ -105,11 +105,25 @@ class Settings(BaseSettings):
     # Below this self-reported confidence a message is treated as UNKNOWN.
     INTENT_MIN_CONFIDENCE: float = 0.6
 
+    # ---- object storage (Cloudflare R2, S3-compatible) -------------------
+    # Farm photos. Leave any of the four blank and uploads answer 503 while
+    # everything else keeps working (same as mobile-backend did).
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET: str = ""
+
     # ---- error tracking (X-2d) ------------------------------------------
     # Blank DSN disables the SDK entirely. No separate SENTRY_ENVIRONMENT:
     # main.py passes ENVIRONMENT.value straight through.
     SENTRY_DSN: str = ""
     SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+
+    @property
+    def r2_configured(self) -> bool:
+        return all(
+            (self.R2_ACCOUNT_ID, self.R2_ACCESS_KEY_ID, self.R2_SECRET_ACCESS_KEY, self.R2_BUCKET)
+        )
 
     @property
     def docs_enabled(self) -> bool:

@@ -30,6 +30,7 @@ sentry_sdk.init(
 )
 
 from src.admin.router import router as admin_router
+from src.agriculture.router import router as agriculture_router
 from src.auth.router import router as auth_router
 from src.exceptions import register_exception_handlers
 from src.internal.router import router as internal_router
@@ -41,6 +42,7 @@ from src.notifications.router import router as notifications_router
 from src.reminders.router import router as reminders_router
 from src.reminders.scheduler import configure_jobs, scheduler
 from src.request_id import request_id_middleware
+from src.tasks.router import router as tasks_router
 
 # X-2e: must run before the app is built, and before uvicorn serves its
 # first request, so every log line carries the request ID (see
@@ -109,6 +111,8 @@ async def health() -> dict[str, str]:
 app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(admin_router)
+app.include_router(tasks_router)
+app.include_router(agriculture_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
 app.include_router(notifications_router)
