@@ -152,3 +152,14 @@ async def test_responses_of_user_lists_only_mine_newest_first(db_session: AsyncS
     assert rows[0].answer == {"grade": "B"}
     assert rows[0].submitted_at == datetime(2026, 10, 1, 10)
     assert rows[0].status == "SUBMITTED"
+
+
+async def test_task_titles_cover_only_tasks_that_exist(db_session: AsyncSession) -> None:
+    titled = await _task(db_session, "harvest", datetime(2026, 10, 1, 8))
+    untitled = await insert(db_session, "form.task", title=None)
+    assert untitled is not None
+
+    titles = await db.tasks.task_titles(db_session, [titled, untitled, uuid4()])
+
+    assert titles == {titled: "harvest", untitled: None}
+    assert await db.tasks.task_titles(db_session, []) == {}

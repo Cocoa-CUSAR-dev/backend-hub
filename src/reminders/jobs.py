@@ -7,15 +7,10 @@ from datetime import datetime
 
 from src import db
 from src.clock import bangkok_now
-from src.database import Session, async_session_maker
+from src.database import Session, async_session_maker, transaction
 from src.line.service import multicast_text_batched
-from src.reminders.queries import (
-    already_reminded_since,
-    deactivate_schedule,
-    due_reminders,
-    record_reminders,
-    users_owing_task,
-)
+from src.reminders import service
+from src.reminders.queries import users_owing_task
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +30,7 @@ async def check_and_send_reminders() -> None:
 
 
 async def _run_reminder_check(session: Session, now: datetime) -> None:
-    due = await due_reminders(session, now.time())
+    due = await service.due_reminders(session, now.time())
     if not due:
         return
 
@@ -52,8 +47,8 @@ async def _run_reminder_check(session: Session, now: datetime) -> None:
             # Nobody left who hasn't submitted this task -- turn the
             # schedule off instead of checking it again every day forever.
             # (web-app UI: "farmer completed the task" auto-deactivate.)
-            await deactivate_schedule(session, reminder.schedule_id)
-            await session.commit()
+            async with transaction(session):
+                await db.notify.deactivate_schedule(session, reminder.schedule_id)
             logger.info(
                 "reminder schedule=%s deactivated -- nobody owes task=%s anymore",
                 reminder.schedule_id,
@@ -61,7 +56,7 @@ async def _run_reminder_check(session: Session, now: datetime) -> None:
             )
             continue
 
-        done_today = await already_reminded_since(session, reminder.task_id, day_start)
+        done_today = await db.notify.already_reminded_since(session, reminder.task_id, day_start)
         targets = [uid for uid in owing if uid not in done_today]
         if not targets:
             continue
@@ -82,23 +77,23 @@ async def _run_reminder_check(session: Session, now: datetime) -> None:
         # failed_users as status='failed' (rather than skipping them) is
         # what lets already_reminded_since's status='sent' filter correctly
         # allow a retry on the next tick instead of silently giving up.
-        if succeeded_users:
-            await record_reminders(
-                session,
-                task_id=reminder.task_id,
-                user_ids=succeeded_users,
-                status="sent",
-                sent_at=naive_now,
-            )
-        if failed_users:
-            await record_reminders(
-                session,
-                task_id=reminder.task_id,
-                user_ids=failed_users,
-                status="failed",
-                sent_at=naive_now,
-            )
-        await session.commit()
+        async with transaction(session):
+            if succeeded_users:
+                await db.notify.record_reminders(
+                    session,
+                    task_id=reminder.task_id,
+                    user_ids=succeeded_users,
+                    status="sent",
+                    sent_at=naive_now,
+                )
+            if failed_users:
+                await db.notify.record_reminders(
+                    session,
+                    task_id=reminder.task_id,
+                    user_ids=failed_users,
+                    status="failed",
+                    sent_at=naive_now,
+                )
         logger.info(
             "reminder task=%s sent=%d failed=%d",
             reminder.task_id,

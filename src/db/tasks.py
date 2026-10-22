@@ -96,6 +96,17 @@ async def tasks_for_user(
     return [TaskRow(**row._mapping) for row in result]
 
 
+async def task_titles(session: AsyncSession, task_ids: list[UUID]) -> dict[UUID, str | None]:
+    """task_id -> title, for the ids that exist. A task may have no title."""
+    if not task_ids:
+        return {}
+    rows = await session.execute(
+        text("SELECT task_id, title FROM form.task WHERE task_id = ANY(:ids)"),
+        {"ids": task_ids},
+    )
+    return {row.task_id: row.title for row in rows}
+
+
 async def task_visible_to(session: AsyncSession, user_id: UUID, task_id: UUID) -> bool:
     """Whether the task exists and this user may see it (same rule as the
     task list)."""

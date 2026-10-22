@@ -3,7 +3,7 @@ from unittest.mock import ANY, AsyncMock, patch
 from uuid import uuid4
 
 from src.reminders.jobs import _run_reminder_check
-from src.reminders.queries import DueReminder
+from src.reminders.service import DueReminder
 
 _NOW = datetime(2026, 9, 7, 17, 5)  # 17:05, past a 17:00 time_of_day
 
@@ -17,10 +17,10 @@ async def _run(*, due, owing, done, id_map, multicast_batched=None):
     session = AsyncMock()
     multicast_batched = multicast_batched or AsyncMock(side_effect=lambda to, _msg: (to, []))
     with (
-        patch("src.reminders.jobs.due_reminders", new=AsyncMock(return_value=due)),
+        patch("src.reminders.service.due_reminders", new=AsyncMock(return_value=due)),
         patch("src.reminders.jobs.users_owing_task", new=AsyncMock(return_value=owing)),
         patch(
-            "src.reminders.jobs.already_reminded_since",
+            "src.db.notify.already_reminded_since",
             new=AsyncMock(return_value=done),
         ),
         patch(
@@ -28,8 +28,8 @@ async def _run(*, due, owing, done, id_map, multicast_batched=None):
             new=AsyncMock(return_value=id_map),
         ),
         patch("src.reminders.jobs.multicast_text_batched", new=multicast_batched),
-        patch("src.reminders.jobs.record_reminders", new=AsyncMock()) as record,
-        patch("src.reminders.jobs.deactivate_schedule", new=AsyncMock()) as deactivate,
+        patch("src.db.notify.record_reminders", new=AsyncMock()) as record,
+        patch("src.db.notify.deactivate_schedule", new=AsyncMock()) as deactivate,
     ):
         await _run_reminder_check(session, _NOW)
     return record, multicast_batched, deactivate
