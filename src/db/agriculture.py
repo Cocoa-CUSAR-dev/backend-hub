@@ -212,3 +212,14 @@ async def plots(
         {"farmer_id": farmer_id, "limit": limit, "offset": offset},
     )
     return [PlotRow(**row._mapping) for row in result]
+
+
+async def farm_names(session: AsyncSession, farm_ids: list[UUID]) -> dict[UUID, str | None]:
+    """farm_id -> farm_name for these farms (e.g. to label harvests at a hub)."""
+    if not farm_ids:
+        return {}
+    result = await session.execute(
+        text("SELECT farm_id, farm_name FROM agriculture.farm WHERE farm_id = ANY(:farm_ids)"),
+        {"farm_ids": farm_ids},
+    )
+    return {row.farm_id: row.farm_name for row in result}

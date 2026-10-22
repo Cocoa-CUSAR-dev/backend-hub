@@ -434,3 +434,102 @@ CREATE TABLE storage.geo (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT pk_geo PRIMARY KEY (geo_id)
 );
+
+-- docs-and-plan#266: hubs, processing stations, batches and harvests, read
+-- and written by src/db/processing.py and src/db/collection.py. Shaped as
+-- in the database repo's V1 baseline, without FKs so tests can insert rows
+-- in any order.
+CREATE TABLE processing.hub (
+    hub_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hub_name character varying,
+    geo_id uuid,
+    found_date date,
+    address_detail character varying,
+    subdistrict_id uuid NOT NULL,
+    district_id uuid NOT NULL,
+    province_id uuid NOT NULL,
+    zip_code character varying,
+    contact_name character varying,
+    phone_number character varying,
+    line character varying,
+    facebook character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_hub PRIMARY KEY (hub_id)
+);
+
+CREATE TABLE processing.processing_station (
+    processing_station_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processing_station_name character varying,
+    hub_id uuid,
+    geo_id uuid,
+    found_date date,
+    processing_station_area numeric,
+    address_detail character varying,
+    subdistrict_id uuid NOT NULL,
+    district_id uuid NOT NULL,
+    province_id uuid NOT NULL,
+    zip_code character varying,
+    contact_name character varying,
+    phone_number character varying,
+    line character varying,
+    facebook character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_processing_station PRIMARY KEY (processing_station_id)
+);
+
+CREATE TABLE processing.processor_processing_station (
+    processor_processing_station_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processor_id uuid NOT NULL,
+    processing_station_id uuid NOT NULL,
+    CONSTRAINT pk_processor_processing_station PRIMARY KEY (processor_processing_station_id)
+);
+
+CREATE TABLE processing.batch (
+    batch_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processing_station_id uuid NOT NULL,
+    origin character varying,
+    notes character varying DEFAULT ''::character varying,
+    quantity_kg numeric,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_batch PRIMARY KEY (batch_id)
+);
+
+CREATE SCHEMA collection;
+
+CREATE TABLE collection.harvest (
+    harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hub_id uuid NOT NULL,
+    farm_id uuid NOT NULL,
+    plot_id uuid,
+    tree_id uuid,
+    harvest_date timestamp without time zone,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT pk_harvest PRIMARY KEY (harvest_id)
+);
+
+CREATE TABLE collection.harvest_grade_detail (
+    harvest_id uuid NOT NULL,
+    grade_code character varying NOT NULL,
+    quantity_kg numeric,
+    description character varying DEFAULT ''::character varying,
+    is_clean boolean,
+    is_appropriate_size boolean,
+    weight_gram_per_pod numeric,
+    is_sprout boolean,
+    is_dry boolean,
+    is_shriveled boolean,
+    cut_test_result character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE collection.harvest_collection (
+    collection_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    harvest_id uuid NOT NULL,
+    batch_id uuid NOT NULL,
+    CONSTRAINT pk_harvest_collection PRIMARY KEY (collection_id)
+);
