@@ -40,6 +40,22 @@ class Settings(BaseSettings):
     # ---- database -------------------------------------------------------
     DATABASE_URL: str
 
+    # ---- auth (src/auth, CONVENTIONS.md §5) -----------------------------
+    # Signs every access token. Must be the same value web-backend and
+    # mobile-backend use while they still run, so they accept hub tokens.
+    JWT_KEY: str
+    # Access tokens are short because roles live inside them; clients refresh
+    # automatically. The refresh token slides: each use issues a new one with
+    # a fresh lifetime, so a farmer who opens the app at least once every
+    # REFRESH_TOKEN_TTL_DAYS never has to type the password again.
+    ACCESS_TOKEN_TTL_SECONDS: int = 3600
+    REFRESH_TOKEN_TTL_DAYS: int = 90
+    # One-time token in the LINE diary card's "open the web app" link.
+    SSO_TOKEN_TTL_SECONDS: int = 900
+    # Researchers sign themselves up with this code (given out by the team).
+    # Empty disables researcher self sign-up.
+    RESEARCHER_SIGNUP_CODE: str = ""
+
     # ---- old backends (until the merge is finished) ---------------------
     KOTLIN_BACKEND_URL: str
     GO_BACKEND_URL: str
@@ -61,6 +77,11 @@ class Settings(BaseSettings):
     LINE_CHANNEL_SECRET: str
     LINE_CHANNEL_ACCESS_TOKEN: str
     LIFF_ID: str = ""
+    # LINE Login channels whose LIFF ID tokens may sign in through
+    # POST /api/v1/auth/line/*, besides the one LIFF_ID belongs to -- e.g.
+    # the mobile app's own LIFF link page if it lives on another channel.
+    # JSON list in .env: LINE_LOGIN_CHANNEL_IDS=["1234567890"]
+    LINE_LOGIN_CHANNEL_IDS: list[str] = []
     # US2-6 (docs-and-plan#133): base URL for the diary card's "view full
     # history" button; src/sso/client.py appends a short-lived ?token=.
     WEB_APP_URL: str = ""

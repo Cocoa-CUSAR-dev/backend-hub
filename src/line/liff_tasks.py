@@ -16,15 +16,21 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from src import db
+from src.auth import tokens
 from src.config import settings
 from src.conversation import reuse, service
 from src.conversation.constants import ActiveSubstate
-from src.database import get_session
-from src.exceptions import InvalidLiffToken, LineAccountNotLinked, UpstreamServiceError
+from src.database import Session, get_session
+from src.exceptions import (
+    InvalidLiffToken,
+    LineAccountNotLinked,
+    Unauthorized,
+    UpstreamServiceError,
+)
 from src.forms.client import get_form
-from src.line import identity, liff, parent_picker
+from src.line import liff, parent_picker
 from src.line.schemas import QuickReplyOption
 from src.line.service import push_autofill_offer, push_confirm_prompt, push_text
 from src.tasks.client import fetch_last_answer, fetch_pending_tasks
@@ -33,9 +39,7 @@ from src.tasks.schemas import TaskListItem
 router = APIRouter(prefix="/line/liff", tags=["liff"])
 logger = logging.getLogger(__name__)
 
-# Same local alias convention as src/notifications/router.py -- no shared
-# export for this in src/database.py yet.
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SessionDep = Annotated[Session, Depends(get_session)]
 
 
 class ResolvedLiffUser(BaseModel):
@@ -43,40 +47,41 @@ class ResolvedLiffUser(BaseModel):
     line_user_id: str
 
 
-def _channel_id_from_liff_id(liff_id: str) -> str:
-    """LINE documents a LIFF ID as "{channelId}-{randomId}" -- the same
-    channel ID the OAuth2 verify endpoint's client_id parameter expects.
-    Deriving it avoids a second, easy-to-desync env var just for this one
-    value -- see LIFF_ID in src/config.py.
-    """
-    return liff_id.split("-", 1)[0]
-
-
 async def resolve_liff_user(
     session: SessionDep,
     authorization: Annotated[str | None, Header()] = None,
 ) -> ResolvedLiffUser:
-    """FastAPI dependency: Bearer LIFF ID token -> the internal user_id, via
-    the same two steps _resolve_user_id/liff.verify_id_token already do
-    elsewhere, just reachable from an HTTP call instead of a LINE event.
+    """FastAPI dependency for the LIFF screens. Accepts either:
+    - our own access token (from POST /api/v1/auth/line/login) -- the target:
+      verified locally, no call to LINE; or
+    - a raw LIFF ID token -- the old way, verified with LINE on every call.
+      Kept until the LIFF front end switches to /auth/line/login.
     """
     if not authorization or not authorization.startswith("Bearer "):
-        raise InvalidLiffToken("Missing bearer LIFF ID token")
-    id_token = authorization.removeprefix("Bearer ")
+        raise InvalidLiffToken("Missing bearer token")
+    token = authorization.removeprefix("Bearer ")
+
+    try:
+        claims = tokens.read_access_token(token)
+    except Unauthorized:
+        claims = None
+    if claims is not None:
+        line_ids = await db.auth.line_user_ids_for(session, [claims.user_id])
+        if claims.user_id not in line_ids:
+            raise LineAccountNotLinked
+        return ResolvedLiffUser(user_id=claims.user_id, line_user_id=line_ids[claims.user_id])
 
     if not settings.LIFF_ID:
-        # Fail closed, same reasoning as ServiceAuthMiddleware's unset-key
-        # case on the mobile-backend side: an unconfigured LIFF_ID must
-        # never silently accept every token as if it were a real channel.
+        # Fail closed: an unconfigured LIFF_ID must never silently accept
+        # every token as if it were a real channel.
         raise InvalidLiffToken("LIFF_ID is not configured")
-
-    channel_id = _channel_id_from_liff_id(settings.LIFF_ID)
-    claims = await liff.verify_id_token(id_token, channel_id)
-    line_user_id = claims.get("sub")
+    channel_id = liff.channel_id_from_liff_id(settings.LIFF_ID)
+    liff_claims = await liff.verify_id_token(token, channel_id)
+    line_user_id = liff_claims.get("sub")
     if not line_user_id:
         raise InvalidLiffToken("LIFF token had no sub claim")
 
-    user_id = await identity.lookup_user_id(session, line_user_id)
+    user_id = await db.auth.user_id_for_line(session, line_user_id)
     if user_id is None:
         raise LineAccountNotLinked
 

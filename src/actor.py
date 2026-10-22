@@ -16,7 +16,9 @@ from uuid import UUID
 
 from src.exceptions import Forbidden
 
-Channel = Literal["web", "mobile", "line", "liff", "system"]
+# "api" = a Bearer token over HTTP (web app via Next.js, or the mobile app);
+# the backend can't and needn't tell those two apart.
+Channel = Literal["api", "line", "liff", "system"]
 
 # Grants every permission. Only Actor.system() carries it.
 ALL_PERMISSIONS = "*"
