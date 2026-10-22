@@ -8,7 +8,6 @@ lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
 sql-outside-db|src/chat/dev_queries.py|imports sqlalchemy
 sql-outside-db|src/line/parent_picker.py|imports sqlalchemy
-sql-outside-db|src/line/temp_task_picker.py|imports sqlalchemy
 sql-outside-db|src/reminders/queries.py|imports sqlalchemy
 table-owner|src/chat/dev_queries.py|auth.user_account (owner: src/db/auth.py)
 table-owner|src/chat/dev_queries.py|form.field_validation_rule (owner: src/db/forms.py)
@@ -31,11 +30,6 @@ table-owner|src/line/parent_picker.py|processing.hub_collector (owner: src/db/pr
 table-owner|src/line/parent_picker.py|processing.processing_station (owner: src/db/processing.py)
 table-owner|src/line/parent_picker.py|processing.processor_processing_station (owner: src/db/processing.py)
 table-owner|src/line/parent_picker.py|ref.farm_activity_type_constant (owner: src/db/ref.py)
-table-owner|src/line/temp_task_picker.py|chat.conversation (owner: src/db/chat.py)
-table-owner|src/line/temp_task_picker.py|form.assignment (owner: src/db/tasks.py)
-table-owner|src/line/temp_task_picker.py|form.response (owner: src/db/tasks.py)
-table-owner|src/line/temp_task_picker.py|form.task (owner: src/db/tasks.py)
-table-owner|src/line/temp_task_picker.py|form.task_form (owner: src/db/forms.py)
 table-owner|src/reminders/queries.py|auth.line_identity (owner: src/db/auth.py)
 table-owner|src/reminders/queries.py|auth.user_role (owner: src/db/auth.py)
 table-owner|src/reminders/queries.py|form.assignment (owner: src/db/tasks.py)

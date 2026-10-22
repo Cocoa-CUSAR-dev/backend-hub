@@ -129,6 +129,24 @@ async def test_resumable_conversation_is_active_or_paused_for_that_task_only(
     assert found is not None and found.conversation_id == paused.conversation_id
 
 
+async def test_open_task_ids_are_the_users_active_or_paused_tasks(
+    db_session: AsyncSession,
+) -> None:
+    me, other = await _user(db_session), await _user(db_session)
+    active, paused, done, theirs = [await _task(db_session) for _ in range(4)]
+    await _conversation(db_session, me, active, ConversationStatus.ACTIVE)
+    await _conversation(db_session, me, paused, ConversationStatus.PAUSED)
+    await _conversation(db_session, me, done, ConversationStatus.COMPLETED)
+    await _conversation(db_session, other, theirs, ConversationStatus.ACTIVE)
+
+    found = await db.chat.open_task_ids(
+        db_session, me, [active[0], paused[0], done[0], theirs[0], uuid4()]
+    )
+
+    assert found == {active[0], paused[0]}
+    assert await db.chat.open_task_ids(db_session, me, []) == set()
+
+
 async def test_pause_all_active_pauses_only_active_ones_and_counts_them(
     db_session: AsyncSession,
 ) -> None:

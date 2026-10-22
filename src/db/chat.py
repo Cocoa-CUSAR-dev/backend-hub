@@ -116,6 +116,21 @@ async def resumable_conversation(
     return result.scalars().first()
 
 
+async def open_task_ids(session: AsyncSession, user_id: UUID, task_ids: list[UUID]) -> set[UUID]:
+    """Which of these tasks the user has a not-yet-done conversation for
+    (ACTIVE or PAUSED)."""
+    if not task_ids:
+        return set()
+    result = await session.execute(
+        select(Conversation.task_id).where(
+            Conversation.user_id == user_id,
+            Conversation.task_id.in_(task_ids),
+            Conversation.status.in_([ConversationStatus.ACTIVE, ConversationStatus.PAUSED]),
+        )
+    )
+    return set(result.scalars())
+
+
 async def pause_all_active(session: AsyncSession) -> int:
     """Pauses every ACTIVE conversation. Returns how many were paused."""
     raw_result = await session.execute(
