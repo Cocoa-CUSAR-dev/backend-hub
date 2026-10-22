@@ -42,6 +42,14 @@ TAGS: list[dict[str, Any]] = [
         "description": "Farms, plots and farm photos: register them and list mine. Photos are "
         "private; lists carry a link to each farm's newest photo, valid for an hour.",
     },
+    {
+        "name": "collection",
+        "description": "Collection hubs and the harvests received there (hub collectors).",
+    },
+    {
+        "name": "processing",
+        "description": "Processing stations and their batches (processors).",
+    },
     {"name": "line", "description": "LINE webhook: every chat event from the LINE OA."},
     {"name": "liff", "description": "Endpoints the LIFF pages call from inside LINE."},
     {

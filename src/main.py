@@ -32,6 +32,7 @@ sentry_sdk.init(
 from src.admin.router import router as admin_router
 from src.agriculture.router import router as agriculture_router
 from src.auth.router import router as auth_router
+from src.collection.router import router as collection_router
 from src.exceptions import register_exception_handlers
 from src.internal.router import router as internal_router
 from src.line.liff_tasks import router as liff_tasks_router
@@ -39,6 +40,7 @@ from src.line.router import router as line_router
 from src.logging_config import configure_logging
 from src.me.router import router as me_router
 from src.notifications.router import router as notifications_router
+from src.processing.router import router as processing_router
 from src.reminders.router import router as reminders_router
 from src.reminders.scheduler import configure_jobs, scheduler
 from src.request_id import request_id_middleware
@@ -111,6 +113,8 @@ app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(admin_router)
 app.include_router(agriculture_router)
+app.include_router(collection_router)
+app.include_router(processing_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
 app.include_router(notifications_router)
