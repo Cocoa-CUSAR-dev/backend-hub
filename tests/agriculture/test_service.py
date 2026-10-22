@@ -25,7 +25,7 @@ WEBP = b"RIFF\x00\x00\x00\x00WEBPVP8 " + b"0" * 20
 
 def _actor(perms: frozenset[str] = FARMER, user_id: UUID | None = None) -> Actor:
     return Actor(
-        user_id=user_id or uuid4(), roles=frozenset({"farmer"}), perms=perms, channel="mobile"
+        user_id=user_id or uuid4(), roles=frozenset({"farmer"}), perms=perms, channel="api"
     )
 
 

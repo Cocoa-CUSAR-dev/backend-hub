@@ -32,7 +32,7 @@ def fake_r2(monkeypatch: pytest.MonkeyPatch) -> Iterator[AsyncMock]:
 async def _farmer(session: AsyncSession) -> Actor:
     user_id = await insert(session, "auth.user_account", username=f"farmer-{uuid4()}")
     assert isinstance(user_id, UUID)
-    return Actor(user_id=user_id, roles=frozenset({"farmer"}), perms=FARMER, channel="mobile")
+    return Actor(user_id=user_id, roles=frozenset({"farmer"}), perms=FARMER, channel="api")
 
 
 def _farm(name: str, **extra: object) -> FarmIn:

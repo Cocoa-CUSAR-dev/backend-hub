@@ -29,7 +29,7 @@ from src.agriculture.schemas import (
     PlotIn,
     PlotOut,
 )
-from src.database import transaction
+from src.database import Session, transaction
 from src.exceptions import Forbidden, Invalid, NotFound, Unavailable
 from src.r2 import client as r2
 
@@ -84,7 +84,7 @@ def _wkt_polygon(points: list[GisPoint]) -> str:
     return "POLYGON((" + ",".join(f"{p.lng:f} {p.lat:f}" for p in ring) + "))"
 
 
-async def create_farm(session: db.Session, actor: Actor, farm: FarmIn) -> FarmCreatedOut:
+async def create_farm(session: Session, actor: Actor, farm: FarmIn) -> FarmCreatedOut:
     """Register a farm owned by the caller, with its location or outline."""
     require(actor, "create:farm:own")
     user_id = _caller(actor)
@@ -124,7 +124,7 @@ async def create_farm(session: db.Session, actor: Actor, farm: FarmIn) -> FarmCr
     return FarmCreatedOut(farm_id=farm_id)
 
 
-async def create_plot(session: db.Session, actor: Actor, plot: PlotIn) -> PlotCreatedOut:
+async def create_plot(session: Session, actor: Actor, plot: PlotIn) -> PlotCreatedOut:
     """Register a plot on one of the caller's farms.
 
     Go accepted any farm_id, so a farmer could add plots to someone else's
@@ -179,7 +179,7 @@ def _scope(actor: Actor) -> UUID | None:
     return _caller(actor)
 
 
-async def _image_urls(session: db.Session, farm_ids: list[UUID]) -> dict[UUID, str]:
+async def _image_urls(session: Session, farm_ids: list[UUID]) -> dict[UUID, str]:
     """Links to each farm's newest photo. A missing or broken link leaves
     that farm without one; it never fails the list."""
     if not r2.configured() or not farm_ids:
@@ -197,7 +197,7 @@ async def _image_urls(session: db.Session, farm_ids: list[UUID]) -> dict[UUID, s
 
 
 async def list_farms(
-    session: db.Session, actor: Actor, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+    session: Session, actor: Actor, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
 ) -> list[FarmOut]:
     """Farms (the caller's, or all with read:farm:all), each with its plots
     and a link to its newest photo."""
@@ -222,7 +222,7 @@ async def list_farms(
 
 
 async def list_plots(
-    session: db.Session, actor: Actor, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+    session: Session, actor: Actor, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
 ) -> list[PlotOut]:
     """Plots on the caller's farms, or all with read:farm:all."""
     farmer_id = _scope(actor)
@@ -244,7 +244,7 @@ def _image_type(data: bytes) -> tuple[str, str] | None:
 
 
 async def upload_farm_image(
-    session: db.Session, actor: Actor, farm_id: UUID, *, filename: str, data: bytes
+    session: Session, actor: Actor, farm_id: UUID, *, filename: str, data: bytes
 ) -> FarmImageOut:
     """Store a new photo of one of the caller's farms and return a link to it.
 
@@ -281,7 +281,7 @@ async def upload_farm_image(
             storage_path=key,
             checksum=hashlib.sha256(data).hexdigest(),
             uploaded_by=user_id,
-            created_at=clock.utc_now().replace(tzinfo=None),
+            created_at=clock.utc_now_naive(),
         )
     try:
         image_url: str | None = await r2.presigned_get(key, IMAGE_URL_SECONDS)

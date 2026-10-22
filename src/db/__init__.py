@@ -5,10 +5,7 @@ owns, and scripts/check_conventions.py fails CI if two modules claim the
 same table or SQL for an owned table appears outside src/db/.
 
 Call queries as `from src import db` -> `await db.tasks.latest_response(...)`.
-Services type their session as `db.Session`, so they never import sqlalchemy.
 """
-
-from sqlalchemy.ext.asyncio import AsyncSession as Session
 
 from src.db import (
     agriculture,
@@ -26,7 +23,6 @@ from src.db import (
 )
 
 __all__ = [
-    "Session",
     "agriculture",
     "auth",
     "chat",
