@@ -23,9 +23,9 @@ from typing import cast
 from uuid import UUID
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.chat.schemas import FormSummary
+from src.database import Session
 from src.exceptions import ConversationNotFound, FormNotFound
 from src.forms.client import _convert_keys
 from src.forms.schemas import FormDetail
@@ -50,7 +50,7 @@ _FIELD_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*_id$")
 _CHOICE_LIMIT = 13  # LINE's own Quick Reply cap -- see src/line/temp_task_picker.py
 
 
-async def list_testable_forms(session: AsyncSession) -> list[FormSummary]:
+async def list_testable_forms(session: Session) -> list[FormSummary]:
     """Uses form.task.title, not form.task_form.title -- the task_form title
     is a generic template name shared by every recurring instance of a task
     (e.g. every "farm_activity" row says the same thing), while form.task's
@@ -72,7 +72,7 @@ async def list_testable_forms(session: AsyncSession) -> list[FormSummary]:
     return [FormSummary(**dict(row._mapping)) for row in rows]
 
 
-async def _load_choices(session: AsyncSession, field_name: str) -> list[dict[str, str]]:
+async def _load_choices(session: Session, field_name: str) -> list[dict[str, str]]:
     """Mirrors Kotlin's real fetchRefChoices naming convention (confirmed by
     reading web-backend's FormRepository.kt directly, not guessed): strip
     "_id", append "_constant" for the table name; the id column is
@@ -105,7 +105,7 @@ async def _load_choices(session: AsyncSession, field_name: str) -> list[dict[str
     return [{"id": str(row.id), "name": row.name} for row in rows]
 
 
-async def load_form_detail(session: AsyncSession, task_form_id: UUID) -> FormDetail:
+async def load_form_detail(session: Session, task_form_id: UUID) -> FormDetail:
     """Direct-query counterpart to forms.client.get_form() -- builds the same
     FormDetail shape service.py expects, from the local `form.*` tables
     instead of a real Kotlin call. OPTION-type questions get a real
@@ -159,7 +159,7 @@ async def load_form_detail(session: AsyncSession, task_form_id: UUID) -> FormDet
     return FormDetail(task_form_id=str(task_form_id), sections=[{"questions": questions}])
 
 
-async def resolve_test_user_id(session: AsyncSession) -> UUID:
+async def resolve_test_user_id(session: Session) -> UUID:
     result = await session.execute(
         text("SELECT user_id FROM auth.user_account WHERE username = :username"),
         {"username": TEST_USERNAME},

@@ -25,7 +25,8 @@ import time
 from dataclasses import dataclass
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.database import Session
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def reset_cache() -> None:
     _cache = None
 
 
-async def _child_handlers(session: AsyncSession) -> dict[str, ChildHandler]:
+async def _child_handlers(session: Session) -> dict[str, ChildHandler]:
     global _cache
     if _cache is not None and time.monotonic() - _cache[0] < _TTL_SECONDS:
         return _cache[1]
@@ -82,14 +83,14 @@ async def _child_handlers(session: AsyncSession) -> dict[str, ChildHandler]:
     return children
 
 
-async def parent_kind_for(session: AsyncSession, handler: str) -> str | None:
+async def parent_kind_for(session: Session, handler: str) -> str | None:
     """The parent kind a farmer must pick before this handler's questions, or
     None for a standalone handler (the common case)."""
     child = (await _child_handlers(session)).get(handler)
     return child.parent_handler if child else None
 
 
-async def parent_field_for(session: AsyncSession, parent_kind: str) -> str | None:
+async def parent_field_for(session: Session, parent_kind: str) -> str | None:
     """The column a picked parent of this kind is stored under. Every child
     of one parent kind uses the same one (farm_activity_id / harvest_id /
     batch_id), so the kind is enough to find it."""

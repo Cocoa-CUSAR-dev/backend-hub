@@ -17,8 +17,8 @@ from datetime import datetime, time
 
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.database import Session
 from src.exceptions import InvalidReminderReference, ReminderNotFound
 from src.reminders.schemas import RecipientRule
 
@@ -30,7 +30,7 @@ class DueReminder:
     task_title: str | None
 
 
-async def due_reminders(session: AsyncSession, now_time: time) -> list[DueReminder]:
+async def due_reminders(session: Session, now_time: time) -> list[DueReminder]:
     """Active schedules whose time_of_day has already passed for today.
 
     MVP: DAILY only. WEEKLY/other cadences are ignored -- notify.reminder_schedule
@@ -58,7 +58,7 @@ async def due_reminders(session: AsyncSession, now_time: time) -> list[DueRemind
 
 
 async def users_owing_task(
-    session: AsyncSession,
+    session: Session,
     task_id: uuid.UUID,
     now: datetime,
     schedule_id: uuid.UUID | None = None,
@@ -129,7 +129,7 @@ async def users_owing_task(
 
 
 async def already_reminded_since(
-    session: AsyncSession, task_id: uuid.UUID, since: datetime
+    session: Session, task_id: uuid.UUID, since: datetime
 ) -> set[uuid.UUID]:
     """The idempotency check -- against the persisted notify.reminder_log, never
     APScheduler's in-memory state, so it survives a restart (ADR 0006).
@@ -162,7 +162,7 @@ async def already_reminded_since(
 
 
 async def create_reminder_schedule(
-    session: AsyncSession,
+    session: Session,
     *,
     task_id: uuid.UUID,
     time_of_day: time,
@@ -204,7 +204,7 @@ def _dedupe(recipients: list[RecipientRule]) -> list[RecipientRule]:
 
 
 async def _insert_recipients(
-    session: AsyncSession, schedule_id: uuid.UUID, recipients: list[RecipientRule]
+    session: Session, schedule_id: uuid.UUID, recipients: list[RecipientRule]
 ) -> None:
     rows = [
         {
@@ -228,7 +228,7 @@ async def _insert_recipients(
 
 
 @asynccontextmanager
-async def _invalid_reference_guard(session: AsyncSession) -> AsyncIterator[None]:
+async def _invalid_reference_guard(session: Session) -> AsyncIterator[None]:
     """A foreign-key failure (a task/role/user id that doesn't exist) can
     surface at any INSERT or at commit -- either way, undo the whole write
     and report it as a bad request rather than a 500.
@@ -252,7 +252,7 @@ class ScheduleRow:
 
 
 async def _recipients_for(
-    session: AsyncSession, schedule_ids: list[uuid.UUID]
+    session: Session, schedule_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, list[RecipientRule]]:
     if not schedule_ids:
         return {}
@@ -274,7 +274,7 @@ async def _recipients_for(
     return grouped
 
 
-async def list_schedules_for_task(session: AsyncSession, task_id: uuid.UUID) -> list[ScheduleRow]:
+async def list_schedules_for_task(session: Session, task_id: uuid.UUID) -> list[ScheduleRow]:
     rows = await session.execute(
         text(
             "SELECT schedule_id, task_id, cadence, time_of_day, is_active, created_by "
@@ -288,7 +288,7 @@ async def list_schedules_for_task(session: AsyncSession, task_id: uuid.UUID) -> 
 
 
 async def update_reminder_schedule(
-    session: AsyncSession,
+    session: Session,
     schedule_id: uuid.UUID,
     *,
     time_of_day: time | None = None,
@@ -331,7 +331,7 @@ async def update_reminder_schedule(
     return next(s for s in schedules if s.schedule_id == schedule_id)
 
 
-async def deactivate_schedule(session: AsyncSession, schedule_id: uuid.UUID) -> None:
+async def deactivate_schedule(session: Session, schedule_id: uuid.UUID) -> None:
     """Turns off a schedule -- used when nobody owes its task anymore (see
     jobs.py's _run_reminder_check): there's no point checking it again every
     day forever once every farmer who needed the reminder has submitted.
@@ -345,7 +345,7 @@ async def deactivate_schedule(session: AsyncSession, schedule_id: uuid.UUID) -> 
 
 
 async def record_reminders(
-    session: AsyncSession,
+    session: Session,
     *,
     task_id: uuid.UUID,
     user_ids: list[uuid.UUID],

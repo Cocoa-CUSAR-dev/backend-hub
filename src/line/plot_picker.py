@@ -26,9 +26,9 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
+from src.database import Session
 
 # Fields whose choices are scoped to the farmer's own rows (US2-13). Kotlin
 # sends both as global lists (ref.farm_constant / ref.plot_constant).
@@ -54,7 +54,7 @@ class PlotOption:
 
 
 async def list_plots(
-    session: AsyncSession, user_id: UUID, *, farm_id: str | None = None
+    session: Session, user_id: UUID, *, farm_id: str | None = None
 ) -> list[PlotOption]:
     """Every plot on a farm this farmer is linked to, newest farm/plot name
     order, optionally narrowed to one farm.
@@ -107,9 +107,7 @@ async def list_plots(
     return options[:MAX_PLOTS]
 
 
-async def farmer_owned_ids(
-    session: AsyncSession, user_id: UUID, field_name: str
-) -> set[str] | None:
+async def farmer_owned_ids(session: Session, user_id: UUID, field_name: str) -> set[str] | None:
     """The ids of `field_name`'s choices this farmer may pick: the farms
     they're linked to through agriculture.farmer_farm, or those farms' plots.
 

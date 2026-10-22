@@ -16,9 +16,8 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_session
+from src.database import Session, get_session
 from src.notifications.dependencies import require_service_key
 from src.reminders.queries import (
     ScheduleRow,
@@ -38,7 +37,7 @@ router = APIRouter(
     dependencies=[Depends(require_service_key)],
 )
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SessionDep = Annotated[Session, Depends(get_session)]
 
 
 def _to_response(row: ScheduleRow) -> ReminderScheduleResponse:

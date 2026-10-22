@@ -12,7 +12,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.chat import dev_queries, service
 from src.chat.schemas import (
@@ -24,7 +23,7 @@ from src.chat.schemas import (
     MessageRequest,
     StartConversationRequest,
 )
-from src.database import get_session
+from src.database import Session, get_session
 from src.exceptions import AnswerInFlight
 
 router = APIRouter(prefix="/conversation/test", tags=["conversation-test"])
@@ -34,7 +33,7 @@ _TEMPLATE_PATH = Path(__file__).parent / "templates" / "chat_test.html"
 # Annotated[..., Depends(...)] instead of `= Depends(...)` -- ruff's B008
 # (flake8-bugbear) flags a function call in an argument default; this is
 # also the FastAPI-recommended form for a reusable dependency type.
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SessionDep = Annotated[Session, Depends(get_session)]
 
 
 def _to_response(reply: service.ConversationReply) -> ConversationReplyResponse:

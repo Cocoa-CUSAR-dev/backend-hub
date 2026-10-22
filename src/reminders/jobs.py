@@ -5,11 +5,9 @@ directly-testable async functions with no APScheduler-specific plumbing.
 import logging
 from datetime import datetime
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src import db
 from src.clock import bangkok_now
-from src.database import async_session_maker
+from src.database import Session, async_session_maker
 from src.line.service import multicast_text_batched
 from src.reminders.queries import (
     already_reminded_since,
@@ -36,7 +34,7 @@ async def check_and_send_reminders() -> None:
         await _run_reminder_check(session, bangkok_now())
 
 
-async def _run_reminder_check(session: AsyncSession, now: datetime) -> None:
+async def _run_reminder_check(session: Session, now: datetime) -> None:
     due = await due_reminders(session, now.time())
     if not due:
         return

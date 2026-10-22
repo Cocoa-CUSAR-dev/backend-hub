@@ -31,8 +31,8 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.database import Session
 from src.line import handler_registry
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ class ParentOption:
 UNSUPPORTED_PROMPT = "ขออภัยครับ แบบฟอร์มนี้ยังไม่รองรับการกรอกในแชท กรุณากรอกผ่านแอปนะครับ"
 
 
-async def kind_for_handler(session: AsyncSession, handler: str) -> str | None:
+async def kind_for_handler(session: Session, handler: str) -> str | None:
     """The parent kind to pick before this handler's questions, from the
     registry -- or None for a standalone handler."""
     return await handler_registry.parent_kind_for(session, handler)
@@ -89,7 +89,7 @@ def has_picker(kind: str) -> bool:
     return supported
 
 
-async def field_name_for(session: AsyncSession, kind: str) -> str:
+async def field_name_for(session: Session, kind: str) -> str:
     """The real destination column a picked parent rides under in the answer
     payload (see docs' "field_name trick"), from the registry."""
     field_name = await handler_registry.parent_field_for(session, kind)
@@ -105,7 +105,7 @@ def _label(prefix: str, when: datetime, place: str) -> str:
     return f"{prefix} {when:%d/%m/%Y} — {place}"
 
 
-async def _farm_activity_choices(session: AsyncSession, user_id: UUID) -> list[ParentOption]:
+async def _farm_activity_choices(session: Session, user_id: UUID) -> list[ParentOption]:
     rows = await session.execute(
         text(
             """
@@ -129,7 +129,7 @@ async def _farm_activity_choices(session: AsyncSession, user_id: UUID) -> list[P
     ]
 
 
-async def _harvest_choices(session: AsyncSession, user_id: UUID) -> list[ParentOption]:
+async def _harvest_choices(session: Session, user_id: UUID) -> list[ParentOption]:
     rows = await session.execute(
         text(
             """
@@ -154,7 +154,7 @@ async def _harvest_choices(session: AsyncSession, user_id: UUID) -> list[ParentO
     ]
 
 
-async def _batch_choices(session: AsyncSession, user_id: UUID) -> list[ParentOption]:
+async def _batch_choices(session: Session, user_id: UUID) -> list[ParentOption]:
     rows = await session.execute(
         text(
             """
@@ -181,5 +181,5 @@ _CHOICE_QUERY = {
 }
 
 
-async def choices_for(session: AsyncSession, kind: str, user_id: UUID) -> list[ParentOption]:
+async def choices_for(session: Session, kind: str, user_id: UUID) -> list[ParentOption]:
     return await _CHOICE_QUERY[kind](session, user_id)

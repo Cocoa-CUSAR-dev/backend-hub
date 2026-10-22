@@ -7,7 +7,6 @@ lib-outside-client|src/forms/client.py|imports httpx
 lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
 sql-outside-db|src/chat/dev_queries.py|imports sqlalchemy
-sql-outside-db|src/chat/dev_router.py|imports sqlalchemy
 sql-outside-db|src/chat/jobs.py|imports sqlalchemy
 sql-outside-db|src/chat/models.py|imports sqlalchemy
 sql-outside-db|src/chat/router.py|imports sqlalchemy
@@ -17,12 +16,8 @@ sql-outside-db|src/line/parent_picker.py|imports sqlalchemy
 sql-outside-db|src/line/plot_picker.py|imports sqlalchemy
 sql-outside-db|src/line/temp_task_picker.py|imports sqlalchemy
 sql-outside-db|src/models.py|imports sqlalchemy
-sql-outside-db|src/notifications/router.py|imports sqlalchemy
-sql-outside-db|src/notifications/service.py|imports sqlalchemy
-sql-outside-db|src/reminders/jobs.py|imports sqlalchemy
 sql-outside-db|src/reminders/models.py|imports sqlalchemy
 sql-outside-db|src/reminders/queries.py|imports sqlalchemy
-sql-outside-db|src/reminders/router.py|imports sqlalchemy
 table-owner|src/chat/dev_queries.py|auth.user_account (owner: src/db/auth.py)
 table-owner|src/chat/dev_queries.py|form.field_validation_rule (owner: src/db/forms.py)
 table-owner|src/chat/dev_queries.py|form.question (owner: src/db/forms.py)

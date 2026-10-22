@@ -32,7 +32,6 @@ from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
 
 from src.chat import llm_parsing, reuse, text_parsing
@@ -45,7 +44,7 @@ from src.chat.constants import (
 from src.chat.models import Conversation, ConversationAnswer
 from src.chat.state_machine import on_guided_answer
 from src.chat.validation import parse_lat_lng, validate_answer
-from src.database import async_session_maker
+from src.database import Session, async_session_maker
 from src.exceptions import ConversationNotFound, HandlerNotSupported
 from src.forms.schemas import FormDetail
 from src.line import parent_picker, plot_picker
@@ -365,7 +364,7 @@ def _answered_question_ids(answer_rows: list[ConversationAnswer]) -> set[UUID]:
 
 
 async def _answered_rows(
-    session: AsyncSession, conversation_id: UUID, *, refresh: bool = False
+    session: Session, conversation_id: UUID, *, refresh: bool = False
 ) -> list[ConversationAnswer]:
     """refresh=True re-reads rows this session may already hold (see
     confirm_conversation: after waiting on a lock, a stale in-memory
@@ -563,7 +562,7 @@ def is_multi_choice_question(question: Question, form: FormDetail) -> bool:
 
 
 async def multi_choice_options_for(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     question: Question,
@@ -712,7 +711,7 @@ def _with_real_choices(question: Question, real: list[Choice]) -> Question:
 
 
 async def _scope_question(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     question: Question,
@@ -761,7 +760,7 @@ async def _scope_question(
 
 
 async def _ask_question(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     question: Question,
@@ -796,9 +795,7 @@ async def _ask_question(
     )
 
 
-async def _selection_row(
-    session: AsyncSession, conversation: Conversation
-) -> ConversationAnswer | None:
+async def _selection_row(session: Session, conversation: Conversation) -> ConversationAnswer | None:
     """The answer row for the question currently open, if there is one.
 
     While a selection is being built this row exists and carries
@@ -812,7 +809,7 @@ async def _selection_row(
 
 
 async def _current_selection(
-    session: AsyncSession, conversation: Conversation
+    session: Session, conversation: Conversation
 ) -> tuple[list[str], list[str]]:
     """(values, labels) already chosen on the open question.
 
@@ -842,7 +839,7 @@ def _selection_text(labels: list[str]) -> str:
 
 
 async def _store_selection(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     values: list[str],
@@ -895,7 +892,7 @@ def _multi_choice_answer(values: list[str], labels: list[str]) -> dict[str, Any]
 
 
 async def _locked_selection(
-    session: AsyncSession, *, conversation_id: UUID, form: FormDetail
+    session: Session, *, conversation_id: UUID, form: FormDetail
 ) -> tuple[Conversation, Question, list[Choice]] | None:
     """Loads the conversation FOR UPDATE and checks that a picker button
     tapped right now is still meaningful. None means "stale, change nothing".
@@ -945,7 +942,7 @@ def _stale_reply(conversation_id: UUID) -> ConversationReply:
 
 
 async def toggle_choice(
-    session: AsyncSession, *, conversation_id: UUID, choice_id: str, form: FormDetail
+    session: Session, *, conversation_id: UUID, choice_id: str, form: FormDetail
 ) -> ConversationReply:
     """Adds or removes one option from the running selection (the
     "multi_toggle" postback). Replies with the running selection as a short
@@ -983,7 +980,7 @@ async def toggle_choice(
 
 
 async def finish_selection(
-    session: AsyncSession, *, conversation_id: UUID, form: FormDetail
+    session: Session, *, conversation_id: UUID, form: FormDetail
 ) -> ConversationReply:
     """Ends the selection (the "multi_done" postback / a typed "เสร็จ").
 
@@ -1015,7 +1012,7 @@ async def finish_selection(
 
 
 async def skip_selection(
-    session: AsyncSession, *, conversation_id: UUID, form: FormDetail
+    session: Session, *, conversation_id: UUID, form: FormDetail
 ) -> ConversationReply:
     """The picker's skip button ("ทั้งฟาร์ม" on the plot question, "⏭️ ข้าม"
     elsewhere) -- stored as {"skipped": true}, byte for byte what the skip
@@ -1047,7 +1044,7 @@ async def skip_selection(
 
 
 async def _handle_typed_selection_text(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     question: Question,
@@ -1118,7 +1115,7 @@ def _reply_for_question(
 
 
 async def start_conversation(
-    session: AsyncSession,
+    session: Session,
     *,
     user_id: UUID,
     task_id: UUID,
@@ -1188,7 +1185,7 @@ async def start_conversation(
 
 
 async def start_conversation_with_autofill(
-    session: AsyncSession,
+    session: Session,
     *,
     user_id: UUID,
     task_id: UUID,
@@ -1257,7 +1254,7 @@ async def start_conversation_with_autofill(
 
 
 async def _handle_parent_answer(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     raw_text: str,
@@ -1312,7 +1309,7 @@ async def _handle_parent_answer(
 
 
 async def _store_answer_and_advance(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     questions: list[Question],
@@ -1402,7 +1399,7 @@ class _AnswerInFlight(Exception):
     """Another message for this conversation is already being processed."""
 
 
-async def _lock_conversation(session: AsyncSession, conversation_id: UUID) -> Conversation:
+async def _lock_conversation(session: Session, conversation_id: UUID) -> Conversation:
     """Locks the conversation row for the rest of the caller's transaction --
     see handle_answer's comment for why, and why NOWAIT. Shared with
     handle_location so a location and a typed answer arriving together for
@@ -1439,7 +1436,7 @@ async def _lock_conversation(session: AsyncSession, conversation_id: UUID) -> Co
 
 
 async def handle_answer(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation_id: UUID,
     raw_text: str,
@@ -1700,7 +1697,7 @@ _LOCATION_TEXT_NOT_UNDERSTOOD = "ขออภัยครับ อ่านต�
 
 
 async def _answer_geodata_from_text(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     question: Question,
@@ -1748,7 +1745,7 @@ async def _answer_geodata_from_text(
 
 
 async def handle_location(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation_id: UUID,
     latitude: float,
@@ -1841,7 +1838,7 @@ def _multi_choice_row(answer_rows: list[ConversationAnswer]) -> ConversationAnsw
 
 
 async def _submit_per_choice(
-    session: AsyncSession,
+    session: Session,
     *,
     conversation: Conversation,
     row: ConversationAnswer,
@@ -1967,7 +1964,7 @@ _CONFIRM_WHILE_PAUSED = 'งานนี้พักไว้อยู่แล�
 
 
 async def confirm_conversation(
-    session: AsyncSession, *, conversation_id: UUID, form: FormDetail
+    session: Session, *, conversation_id: UUID, form: FormDetail
 ) -> ConversationReply:
     # Locked, and WAITING for the lock (not NOWAIT): a double tap on ยืนยัน,
     # or LINE redelivering the postback, arrives as two independent webhook
@@ -2174,7 +2171,7 @@ def _carried_answer(answer: dict[str, Any]) -> dict[str, Any]:
 
 
 async def start_next_submission(
-    session: AsyncSession, *, conversation_id: UUID, form: FormDetail
+    session: Session, *, conversation_id: UUID, form: FormDetail
 ) -> ConversationReply:
     """The "➕ เพิ่มอีกรายการ" half of multi-submit: opens a FRESH conversation
     on the same task and form as the one just confirmed.
@@ -2256,7 +2253,7 @@ async def start_next_submission(
     )
 
 
-async def cancel_conversation(session: AsyncSession, *, conversation_id: UUID) -> ConversationReply:
+async def cancel_conversation(session: Session, *, conversation_id: UUID) -> ConversationReply:
     """The escape hatch confirm/retry didn't have -- added after a farmer got
     stuck retrying a submission that could never succeed (an unsupported
     handler, CB-1's honest-failure message correctly refusing to lie about
@@ -2280,7 +2277,7 @@ async def cancel_conversation(session: AsyncSession, *, conversation_id: UUID) -
     )
 
 
-async def pause_active_conversation(session: AsyncSession, *, user_id: UUID) -> None:
+async def pause_active_conversation(session: Session, *, user_id: UUID) -> None:
     """Called whenever the farmer types เริ่ม (US2-3) -- since เริ่ม now always
     shows the task list, whatever's currently ACTIVE for this farmer needs
     to be paused first so switching to look at the list never silently
@@ -2308,7 +2305,7 @@ async def pause_active_conversation(session: AsyncSession, *, user_id: UUID) -> 
 
 
 async def find_resumable_conversation(
-    session: AsyncSession, *, user_id: UUID, task_id: UUID
+    session: Session, *, user_id: UUID, task_id: UUID
 ) -> Conversation | None:
     """Whether this (farmer, task) pair already has a conversation that
     isn't done -- ACTIVE (mid-turn, rare to hit here since เริ่ม just paused
@@ -2332,7 +2329,7 @@ async def find_resumable_conversation(
 
 
 async def resume_conversation(
-    session: AsyncSession, *, conversation: Conversation, form: FormDetail
+    session: Session, *, conversation: Conversation, form: FormDetail
 ) -> ConversationReply:
     """Picks a paused (or still-active) conversation back up (US2-3's
     resume-conversation logic) -- never silently: the reply always leads
@@ -2418,7 +2415,7 @@ async def resume_conversation(
 
 
 async def confirmation_prompt(
-    session: AsyncSession, *, conversation_id: UUID, form: FormDetail
+    session: Session, *, conversation_id: UUID, form: FormDetail
 ) -> ConversationReply:
     """Re-renders the confirmation summary for a conversation already sitting
     at the confirmation step, without changing anything about it.
@@ -2448,7 +2445,7 @@ async def confirmation_prompt(
 
 
 async def editable_questions(
-    session: AsyncSession, *, conversation_id: UUID, form: FormDetail
+    session: Session, *, conversation_id: UUID, form: FormDetail
 ) -> list[Question]:
     """Every question a farmer can currently pick to revisit via "แก้ไข"
     (US2-6, edit-at-confirmation) -- both real answers AND intentionally-
@@ -2465,7 +2462,7 @@ async def editable_questions(
     return [question_by_id[qid] for qid in ordered]
 
 
-async def edit_blocked_reason(session: AsyncSession, *, conversation_id: UUID) -> str | None:
+async def edit_blocked_reason(session: Session, *, conversation_id: UUID) -> str | None:
     """Why แก้ไข isn't allowed right now, or None if it is.
 
     Blocked exactly when a several-answer confirm stopped partway: some rows
@@ -2490,7 +2487,7 @@ async def edit_blocked_reason(session: AsyncSession, *, conversation_id: UUID) -
 
 
 async def begin_edit(
-    session: AsyncSession, *, conversation_id: UUID, question_id: UUID, form: FormDetail
+    session: Session, *, conversation_id: UUID, question_id: UUID, form: FormDetail
 ) -> ConversationReply:
     """US2-6: re-opens an already-answered (or skipped) question for editing
     from the confirmation step. Sets current_question_id back to it and

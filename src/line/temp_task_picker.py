@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.database import Session
 
 # The one keyword every hint message names (#186 item 1). START_KEYWORDS is a
 # set, so `next(iter(...))` -- what the hint used to do -- could tell one
@@ -44,7 +45,7 @@ class PendingTask:
     has_conversation: bool
 
 
-async def list_pending_tasks(session: AsyncSession, user_id: UUID) -> list[PendingTask]:
+async def list_pending_tasks(session: Session, user_id: UUID) -> list[PendingTask]:
     """A task is "pending" if this user has no form.response row for it yet,
     OR its form is multiple-submit (in which case it stays listed no matter
     how many responses exist -- see the WHERE clause) -- mirrors
