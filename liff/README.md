@@ -32,6 +32,18 @@ can be exercised in a plain desktop browser -- but `liff.login()` still
 needs a real LIFF ID to redirect through, and the pushed follow-up message
 only shows up in the real LINE chat, not in this app.
 
+## Testing
+
+```bash
+npm test
+```
+
+`src/App.test.tsx` (docs-and-plan#177) drives the whole screen -- `App`,
+`api.ts` and `liffClient.ts` -- against a fake chatbot backend, with only
+the LINE SDK stubbed. No LIFF ID or running backend needed. CI runs it
+alongside lint and the production build (the `liff` job in
+`.github/workflows/ci.yml`).
+
 ## Deploying
 
 Whoever registers the LIFF app in the LINE Developers Console (under the

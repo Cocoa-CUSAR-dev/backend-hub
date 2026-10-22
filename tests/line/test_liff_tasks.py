@@ -132,6 +132,49 @@ async def test_list_pending_tasks_filters_out_completed(client: AsyncClient) -> 
     assert body[0]["task_id"] == str(pending.task_id)
 
 
+async def test_list_pending_tasks_keeps_everything_still_outstanding(client: AsyncClient) -> None:
+    # docs-and-plan#177: "pending" means anything the farmer can still act
+    # on. A multi-submit form with rows already in comes back from Go as
+    # IN_PROGRESS (form_handler.go's status ladder), and an overdue task is
+    # still owed -- both stay, in Go's order; only COMPLETED goes.
+    user_id = uuid4()
+    not_started = _task_item(uuid4(), "farm_activity", "NOT_STARTED")
+    multi_submit_in_progress = _task_item(uuid4(), "harvest_grade", "IN_PROGRESS")
+    done = _task_item(uuid4(), "harvest", "COMPLETED")
+    overdue = _task_item(uuid4(), "fertilizer", "OVERDUE")
+    app.dependency_overrides[liff_tasks.resolve_liff_user] = lambda: liff_tasks.ResolvedLiffUser(
+        user_id=user_id, line_user_id="Uabc"
+    )
+
+    fetch = AsyncMock(return_value=[not_started, multi_submit_in_progress, done, overdue])
+    with patch("src.line.liff_tasks.fetch_pending_tasks", fetch):
+        resp = await client.get("/line/liff/tasks")
+
+    assert resp.status_code == 200
+    assert [(t["task_id"], t["status"]) for t in resp.json()] == [
+        (str(not_started.task_id), "NOT_STARTED"),
+        (str(multi_submit_in_progress.task_id), "IN_PROGRESS"),
+        (str(overdue.task_id), "OVERDUE"),
+    ]
+    # Asked for this farmer's tasks, not anyone else's.
+    fetch.assert_awaited_once_with(user_id=str(user_id))
+
+
+async def test_list_pending_tasks_is_empty_when_everything_is_done(client: AsyncClient) -> None:
+    app.dependency_overrides[liff_tasks.resolve_liff_user] = lambda: liff_tasks.ResolvedLiffUser(
+        user_id=uuid4(), line_user_id="Uabc"
+    )
+
+    with patch(
+        "src.line.liff_tasks.fetch_pending_tasks",
+        AsyncMock(return_value=[_task_item(uuid4(), "harvest", "COMPLETED")]),
+    ):
+        resp = await client.get("/line/liff/tasks")
+
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
 async def test_list_pending_tasks_requires_auth(client: AsyncClient) -> None:
     resp = await client.get("/line/liff/tasks")
     assert resp.status_code == 400
