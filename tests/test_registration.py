@@ -19,9 +19,12 @@ def test_wkt_is_lon_lat_with_six_decimals() -> None:
     )
 
 
-def test_one_point_is_a_location_and_more_an_outline() -> None:
+def test_one_point_is_a_location_three_an_outline_and_two_neither() -> None:
     assert registration.wkt_shape([A]).startswith("POINT(")
-    assert registration.wkt_shape([A, B]).startswith("POLYGON((")
+    assert registration.wkt_shape([A, B, C]).startswith("POLYGON((")
+    with pytest.raises(Invalid) as caught:
+        registration.wkt_shape([A, B])
+    assert caught.value.fields == {"gis": "An outline needs at least 3 points"}
 
 
 def test_found_date(monkeypatch: pytest.MonkeyPatch) -> None:
