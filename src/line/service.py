@@ -19,12 +19,12 @@ from linebot.v3.messaging import (
     TextMessage,
 )
 
+from src.chat.ui.flex_builders import build_multi_choice_flex
+from src.chat.ui.schemas import QuickReplyOption
 from src.config import settings
-from src.line.flex_builders import build_multi_choice_flex
-from src.line.schemas import QuickReplyOption
 
 if TYPE_CHECKING:
-    from src.conversation.service import Question
+    from src.chat.service import Question
     from src.line.temp_task_picker import PendingTask
 
 logger = logging.getLogger(__name__)

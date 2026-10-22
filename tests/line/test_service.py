@@ -1,8 +1,8 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from src.chat.ui.schemas import QuickReplyOption
 from src.line import service
-from src.line.schemas import QuickReplyOption
 from src.line.temp_task_picker import PendingTask
 
 

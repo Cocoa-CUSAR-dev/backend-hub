@@ -1,5 +1,5 @@
 """Webhook-level tests for the guided-flow answer loop -- exercises
-src.line.router + src.conversation.service + a real Postgres session
+src.chat.router + src.chat.service + a real Postgres session
 together through the actual /line/webhook route. Kotlin's forms endpoint is
 mocked with respx (it's httpx-based); LINE's reply call is mocked by
 patching AsyncMessagingApi.reply_message directly, since line-bot-sdk sends

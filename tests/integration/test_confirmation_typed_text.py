@@ -48,9 +48,9 @@ async def _send_message(client: AsyncClient, *, line_user_id: str, text_content:
         patch(
             "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
-        patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-        patch("src.line.router.push_flex", new=AsyncMock()),
-        patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="token")),
+        patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+        patch("src.chat.router.push_flex", new=AsyncMock()),
+        patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -138,7 +138,7 @@ class TestTypedYesWordConfirms:
             respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
-            with patch("src.conversation.service.submit_task", new=AsyncMock()):
+            with patch("src.chat.service.submit_task", new=AsyncMock()):
                 reply_message = await _send_message(
                     client, line_user_id=line_user_id, text_content="เค"
                 )
@@ -160,7 +160,7 @@ class TestTypedYesWordConfirms:
             respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
-            with patch("src.conversation.service.submit_task", new=AsyncMock()):
+            with patch("src.chat.service.submit_task", new=AsyncMock()):
                 await _send_message(client, line_user_id=line_user_id, text_content="ยืนยันครับ")
 
         assert await _status_of(db_session, conversation_id) == "completed"
@@ -180,7 +180,7 @@ class TestTypedYesWordConfirms:
             respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
-            with patch("src.conversation.service.submit_task", new=AsyncMock()):
+            with patch("src.chat.service.submit_task", new=AsyncMock()):
                 reply_message = await _send_message(
                     client, line_user_id=line_user_id, text_content="ตกลง"
                 )

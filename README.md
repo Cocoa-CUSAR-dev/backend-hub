@@ -39,9 +39,11 @@ src/
 ├── main.py  config.py  exceptions.py  database.py  actor.py  clock.py   # shared core
 ├── db/                  # ALL SQL, one file per schema (owners listed in each file)
 ├── llm/                 # the only LiteLLM caller
-├── line/  conversation/ # LINE door + chatbot brain (moving to chat/)
+├── chat/                # LINE door + chatbot brain (webhook, LIFF, ui/, state machine, intent, parsing)
+├── line/                # LINE helpers still to be folded into line/client.py (the one linebot importer)
 ├── forms/  tasks/  diary/  sso/   # temporary clients to Kotlin/Go
-├── reminders/  notifications/  internal/
+├── reminders/  notifications/
+├── jobs/                # cron door (/internal/cron/*) and the scheduler
 └── ...                  # feature folders arrive with the merge: auth/ me/ agriculture/ ...
 scripts/check_conventions.py       # CI guard for CONVENTIONS.md
 tests/                             # mirrors src/

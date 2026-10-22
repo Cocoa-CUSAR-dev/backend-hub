@@ -5,10 +5,10 @@ farmer types a keyword and gets their pending tasks back as LINE Quick Reply
 buttons instead.
 
 Deliberate, temporary exception to "the chatbot never touches form.*
-directly" (ADR 0001) -- the same shortcut src/conversation/dev_queries.py
+directly" (ADR 0001) -- the same shortcut src/chat/dev_queries.py
 takes for dev testing, but this is production code reachable from real LINE
 messages, not test scaffolding. Delete this file (and the keyword-handling
-branch in src/line/router.py that calls it) once Sprint 5's real picker
+branch in src/chat/router.py that calls it) once Sprint 5's real picker
 ships.
 """
 

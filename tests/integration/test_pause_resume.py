@@ -1,8 +1,8 @@
 """Tests for pause/resume (US2-3) against a real Postgres session -- most
-classes exercise src.line.router + src.conversation.service together through
+classes exercise src.chat.router + src.chat.service together through
 the real /line/webhook route, with Kotlin's forms endpoint and LINE's reply
 call mocked at the boundary. TestPauseIdleConversations is the exception: it
-calls src.conversation.jobs.pause_idle_conversations directly, since that's a
+calls src.chat.jobs.pause_idle_conversations directly, since that's a
 scheduled job with no webhook involved.
 """
 
@@ -14,8 +14,8 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.chat.jobs import pause_idle_conversations
 from src.config import settings
-from src.conversation.jobs import pause_idle_conversations
 from src.line.parent_picker import ParentOption
 from tests.integration.helpers import (
     build_form_response,

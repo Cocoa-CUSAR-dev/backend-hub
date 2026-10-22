@@ -1,0 +1,1654 @@
+import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from src.chat import service
+from src.chat.constants import ActiveSubstate, AnswerSource, ConversationStatus
+from src.chat.models import Conversation, ConversationAnswer
+from src.exceptions import ConversationNotFound, HandlerNotSupported, UpstreamServiceError
+from src.forms.schemas import FormDetail
+from src.line import parent_picker
+
+
+def _form(*, mandatory_flags: list[bool]) -> tuple[FormDetail, list[uuid.UUID]]:
+    question_ids = [uuid.uuid4() for _ in mandatory_flags]
+    questions = [
+        {
+            "question_id": str(qid),
+            "label": f"question {i}",
+            "field_name": f"field_{i}",
+            "input_type": "VARCHAR",
+            "is_mandatory": mandatory,
+            "sort_order": i,
+        }
+        for i, (qid, mandatory) in enumerate(zip(question_ids, mandatory_flags, strict=True))
+    ]
+    return FormDetail(task_form_id="tf-1", sections=[{"questions": questions}]), question_ids
+
+
+def _validated_field_form(
+    validation_rule: dict[str, object] | None,
+) -> tuple[FormDetail, uuid.UUID]:
+    """A single mandatory free-text question carrying `validation_rule`
+    directly, the same shape _question_from_dict reads off a real question
+    dict post-forms/client.py-conversion -- lets tests drive the Validate
+    Answer step without needing a live Kotlin response.
+    """
+    question_id = uuid.uuid4()
+    questions = [
+        {
+            "question_id": str(question_id),
+            "label": "จำนวนพัดลม",
+            "field_name": "fan_count",
+            "input_type": "VARCHAR",
+            "is_mandatory": True,
+            "sort_order": 0,
+            "validation_rule": validation_rule,
+        }
+    ]
+    return FormDetail(task_form_id="tf-validated", sections=[{"questions": questions}]), question_id
+
+
+def _boolean_form() -> tuple[FormDetail, uuid.UUID]:
+    """A single mandatory BOOLEAN question -- matches the real
+    farm_pest_disease_record.is_quality_damage shape that actually failed
+    with `invalid input syntax for type boolean` before this existed.
+    """
+    question_id = uuid.uuid4()
+    questions = [
+        {
+            "question_id": str(question_id),
+            "label": "ทำให้ผลโกโก้เสียคุณภาพหรือไม่",
+            "field_name": "is_quality_damage",
+            "input_type": "BOOLEAN",
+            "is_mandatory": True,
+            "sort_order": 0,
+        }
+    ]
+    return FormDetail(task_form_id="tf-bool", sections=[{"questions": questions}]), question_id
+
+
+def _option_form(*, choice_count: int, is_mandatory: bool = True) -> tuple[FormDetail, uuid.UUID]:
+    """A single OPTION question with `choice_count` real choices -- matches
+    farm_id (backed by ref.farm_constant) on the harvest/farm_activity
+    forms, the field a reviewer caught actually hitting the pause-slot
+    regression at 13 real rows, and now the shape used to exercise
+    pagination once choice_count exceeds a single page's budget.
+    """
+    question_id = uuid.uuid4()
+    questions = [
+        {
+            "question_id": str(question_id),
+            "label": "เลือกฟาร์ม",
+            "field_name": "farm_id",
+            "input_type": "OPTION",
+            "is_mandatory": is_mandatory,
+            "sort_order": 0,
+            "choices": [
+                {"id": str(uuid.uuid4()), "name": f"farm {i}"} for i in range(choice_count)
+            ],
+        }
+    ]
+    return FormDetail(task_form_id="tf-option", sections=[{"questions": questions}]), question_id
+
+
+def _mandatory_option_form(choice_count: int) -> tuple[FormDetail, uuid.UUID]:
+    return _option_form(choice_count=choice_count, is_mandatory=True)
+
+
+def _answer(question_id: uuid.UUID, text: str = "some answer") -> ConversationAnswer:
+    return ConversationAnswer(
+        conversation_id=uuid.uuid4(),
+        question_id=question_id,
+        answer={"text": text},
+        source=AnswerSource.GUIDED_FLOW,
+    )
+
+
+def _mock_session(
+    *, answers: list[ConversationAnswer], conversation: Conversation | None = None
+) -> MagicMock:
+    """A DB session double -- no real Postgres, matching this repo's existing
+    no-real-DB test convention (see tests/line/test_webhook.py).
+
+    session.execute is used for several different queries across this
+    module: the locked conversation lookup (.scalar_one_or_none()), the
+    answered-rows lookup (.scalars().all()), and the pause/resume lookups
+    (.scalars().first()) -- all rigged on the same result double since each
+    call site only ever touches the method chain it cares about.
+    """
+    session = MagicMock()
+    session.add = MagicMock()
+    session.flush = AsyncMock()
+    session.commit = AsyncMock()
+    session.refresh = AsyncMock(
+        side_effect=lambda obj: setattr(obj, "conversation_id", uuid.uuid4())
+    )
+
+    execute_result = MagicMock()
+    execute_result.scalars.return_value.all.return_value = answers
+    execute_result.scalars.return_value.first.return_value = conversation
+    execute_result.scalar_one_or_none.return_value = conversation
+    session.execute = AsyncMock(return_value=execute_result)
+    return session
+
+
+def test_questions_from_form_orders_by_sort_order() -> None:
+    form, question_ids = _form(mandatory_flags=[True, True])
+    form.sections[0]["questions"].reverse()  # shuffle -- confirm sorting actually happens
+
+    questions = service.questions_from_form(form)
+
+    assert [q.question_id for q in questions] == question_ids
+
+
+def test_boolean_question_gets_synthesized_yes_no_choices() -> None:
+    """Kotlin never sends `choices` for BOOLEAN (its own filter is
+    INPUT_TYPE == OPTION only), so these have to be synthesized locally.
+    """
+    form, question_id = _boolean_form()
+
+    questions = service.questions_from_form(form)
+
+    assert len(questions) == 1
+    assert questions[0].choices == [
+        service.Choice(id="__pause__", label="⏸️ พักไว้ก่อน"),
+        service.Choice(id="true", label="ใช่"),
+        service.Choice(id="false", label="ไม่"),
+    ]
+
+
+def test_mandatory_option_at_quota_leaves_room_for_pause() -> None:
+    """Regression caught in review (PR #25): the mandatory branch of
+    _choices_for used to return `[_PAUSE_CHOICE, *constrained]` completely
+    unsliced, on the assumption a mandatory question's real choices already
+    fit LINE's 13-item Quick Reply cap. Adding pause broke that -- a
+    mandatory OPTION field with exactly 13 real choices (farm_id, backed by
+    ref.farm_constant, real production data) became 14 total, and router.py's
+    own send-time `choices[:13]` slice silently dropped the LAST real
+    choice -- a farm a farmer could no longer actually select via button.
+    """
+    form, _ = _mandatory_option_form(choice_count=service._QUICK_REPLY_LIMIT)
+
+    questions = service.questions_from_form(form)
+
+    assert len(questions) == 1
+    choices = questions[0].choices
+    assert choices is not None
+    assert len(choices) == service._QUICK_REPLY_LIMIT  # pause + 12 real, not 14
+    assert choices[0] == service.Choice(id="__pause__", label="⏸️ พักไว้ก่อน")
+    expected_labels = [f"farm {i}" for i in range(service._QUICK_REPLY_LIMIT - 1)]
+    assert [c.label for c in choices[1:]] == expected_labels
+
+
+def test_mandatory_option_well_under_quota_keeps_every_real_choice() -> None:
+    """The fix must not over-truncate the common case -- only the
+    near-the-cap case actually needs anything dropped."""
+    form, _ = _mandatory_option_form(choice_count=3)
+
+    questions = service.questions_from_form(form)
+
+    choices = questions[0].choices
+    assert choices is not None
+    assert len(choices) == 4  # pause + all 3 real choices, nothing dropped
+    assert [c.label for c in choices[1:]] == ["farm 0", "farm 1", "farm 2"]
+
+
+class TestPaginate:
+    """The follow-up to the mandatory-OPTION regression (test_mandatory_
+    option_at_quota_leaves_room_for_pause above): rather than silently
+    dropping overflow past one page, a question with too many real choices
+    to fit alongside pause(/skip) now pages through them. Exercised
+    directly against service._paginate rather than through handle_answer,
+    since this is where the actual slot math lives -- same lesson from
+    that regression: test the arithmetic directly, not just end-to-end.
+    """
+
+    def test_fits_on_one_page_ignores_page_argument(self) -> None:
+        """The vast majority of questions: real choices already fit
+        alongside pause in one message, exactly _choices_for's own output --
+        `page` must be completely irrelevant here, not just defaulted."""
+        form, question_id = _mandatory_option_form(choice_count=5)
+        question = service.questions_from_form(form)[0]
+
+        for page in (0, 1, 99):
+            paginated = service._paginate(question, page)
+            assert paginated.choices == question.choices
+            assert paginated.indicator == ""
+
+    def test_mandatory_first_page_has_next_but_no_prev(self) -> None:
+        # mandatory budget once paginated: 13 - 1(pause) - 2(nav) = 10 real/page
+        form, _ = _mandatory_option_form(choice_count=25)
+        question = service.questions_from_form(form)[0]
+
+        paginated = service._paginate(question, 0)
+
+        assert paginated.indicator == " (หน้า 1/3)"
+        # One under the cap here, not exactly at it -- only middle pages
+        # (both prev+next) hit the full reserved-nav budget; the first page
+        # only needs one nav slot (next), so it's pause(1) + 10 real + next(1).
+        assert len(paginated.choices) == service._QUICK_REPLY_LIMIT - 1
+        assert paginated.choices[0] == service._PAUSE_CHOICE
+        assert [c.label for c in paginated.choices[1:-1]] == [f"farm {i}" for i in range(10)]
+        assert paginated.choices[-1] == service._NEXT_PAGE_CHOICE
+        assert service._PREV_PAGE_CHOICE not in paginated.choices
+
+    def test_mandatory_middle_page_has_both_prev_and_next(self) -> None:
+        form, _ = _mandatory_option_form(choice_count=25)
+        question = service.questions_from_form(form)[0]
+
+        paginated = service._paginate(question, 1)
+
+        assert paginated.indicator == " (หน้า 2/3)"
+        assert len(paginated.choices) == service._QUICK_REPLY_LIMIT  # worst case, still exact
+        assert paginated.choices[0] == service._PAUSE_CHOICE
+        assert [c.label for c in paginated.choices[1:-2]] == [f"farm {i}" for i in range(10, 20)]
+        assert paginated.choices[-2] == service._PREV_PAGE_CHOICE
+        assert paginated.choices[-1] == service._NEXT_PAGE_CHOICE
+
+    def test_mandatory_last_page_has_prev_but_no_next(self) -> None:
+        form, _ = _mandatory_option_form(choice_count=25)
+        question = service.questions_from_form(form)[0]
+
+        paginated = service._paginate(question, 2)
+
+        assert paginated.indicator == " (หน้า 3/3)"
+        # Nav choices trail the real choices (see the middle-page test above,
+        # which already established this order): pause, then the 5 remaining
+        # real choices, then prev -- not prev wedged between pause and the
+        # real choices.
+        assert paginated.choices[0] == service._PAUSE_CHOICE
+        assert [c.label for c in paginated.choices[1:-1]] == [f"farm {i}" for i in range(20, 25)]
+        assert paginated.choices[-1] == service._PREV_PAGE_CHOICE
+        assert service._NEXT_PAGE_CHOICE not in paginated.choices
+
+    def test_non_mandatory_reserves_room_for_skip_too(self) -> None:
+        # non-mandatory budget once paginated: 13 - 2(skip+pause) - 2(nav) = 9 real/page
+        form, _ = _option_form(choice_count=20, is_mandatory=False)
+        question = service.questions_from_form(form)[0]
+
+        paginated = service._paginate(question, 0)
+
+        # One under the cap -- page 0 only needs the "next" nav slot, same
+        # reasoning as the mandatory first-page test above.
+        assert len(paginated.choices) == service._QUICK_REPLY_LIMIT - 1
+        assert paginated.choices[0] == service._SKIP_CHOICE
+        assert paginated.choices[1] == service._PAUSE_CHOICE
+        assert [c.label for c in paginated.choices[2:-1]] == [f"farm {i}" for i in range(9)]
+        assert paginated.choices[-1] == service._NEXT_PAGE_CHOICE
+
+    def test_out_of_range_page_is_clamped_not_crashed(self) -> None:
+        form, _ = _mandatory_option_form(choice_count=25)
+        question = service.questions_from_form(form)[0]
+
+        too_high = service._paginate(question, 99)
+        negative = service._paginate(question, -5)
+
+        assert too_high.indicator == " (หน้า 3/3)"  # clamped to the real last page
+        assert negative.indicator == " (หน้า 1/3)"  # clamped to the first page
+
+
+class TestStartConversation:
+    async def test_asks_first_unanswered_question_regardless_of_mandatory(self) -> None:
+        """Every question gets asked, not just mandatory ones -- an optional
+        question gets a skip button instead of being silently omitted (see
+        _choices_for's skip-button logic). _next_unanswered_required
+        filtering on is_mandatory again would make skip buttons unreachable
+        dead code, since only questions it selects as "next" ever reach the
+        farmer.
+        """
+        form, (q1, q2, q3) = _form(mandatory_flags=[False, True, True])
+        session = _mock_session(answers=[])
+
+        reply = await service.start_conversation(
+            session,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            form=form,
+        )
+
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert reply.text == "question 0"  # q1, sort_order 0 -- first regardless of mandatory
+        assert reply.choices == [
+            service.Choice(id="__skip__", label="⏭️ ข้าม"),
+            service.Choice(id="__pause__", label="⏸️ พักไว้ก่อน"),
+        ]
+
+    async def test_all_optional_form_still_asks_every_question(self) -> None:
+        """An all-optional form (matches database/seed/mock_forms.sql's
+        processing_record shape) still asks each question with a skip
+        option, rather than silently deciding none of them are worth
+        asking and jumping straight to confirmation.
+        """
+        form, _ = _form(mandatory_flags=[False, False])
+        session = _mock_session(answers=[])
+
+        reply = await service.start_conversation(
+            session,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            form=form,
+        )
+
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert reply.text == "question 0"
+
+
+class TestStartConversationWithAutofill:
+    """US2-4: seeding a brand-new conversation from a sanitized reuse
+    answer (already filtered by src.chat.reuse.sanitize_for_autofill
+    before it reaches here -- these tests pass already-clean dicts, the
+    same way router.py will after calling that function itself).
+    """
+
+    async def test_every_question_reused_goes_straight_to_confirmation(self) -> None:
+        form, (q1, q2) = _form(mandatory_flags=[True, True])
+        session = _mock_session(answers=[])
+
+        reply = await service.start_conversation_with_autofill(
+            session,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            form=form,
+            sanitized_answer={"field_0": "คำตอบที่ 1", "field_1": "คำตอบที่ 2"},
+        )
+
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        assert "สรุปคำตอบของคุณ" in reply.text
+        assert "คำตอบที่ 1" in reply.text
+        assert "คำตอบที่ 2" in reply.text
+
+    async def test_partial_reuse_recaps_then_asks_the_remaining_question(self) -> None:
+        form, (q1, q2) = _form(mandatory_flags=[True, True])
+        session = _mock_session(answers=[])
+
+        reply = await service.start_conversation_with_autofill(
+            session,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            form=form,
+            sanitized_answer={"field_0": "คำตอบที่ 1"},
+        )
+
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert "question 0" in reply.text  # recap of the reused answer
+        assert "คำตอบที่ 1" in reply.text
+        assert reply.text.endswith("question 1")  # the one still unanswered, asked fresh
+
+    async def test_nothing_reused_behaves_like_a_fresh_start_with_no_recap(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        session = _mock_session(answers=[])
+
+        reply = await service.start_conversation_with_autofill(
+            session,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            form=form,
+            sanitized_answer={},
+        )
+
+        assert reply.text == "question 0"  # no recap prefix -- nothing was reused
+
+    async def test_reused_option_value_shows_its_label_not_its_raw_id(self) -> None:
+        form, question_id = _mandatory_option_form(choice_count=3)
+        farm_choice_id = form.sections[0]["questions"][0]["choices"][1]["id"]
+        session = _mock_session(answers=[])
+
+        reply = await service.start_conversation_with_autofill(
+            session,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            form=form,
+            sanitized_answer={"farm_id": farm_choice_id},
+        )
+
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        assert "farm 1" in reply.text  # the label, not the raw uuid
+        assert farm_choice_id not in reply.text
+
+
+class TestStartConversationWithParentPicker:
+    """The 5 previously-blocked handlers (docs/plans/chatbot-child-handler-
+    design.md) start on a synthetic parent-picker question instead of the
+    form's real first question -- router.py has already resolved
+    parent_choices and confirmed it's non-empty before calling this.
+    """
+
+    async def test_asks_parent_picker_question_before_any_real_question(self) -> None:
+        form, _ = _form(mandatory_flags=[True])  # a real question exists but must NOT be asked yet
+        session = _mock_session(answers=[])
+        choices = [parent_picker.ParentOption(id="pa-1", label="กิจกรรม 01/08/2026 — ใส่ปุ๋ย")]
+
+        reply = await service.start_conversation(
+            session,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            form=form,
+            parent_kind="farm_activity",
+            parent_choices=choices,
+        )
+
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert reply.text == parent_picker.PROMPT["farm_activity"]
+        assert reply.choices == [
+            service.Choice(id="__pause__", label="⏸️ พักไว้ก่อน"),
+            service.Choice(id="pa-1", label="กิจกรรม 01/08/2026 — ใส่ปุ๋ย"),
+        ]
+        added_conversation = session.add.call_args.args[0]
+        # current_question_id has a real FK to form.question -- there's no
+        # such row for this synthetic step, so it must stay NULL, not some
+        # made-up placeholder (see the ForeignKeyViolationError this
+        # replaced). Which picker is pending lives in parent_answer instead.
+        assert added_conversation.current_question_id is None
+        assert added_conversation.parent_answer == {"pending_kind": "farm_activity"}
+
+
+class TestHandleAnswer:
+    async def test_advances_to_next_required_question_when_slots_remain(self) -> None:
+        form, (q1, q2) = _form(mandatory_flags=[True, True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=q1,
+        )
+        # q2 still unanswered
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+        # confirm_conversation uses plain session.get, unlike handle_answer's
+        # locked select -- _mock_session only rigs session.execute.
+        session.get = AsyncMock(return_value=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="answer 1", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert conversation.current_question_id == q2
+
+    async def test_reaches_confirmation_once_all_required_answered(self) -> None:
+        """The exact case state_machine.py's own docstring calls out: "slots
+        still missing" vs. "all filled" must route through on_guided_answer,
+        not be reimplemented here.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=q1,
+        )
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+        # confirm_conversation uses plain session.get, unlike handle_answer's
+        # locked select -- _mock_session only rigs session.execute.
+        session.get = AsyncMock(return_value=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="answer 1", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        assert conversation.current_question_id is None
+
+    async def test_reanswering_an_already_answered_question_updates_it_in_place(self) -> None:
+        """The upsert US2-6 (edit-at-confirmation, begin_edit) depends on:
+        re-answering a question that already has a ConversationAnswer row
+        (begin_edit resets current_question_id back to an already-answered
+        question) must update that row, not add a second one for the same
+        question_id -- see handle_answer's own comment on why a duplicate
+        would corrupt both the confirmation summary and confirm_conversation's
+        submission payload.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=q1,
+        )
+        existing_answer = _answer(q1, text="old answer")
+        session = _mock_session(answers=[existing_answer], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="new answer", form=form
+        )
+
+        assert reply is not None
+        session.add.assert_not_called()  # updated the existing row, not a new one
+        assert existing_answer.answer == {"text": "new answer"}
+
+    async def test_confirmation_summary_lists_every_answer(self) -> None:
+        """The actual "submission confirmation" deliverable -- a farmer
+        should see what they answered before confirming, not a generic
+        "ready?" line.
+        """
+        form, (q1, q2) = _form(mandatory_flags=[True, True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=q2,
+        )
+        session = _mock_session(
+            answers=[_answer(q1, text="คำตอบที่ 1"), _answer(q2, text="คำตอบที่ 2")],
+            conversation=conversation,
+        )
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="คำตอบที่ 2", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        assert "question 0" in reply.text
+        assert "คำตอบที่ 1" in reply.text
+        assert "question 1" in reply.text
+        assert "คำตอบที่ 2" in reply.text
+        # question 0's label should appear before question 1's -- sort_order,
+        # not answer-insertion order.
+        assert reply.text.index("question 0") < reply.text.index("question 1")
+
+
+class TestHandleAnswerWithChoices:
+    """Covers the resolution logic BOOLEAN and OPTION questions both share --
+    real bug this closes: `agriculture.farm_pest_disease_record` rejected
+    free-text answers like "ไม่"/"aaa" for its real `boolean` column with
+    `invalid input syntax for type boolean` until this resolved a tapped/typed
+    label to a real "true"/"false" value first.
+    """
+
+    async def test_matching_choice_resolves_to_true_false_value(self) -> None:
+        form, question_id = _boolean_form()
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="ใช่", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        added_answer = session.add.call_args.args[0]
+        assert added_answer.answer == {"text": "ใช่", "value": "true"}
+
+    async def test_choice_with_trailing_particle_still_resolves(self) -> None:
+        """text_parsing.match_choice: "ใช่ครับ" resolves to the "ใช่" choice
+        same as an exact "ใช่" would -- the farmer's answer is normal
+        BOOLEAN-question phrasing, not free text that fails to resolve.
+        """
+        form, question_id = _boolean_form()
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="ใช่ครับ", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        added_answer = session.add.call_args.args[0]
+        assert added_answer.answer == {"text": "ใช่ครับ", "value": "true"}
+
+    async def test_non_matching_answer_reasks_same_question(self) -> None:
+        form, question_id = _boolean_form()
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="aaa", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert reply.choices == [
+            service.Choice(id="__pause__", label="⏸️ พักไว้ก่อน"),
+            service.Choice(id="true", label="ใช่"),
+            service.Choice(id="false", label="ไม่"),
+        ]
+        assert "กรุณาเลือกคำตอบจากตัวเลือกที่กำหนดเท่านั้น" in reply.text
+        session.add.assert_not_called()  # bad answer never gets persisted
+        assert conversation.current_question_id == question_id  # unchanged, still open
+
+
+_FAN_COUNT_RULE = {
+    "type": "INT",
+    "min": 0,
+    "max": 50,
+    "integer_only": True,
+    "error_message": "กรุณากรอกจำนวนพัดลมเป็นจำนวนเต็ม 0-50",
+}
+
+
+class TestHandleAnswerValidation:
+    """The (New) Validate Answer step: a free-text answer that fails its
+    field's format rule must be rejected -- re-ask the same question with
+    the rule's own error_message, never persisted.
+    """
+
+    async def test_invalid_answer_reasks_with_error_message(self) -> None:
+        form, question_id = _validated_field_form(_FAN_COUNT_RULE)
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="999", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert "กรุณากรอกจำนวนพัดลมเป็นจำนวนเต็ม 0-50" in reply.text
+        assert "จำนวนพัดลม" in reply.text  # question re-asked, not dropped
+        session.add.assert_not_called()  # invalid answer never gets persisted
+        assert conversation.current_question_id == question_id  # unchanged, still open
+
+    async def test_valid_answer_is_stored_and_advances(self) -> None:
+        form, question_id = _validated_field_form(_FAN_COUNT_RULE)
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="5", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        added_answer = session.add.call_args.args[0]
+        assert added_answer.answer == {"text": "5"}
+
+    async def test_field_with_no_rule_skips_validation_entirely(self) -> None:
+        """Existing behavior for untracked fields (e.g. field_0/field_1 used
+        throughout this file's other fixtures) must be unaffected.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=q1,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="anything goes", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        session.add.assert_called_once()
+
+    async def test_mandatory_question_with_no_rule_rejects_blank_answer(self) -> None:
+        """A mandatory field with no validation_rule row at all must still
+        reject a blank/whitespace-only answer -- validate_answer alone would
+        pass it through unchecked (see test_field_with_no_rule_skips_
+        validation_entirely), which is exactly the gap this guards against.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=q1,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="   ", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert "เว้นว่าง" in reply.text
+        session.add.assert_not_called()  # blank answer never gets persisted
+        assert conversation.current_question_id == q1  # unchanged, still open
+
+    async def test_spelled_out_thai_number_is_normalized_before_storing(self) -> None:
+        """text_parsing's fixed-parse step (docs/plans/text-parsing-
+        pipeline.md): a spelled-out Thai number still has to pass the
+        field's own INT rule afterward, but what gets stored is the
+        normalized digit string, not the words the farmer typed.
+        """
+        form, question_id = _validated_field_form(_FAN_COUNT_RULE)
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="ห้า", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        added_answer = session.add.call_args.args[0]
+        assert added_answer.answer == {"text": "5"}
+
+    async def test_unparseable_number_reasks_with_the_fields_own_error_message(self) -> None:
+        """No fixed parser (nor the plain int()/float() fast path) can make
+        sense of "กากๆ" -- text_for_validation falls back to raw_text
+        unchanged, so validate_answer rejects it on its own terms, with the
+        SAME error_message any other invalid answer to this field would
+        get. Deliberately not a different, generic "couldn't understand"
+        message -- see text_parsing.py's module docstring.
+        """
+        form, question_id = _validated_field_form(_FAN_COUNT_RULE)
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="กากๆ", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert "กรุณากรอกจำนวนพัดลมเป็นจำนวนเต็ม 0-50" in reply.text
+        session.add.assert_not_called()
+        assert conversation.current_question_id == question_id
+
+    async def test_llm_fallback_value_is_validated_and_stored_when_fixed_parse_misses(
+        self,
+    ) -> None:
+        form, question_id = _validated_field_form(_FAN_COUNT_RULE)
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        with patch(
+            "src.chat.service.llm_parsing.try_llm_parse",
+            new=AsyncMock(return_value="7"),
+        ) as llm:
+            reply = await service.handle_answer(
+                session, conversation_id=conversation_id, raw_text="กากๆ", form=form
+            )
+
+        llm.assert_awaited_once_with("INT", "กากๆ")
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        assert session.add.call_args.args[0].answer == {"text": "7"}
+
+    async def test_llm_value_that_fails_the_fields_rule_is_reasked_not_stored(self) -> None:
+        form, question_id = _validated_field_form(_FAN_COUNT_RULE)
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        with patch(
+            "src.chat.service.llm_parsing.try_llm_parse",
+            new=AsyncMock(return_value="999"),
+        ):
+            reply = await service.handle_answer(
+                session, conversation_id=conversation_id, raw_text="กากๆ", form=form
+            )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert "กรุณากรอกจำนวนพัดลมเป็นจำนวนเต็ม 0-50" in reply.text
+        session.add.assert_not_called()
+
+    async def test_llm_is_not_called_when_the_fixed_parser_already_succeeded(self) -> None:
+        form, question_id = _validated_field_form(_FAN_COUNT_RULE)
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        with patch("src.chat.service.llm_parsing.try_llm_parse", new=AsyncMock()) as llm:
+            await service.handle_answer(
+                session, conversation_id=conversation_id, raw_text="ห้า", form=form
+            )
+
+        llm.assert_not_awaited()
+
+    async def test_relative_thai_date_is_normalized_before_storing(self) -> None:
+        import datetime
+
+        form, question_id = _validated_field_form({"type": "DATE"})
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="วันนี้", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        added_answer = session.add.call_args.args[0]
+        assert added_answer.answer == {"text": datetime.date.today().isoformat()}
+
+    async def test_mandatory_question_with_rule_rejects_blank_answer(self) -> None:
+        """Same as above but for a field that DOES have a validation_rule --
+        the blank check must fire before validate_answer's own type check,
+        not rely on it (an empty string trivially satisfies VARCHAR's
+        max_length-only check).
+        """
+        form, question_id = _validated_field_form(_FAN_COUNT_RULE)
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="", form=form
+        )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert "เว้นว่าง" in reply.text
+        session.add.assert_not_called()
+        assert conversation.current_question_id == question_id
+
+
+class TestHandleAnswerParentPicker:
+    """parent_answer holding a "pending_kind" key means this conversation is
+    still on the synthetic parent-picker step, not a real form.question --
+    handle_answer must route these through _handle_parent_answer rather than
+    the normal ConversationAnswer path (that path would violate
+    conversation_answer.question_id's real FK to form.question, since the
+    picker step has no corresponding row there).
+    """
+
+    def _conversation_awaiting_parent_pick(self, conversation_id: uuid.UUID) -> Conversation:
+        return Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=None,
+            parent_answer={"pending_kind": "batch"},
+        )
+
+    async def test_matching_pick_stores_parent_answer_and_advances_to_real_question(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation_awaiting_parent_pick(conversation_id)
+        session = _mock_session(answers=[], conversation=conversation)
+        choices = [parent_picker.ParentOption(id="batch-1", label="แบทช์ 01/08/2026 — สถานี A")]
+
+        with (
+            patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)),
+            # Since US2-13 the column comes from form.handler_registry.
+            patch("src.line.parent_picker.field_name_for", new=AsyncMock(return_value="batch_id")),
+        ):
+            reply = await service.handle_answer(
+                session,
+                conversation_id=conversation_id,
+                raw_text="แบทช์ 01/08/2026 — สถานี A",
+                form=form,
+            )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert reply.text == "question 0"  # the form's real first question, not re-asking
+        assert conversation.current_question_id == q1
+        assert conversation.parent_answer == {"field_name": "batch_id", "value": "batch-1"}
+        session.add.assert_not_called()  # never written as a ConversationAnswer row
+
+    async def test_non_matching_pick_reasks_with_fresh_choices(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation_awaiting_parent_pick(conversation_id)
+        session = _mock_session(answers=[], conversation=conversation)
+        choices = [parent_picker.ParentOption(id="batch-1", label="แบทช์ 01/08/2026 — สถานี A")]
+
+        with (
+            patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)),
+            # Since US2-13 the column comes from form.handler_registry.
+            patch("src.line.parent_picker.field_name_for", new=AsyncMock(return_value="batch_id")),
+        ):
+            reply = await service.handle_answer(
+                session, conversation_id=conversation_id, raw_text="ไม่ตรงกับตัวเลือกไหนเลย", form=form
+            )
+
+        assert reply is not None
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert reply.choices == [
+            service.Choice(id="__pause__", label="⏸️ พักไว้ก่อน"),
+            service.Choice(id="batch-1", label="แบทช์ 01/08/2026 — สถานี A"),
+        ]
+        # still on the picker step, not advanced to the real form or resolved
+        assert conversation.parent_answer == {"pending_kind": "batch"}
+        assert conversation.current_question_id is None
+
+
+class TestHandleAnswerPause:
+    """US2-3: tapping the pause choice must never write a ConversationAnswer
+    row or touch current_question_id -- pausing isn't answering. Checked
+    against all three shapes handle_answer can be in when the pause label
+    arrives: a real question, the parent-picker step, and no open question
+    at all.
+    """
+
+    async def test_pauses_without_storing_an_answer(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=q1,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="⏸️ พักไว้ก่อน", form=form
+        )
+
+        assert reply is not None
+        assert "พัก" in reply.text
+        assert conversation.status == ConversationStatus.PAUSED
+        assert conversation.current_question_id == q1  # unchanged -- not answered, just paused
+        session.add.assert_not_called()
+
+    async def test_pauses_during_parent_picker_step(self) -> None:
+        form, _ = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=None,
+            parent_answer={"pending_kind": "batch"},
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="⏸️ พักไว้ก่อน", form=form
+        )
+
+        assert reply is not None
+        assert conversation.status == ConversationStatus.PAUSED
+        # still pending -- pausing didn't resolve the parent pick either
+        assert conversation.parent_answer == {"pending_kind": "batch"}
+
+    async def test_pauses_with_no_open_question(self) -> None:
+        """Awaiting confirmation has no pause button in the real UI (only
+        confirm/cancel), but the underlying check is a plain raw-text match
+        with no question-list dependency -- confirming it doesn't crash here
+        (ConversationNotFound) is cheap insurance, not just theoretical.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=None,
+        )
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="⏸️ พักไว้ก่อน", form=form
+        )
+
+        assert reply is not None
+        assert conversation.status == ConversationStatus.PAUSED
+
+
+class TestHandleAnswerPagination:
+    """Tapping the pagination nav choices end to end through handle_answer --
+    not just service._paginate's own arithmetic (TestPaginate above), but
+    that a real conversation's current_page actually advances, nothing gets
+    written as an answer, and a real choice on a non-zero page still
+    resolves correctly (matched against THAT page, not page 0)."""
+
+    def _conversation(
+        self, conversation_id: uuid.UUID, question_id: uuid.UUID, *, page: int
+    ) -> Conversation:
+        return Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=question_id,
+            current_page=page,
+        )
+
+    async def test_next_page_advances_without_storing_an_answer(self) -> None:
+        form, question_id = _mandatory_option_form(choice_count=25)
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id, question_id, page=0)
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="» ถัดไป", form=form
+        )
+
+        assert reply is not None
+        assert conversation.current_page == 1
+        assert conversation.current_question_id == question_id  # still the same question
+        assert reply.text.endswith("(หน้า 2/3)")
+        session.add.assert_not_called()  # paging isn't answering
+
+    async def test_prev_page_retreats_without_storing_an_answer(self) -> None:
+        form, question_id = _mandatory_option_form(choice_count=25)
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id, question_id, page=1)
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="« ก่อนหน้า", form=form
+        )
+
+        assert reply is not None
+        assert conversation.current_page == 0
+        assert reply.text.endswith("(หน้า 1/3)")
+        session.add.assert_not_called()
+
+    async def test_picking_a_real_choice_on_page_two_resolves_correctly(self) -> None:
+        """The exact case a page-0-only match would get wrong: "farm 15"
+        only exists on page 1 (0-indexed), not page 0."""
+        form, question_id = _mandatory_option_form(choice_count=25)
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id, question_id, page=1)
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="farm 15", form=form
+        )
+
+        assert reply is not None
+        added_answer = session.add.call_args.args[0]
+        assert added_answer.answer["value"] is not None  # resolved, not stored as stray free text
+
+    async def test_typing_a_different_pages_choice_reasks_current_page(self) -> None:
+        """ "farm 15" doesn't exist as a button on page 0 -- must re-ask
+        (same page), not silently accept it as free text or crash."""
+        form, question_id = _mandatory_option_form(choice_count=25)
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id, question_id, page=0)
+        session = _mock_session(answers=[], conversation=conversation)
+
+        reply = await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="farm 15", form=form
+        )
+
+        assert reply is not None
+        assert reply.text.endswith("(หน้า 1/3)")  # stayed on the same page
+        session.add.assert_not_called()
+
+    async def test_advancing_to_a_new_question_resets_page_to_zero(self) -> None:
+        form, (q1, q2) = _form(mandatory_flags=[True, True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=q1,
+            current_page=2,  # simulates having paginated on q1 before answering it
+        )
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+
+        await service.handle_answer(
+            session, conversation_id=conversation_id, raw_text="answer 1", form=form
+        )
+
+        assert conversation.current_question_id == q2
+        assert conversation.current_page == 0  # reset -- page 2 belonged to q1, not q2
+
+
+class TestPauseActiveConversation:
+    async def test_pauses_the_active_conversation(self) -> None:
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=uuid.uuid4(),
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        await service.pause_active_conversation(session, user_id=conversation.user_id)
+
+        assert conversation.status == ConversationStatus.PAUSED
+
+    async def test_no_op_when_nothing_active(self) -> None:
+        session = _mock_session(answers=[], conversation=None)
+
+        await service.pause_active_conversation(session, user_id=uuid.uuid4())
+
+        session.commit.assert_not_called()
+
+
+class TestFindResumableConversation:
+    async def test_finds_a_paused_conversation(self) -> None:
+        user_id, task_id = uuid.uuid4(), uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            user_id=user_id,
+            task_id=task_id,
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.PAUSED,
+            current_question_id=uuid.uuid4(),
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+
+        found = await service.find_resumable_conversation(session, user_id=user_id, task_id=task_id)
+
+        assert found is conversation
+
+    async def test_none_when_nothing_open(self) -> None:
+        session = _mock_session(answers=[], conversation=None)
+
+        found = await service.find_resumable_conversation(
+            session, user_id=uuid.uuid4(), task_id=uuid.uuid4()
+        )
+
+        assert found is None
+
+
+class TestResumeConversation:
+    async def test_resume_mid_pagination_shows_the_same_page_not_page_one(self) -> None:
+        """A farmer paused on page 2 of a long OPTION question resumes back
+        on page 2 -- current_page persists across pause/resume same as
+        everything else, not silently reset to the start."""
+        form, question_id = _mandatory_option_form(choice_count=25)
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.PAUSED,
+            current_question_id=question_id,
+            current_page=1,
+        )
+        session = _mock_session(answers=[])
+
+        reply = await service.resume_conversation(session, conversation=conversation, form=form)
+
+        assert conversation.status == ConversationStatus.ACTIVE
+        assert reply.text.endswith("(หน้า 2/3)")
+        assert reply.choices is not None
+        assert service._PREV_PAGE_CHOICE in reply.choices
+        assert service._NEXT_PAGE_CHOICE in reply.choices
+
+    async def test_mid_question_resume_recaps_answers_then_asks_next(self) -> None:
+        form, (q1, q2) = _form(mandatory_flags=[True, True])
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.PAUSED,
+            current_question_id=q2,
+        )
+        session = _mock_session(answers=[_answer(q1, text="คำตอบที่ 1")])
+
+        reply = await service.resume_conversation(session, conversation=conversation, form=form)
+
+        assert conversation.status == ConversationStatus.ACTIVE
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert "question 0" in reply.text  # recap of what was already answered
+        assert "คำตอบที่ 1" in reply.text
+        assert reply.text.endswith("question 1")  # the still-open question, asked fresh
+        assert reply.choices == [
+            service.Choice(id="__pause__", label="⏸️ พักไว้ก่อน"),
+        ]
+
+    async def test_resume_with_nothing_answered_yet_has_no_recap(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.PAUSED,
+            current_question_id=q1,
+        )
+        session = _mock_session(answers=[])
+
+        reply = await service.resume_conversation(session, conversation=conversation, form=form)
+
+        assert reply.text == "question 0"  # no recap prefix -- nothing answered yet
+
+    async def test_resume_at_confirmation_step_shows_summary(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.PAUSED,
+            current_question_id=None,
+        )
+        session = _mock_session(answers=[_answer(q1, text="คำตอบที่ 1")])
+
+        reply = await service.resume_conversation(session, conversation=conversation, form=form)
+
+        assert conversation.status == ConversationStatus.ACTIVE
+        assert reply.substate == ActiveSubstate.AWAITING_CONFIRMATION
+        assert "สรุปคำตอบของคุณ" in reply.text
+        assert "คำตอบที่ 1" in reply.text
+
+    async def test_resume_during_parent_picker_step(self) -> None:
+        form, _ = _form(mandatory_flags=[True])
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.PAUSED,
+            current_question_id=None,
+            parent_answer={"pending_kind": "batch"},
+        )
+        session = _mock_session(answers=[])
+        choices = [parent_picker.ParentOption(id="batch-1", label="แบทช์ 01/08/2026 — สถานี A")]
+
+        with (
+            patch("src.line.parent_picker.choices_for", new=AsyncMock(return_value=choices)),
+            # Since US2-13 the column comes from form.handler_registry.
+            patch("src.line.parent_picker.field_name_for", new=AsyncMock(return_value="batch_id")),
+        ):
+            reply = await service.resume_conversation(session, conversation=conversation, form=form)
+
+        assert conversation.status == ConversationStatus.ACTIVE
+        assert reply.text == parent_picker.PROMPT["batch"]  # no recap -- nothing answered yet
+        assert reply.choices == [
+            service.Choice(id="__pause__", label="⏸️ พักไว้ก่อน"),
+            service.Choice(id="batch-1", label="แบทช์ 01/08/2026 — สถานี A"),
+        ]
+
+    async def test_resume_raises_if_current_question_no_longer_in_form(self) -> None:
+        """The form changed out from under a long-paused conversation (a
+        question was removed) -- fail loudly rather than silently asking
+        about a question that isn't there anymore.
+        """
+        form, _ = _form(mandatory_flags=[True])  # only question 0 exists
+        conversation = Conversation(
+            conversation_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.PAUSED,
+            current_question_id=uuid.uuid4(),  # not in the form at all
+        )
+        session = _mock_session(answers=[])
+
+        with pytest.raises(ConversationNotFound):
+            await service.resume_conversation(session, conversation=conversation, form=form)
+
+
+class TestConfirmConversation:
+    """No coverage existed for this function at all before -- adding it
+    while touching the HandlerNotSupported branch, since it's the function
+    responsible for CB-1's honest-failure behavior (see its own docstring).
+    """
+
+    def _conversation(self, conversation_id: uuid.UUID) -> Conversation:
+        return Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=None,
+        )
+
+    async def test_marks_completed_and_thanks_farmer_on_success(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id)
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+        # confirm_conversation uses plain session.get, unlike handle_answer's
+        # locked select -- _mock_session only rigs session.execute.
+        session.get = AsyncMock(return_value=conversation)
+
+        with patch("src.chat.service.submit_task", new=AsyncMock()):
+            reply = await service.confirm_conversation(
+                session, conversation_id=conversation_id, form=form
+            )
+
+        assert reply.submission_failed is False
+        assert reply.offer_another is False  # single-submit: terminal, as before
+        assert "บันทึกข้อมูลเรียบร้อยแล้ว" in reply.text
+        assert conversation.status == ConversationStatus.COMPLETED
+
+    async def test_multi_submit_form_offers_another_instead_of_ending(self) -> None:
+        """A multi-submit task isn't finished when one row saves -- the
+        farmer is expected to file several (three grades for one harvest),
+        so the reply asks rather than closing out.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        form.is_multiple_submit = True
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id)
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+        session.get = AsyncMock(return_value=conversation)
+
+        with patch("src.chat.service.submit_task", new=AsyncMock()):
+            reply = await service.confirm_conversation(
+                session, conversation_id=conversation_id, form=form
+            )
+
+        assert reply.offer_another is True
+        assert "เพิ่มอีกรายการ" in reply.text
+        # The submission itself still saved and this conversation is done --
+        # "offer another" is about the TASK, not this row.
+        assert reply.submission_failed is False
+        assert conversation.status == ConversationStatus.COMPLETED
+
+    async def test_multi_submit_failure_still_reports_failure_not_another(self) -> None:
+        """offer_another must never mask a failed submission -- otherwise a
+        farmer is invited to add a second row when the first never saved.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        form.is_multiple_submit = True
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id)
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+        session.get = AsyncMock(return_value=conversation)
+
+        failing_submit = AsyncMock(side_effect=UpstreamServiceError("Go returned 500"))
+        with patch("src.chat.service.submit_task", new=failing_submit):
+            reply = await service.confirm_conversation(
+                session, conversation_id=conversation_id, form=form
+            )
+
+        assert reply.submission_failed is True
+        assert reply.offer_another is False
+        assert conversation.status == ConversationStatus.ACTIVE
+
+    async def test_stays_open_and_honest_on_generic_failure(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id)
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+        # confirm_conversation uses plain session.get, unlike handle_answer's
+        # locked select -- _mock_session only rigs session.execute.
+        session.get = AsyncMock(return_value=conversation)
+
+        failing_submit = AsyncMock(side_effect=UpstreamServiceError("Go returned 500"))
+        with patch("src.chat.service.submit_task", new=failing_submit):
+            reply = await service.confirm_conversation(
+                session, conversation_id=conversation_id, form=form
+            )
+
+        assert reply.submission_failed is True
+        assert "ลองใหม่อีกครั้ง" in reply.text  # "try again" -- worth retrying
+        assert conversation.status == ConversationStatus.ACTIVE  # NOT completed -- nothing saved
+
+    async def test_stays_open_with_distinct_message_when_handler_not_supported(self) -> None:
+        """The regression this test guards against: before HandlerNotSupported
+        existed, this case fell into the generic branch and told the farmer
+        "ลองใหม่อีกครั้ง" (try again) for a failure retrying could never fix.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id)
+        session = _mock_session(answers=[_answer(q1)], conversation=conversation)
+        # confirm_conversation uses plain session.get, unlike handle_answer's
+        # locked select -- _mock_session only rigs session.execute.
+        session.get = AsyncMock(return_value=conversation)
+
+        failing_submit = AsyncMock(side_effect=HandlerNotSupported("Go returned 501"))
+        with patch("src.chat.service.submit_task", new=failing_submit):
+            reply = await service.confirm_conversation(
+                session, conversation_id=conversation_id, form=form
+            )
+
+        assert reply.submission_failed is True
+        assert "ลองใหม่อีกครั้ง" not in reply.text  # must NOT suggest retrying
+        assert "ยังไม่รองรับ" in reply.text  # "not supported yet" -- the honest reason
+        assert conversation.status == ConversationStatus.ACTIVE  # still cancellable
+
+    async def test_merges_parent_answer_into_submission_payload(self) -> None:
+        """The parent-picker's pick (stored on conversation.parent_answer, not
+        as a ConversationAnswer row -- see TestHandleAnswerParentPicker) must
+        still land in Go's payload under its real column name, alongside the
+        form's normal answers.
+        """
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        conversation = self._conversation(conversation_id)
+        conversation.parent_answer = {"field_name": "batch_id", "value": "batch-1"}
+        session = _mock_session(answers=[_answer(q1, text="คำตอบ")], conversation=conversation)
+        session.get = AsyncMock(return_value=conversation)
+
+        submit_task_mock = AsyncMock()
+        with patch("src.chat.service.submit_task", new=submit_task_mock):
+            reply = await service.confirm_conversation(
+                session, conversation_id=conversation_id, form=form
+            )
+
+        assert reply.submission_failed is False
+        submission = submit_task_mock.call_args.args[0]
+        assert submission.answer["batch_id"] == "batch-1"
+        assert submission.answer["field_0"] == "คำตอบ"
+
+
+class TestEditableQuestions:
+    """US2-6: the picker "แก้ไข" shows -- every question with an existing
+    answer row, real or skipped, matching editable_questions' own docstring.
+    """
+
+    async def test_includes_both_answered_and_skipped_questions(self) -> None:
+        form, (q1, q2) = _form(mandatory_flags=[True, False])
+        conversation_id = uuid.uuid4()
+        skipped = ConversationAnswer(
+            conversation_id=conversation_id,
+            question_id=q2,
+            answer={"skipped": True},
+            source=AnswerSource.GUIDED_FLOW,
+        )
+        session = _mock_session(answers=[_answer(q1, text="คำตอบ"), skipped])
+
+        questions = await service.editable_questions(
+            session, conversation_id=conversation_id, form=form
+        )
+
+        assert [q.question_id for q in questions] == [q1, q2]
+
+    async def test_orders_by_sort_order_not_answer_insertion_order(self) -> None:
+        form, (q1, q2) = _form(mandatory_flags=[True, True])
+        conversation_id = uuid.uuid4()
+        # Answered out of order -- q2 first -- editable_questions must still
+        # return them sort_order-first, matching _format_answered_lines.
+        session = _mock_session(answers=[_answer(q2), _answer(q1)])
+
+        questions = await service.editable_questions(
+            session, conversation_id=conversation_id, form=form
+        )
+
+        assert [q.question_id for q in questions] == [q1, q2]
+
+    async def test_excludes_a_question_no_longer_on_the_current_form(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        conversation_id = uuid.uuid4()
+        stale_answer = ConversationAnswer(
+            conversation_id=conversation_id,
+            question_id=uuid.uuid4(),  # not on `form` at all
+            answer={"text": "x"},
+            source=AnswerSource.GUIDED_FLOW,
+        )
+        session = _mock_session(answers=[_answer(q1), stale_answer])
+
+        questions = await service.editable_questions(
+            session, conversation_id=conversation_id, form=form
+        )
+
+        assert [q.question_id for q in questions] == [q1]
+
+
+class TestBeginEdit:
+    """US2-6: begin_edit is what a farmer's tap on the edit picker resolves
+    to -- re-opens an already-answered question exactly like a fresh one.
+    """
+
+    async def test_reopens_the_picked_question(self) -> None:
+        form, (q1, q2) = _form(mandatory_flags=[True, True])
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=None,  # was at AWAITING_CONFIRMATION
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+        session.get = AsyncMock(return_value=conversation)
+
+        reply = await service.begin_edit(
+            session, conversation_id=conversation_id, question_id=q1, form=form
+        )
+
+        assert conversation.current_question_id == q1
+        assert reply.substate == ActiveSubstate.GUIDED_ASKING_FIXED_QUESTION
+        assert reply.text == "question 0"
+
+    async def test_raises_if_conversation_not_found(self) -> None:
+        form, (q1,) = _form(mandatory_flags=[True])
+        session = _mock_session(answers=[])
+        session.get = AsyncMock(return_value=None)
+
+        with pytest.raises(ConversationNotFound):
+            await service.begin_edit(
+                session, conversation_id=uuid.uuid4(), question_id=q1, form=form
+            )
+
+    async def test_raises_if_question_no_longer_on_the_current_form(self) -> None:
+        """Same "fail loudly" precedent as resume_conversation's own
+        current_question lookup -- the form changed out from under this
+        conversation between the picker being sent and the tap landing.
+        """
+        form, _ = _form(mandatory_flags=[True])  # only question 0 exists
+        conversation_id = uuid.uuid4()
+        conversation = Conversation(
+            conversation_id=conversation_id,
+            user_id=uuid.uuid4(),
+            task_id=uuid.uuid4(),
+            task_form_id=uuid.uuid4(),
+            status=ConversationStatus.ACTIVE,
+            current_question_id=None,
+        )
+        session = _mock_session(answers=[], conversation=conversation)
+        session.get = AsyncMock(return_value=conversation)
+
+        with pytest.raises(ConversationNotFound):
+            await service.begin_edit(
+                session, conversation_id=conversation_id, question_id=uuid.uuid4(), form=form
+            )

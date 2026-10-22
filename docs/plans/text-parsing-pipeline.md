@@ -25,7 +25,7 @@ logic that existed before. This module never stores a value validation
 didn't approve, and never invents an answer the farmer didn't give.
 
 When the fixed parser can't make sense of an INT/FLOAT/DATE/DATETIME answer,
-`src/conversation/llm_parsing.py` asks the LLM to normalize it. The LLM's
+`src/chat/llm_parsing.py` asks the LLM to normalize it. The LLM's
 answer is only a proposal: it still goes through `validate_answer`, so a wrong
 guess is re-asked, never stored. OPTION/BOOLEAN never use the LLM -- they are
 buttons, so an unmatched typed answer is simply re-asked with the same buttons.
@@ -59,7 +59,7 @@ the wrong record — a materially worse failure than one extra re-ask.
 ### Two separate integration points, not one
 
 The original diagram drew a single "Fixed parser" box. Reading
-`src/conversation/service.py` found this is actually two independent
+`src/chat/service.py` found this is actually two independent
 mechanisms in `handle_answer`, wired separately:
 
 1. **Before `validate_answer`** (`INT`/`FLOAT`/`DATE`/`DATETIME`) —
@@ -148,8 +148,8 @@ its tests would think to cover.
 
 | File | Change |
 |---|---|
-| `src/conversation/text_parsing.py` | New. `parse_number`, `parse_date`, `match_choice`, `try_fixed_parse`, `FIXED_PARSE_TYPES`. |
-| `src/conversation/service.py` | `handle_answer`: fixed-parse step before `validate_answer`; choice-match call site now goes through `text_parsing.match_choice`. |
+| `src/chat/text_parsing.py` | New. `parse_number`, `parse_date`, `match_choice`, `try_fixed_parse`, `FIXED_PARSE_TYPES`. |
+| `src/chat/service.py` | `handle_answer`: fixed-parse step before `validate_answer`; choice-match call site now goes through `text_parsing.match_choice`. |
 | `pyproject.toml` | Added `pythainlp>=5.0`, `dateparser>=1.2`. |
 | `tests/conversation/test_text_parsing.py` | New. Unit tests for all four functions, including the two regressions found while writing them (see Design above). |
 | `tests/conversation/test_service.py` | New `handle_answer`-level cases: spelled-out number normalized before storing, unparseable number still shows the field's own error, relative Thai date normalized, choice with a trailing particle resolves. |

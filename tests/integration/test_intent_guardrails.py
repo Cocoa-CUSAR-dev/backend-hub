@@ -18,9 +18,9 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.chat import intent
+from src.chat.ui import messages
 from src.config import settings
-from src.conversation import intent
-from src.line import messages
 from tests.integration.helpers import (
     build_text_message_event,
     seed_task_form,
@@ -65,8 +65,8 @@ async def _send(
         ) as reply_message,
         patch.object(intent.settings, "LLM_API_KEY", "test-key"),
         patch.object(intent.settings, "INTENT_ROUTING_ENABLED", True),
-        patch("src.conversation.intent.extract_slots", new=model),
-        patch("src.conversation.service.submit_task", new=submit_task),
+        patch("src.chat.intent.extract_slots", new=model),
+        patch("src.chat.service.submit_task", new=submit_task),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}

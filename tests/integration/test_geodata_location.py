@@ -77,9 +77,9 @@ async def _post(client: AsyncClient, body: bytes) -> AsyncMock:
         patch(
             "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
-        patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-        patch("src.line.router.push_flex", new=AsyncMock()),
-        patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="token")),
+        patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+        patch("src.chat.router.push_flex", new=AsyncMock()),
+        patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -194,7 +194,7 @@ class TestLocationAnswersTheGeodataQuestion:
                 ),
             )
             stored = await _stored_answer(db_session, gis_q)
-            with patch("src.conversation.service.submit_task", new=submit_task):
+            with patch("src.chat.service.submit_task", new=submit_task):
                 await _post(
                     client,
                     build_postback_event(

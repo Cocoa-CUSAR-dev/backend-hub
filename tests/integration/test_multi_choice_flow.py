@@ -52,9 +52,9 @@ async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -
         patch(
             "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
-        patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-        patch("src.line.router.push_flex", new=AsyncMock()),
-        patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="token")),
+        patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+        patch("src.chat.router.push_flex", new=AsyncMock()),
+        patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -343,7 +343,7 @@ class TestSelecting:
             )
 
             submit = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=submit):
+            with patch("src.chat.service.submit_task", new=submit):
                 reply_message = await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -397,7 +397,7 @@ class TestSelecting:
             )
 
             submit = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=submit):
+            with patch("src.chat.service.submit_task", new=submit):
                 await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -423,7 +423,7 @@ class TestSelecting:
             )
 
             submit = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=submit):
+            with patch("src.chat.service.submit_task", new=submit):
                 await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -613,7 +613,7 @@ class TestPartialFailureRetry:
             )
 
             failing = AsyncMock(side_effect=[None, RuntimeError("go is down")])
-            with patch("src.conversation.service.submit_task", new=failing):
+            with patch("src.chat.service.submit_task", new=failing):
                 reply_message = await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -626,7 +626,7 @@ class TestPartialFailureRetry:
             assert status.scalar_one() == "active"
 
             retry = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=retry):
+            with patch("src.chat.service.submit_task", new=retry):
                 await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -755,7 +755,7 @@ class TestAnyOptionQuestion:
             await _send_text(client, line_user_id=fixture.line_user_id, text_content="แปลงของคนอื่น")
 
             submit = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=submit):
+            with patch("src.chat.service.submit_task", new=submit):
                 await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -829,10 +829,10 @@ class TestNoAddAnotherAfterAMultiChoiceConfirm:
                 patch(
                     "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
                 ) as reply_message,
-                patch("src.line.router.generate_diary", new=diary),
-                patch("src.line.router.push_flex", new=AsyncMock()),
-                patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="t")),
-                patch("src.conversation.service.submit_task", new=AsyncMock()),
+                patch("src.chat.router.generate_diary", new=diary),
+                patch("src.chat.router.push_flex", new=AsyncMock()),
+                patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="t")),
+                patch("src.chat.service.submit_task", new=AsyncMock()),
             ):
                 response = await client.post(
                     "/line/webhook", content=body, headers={"X-Line-Signature": signature}
