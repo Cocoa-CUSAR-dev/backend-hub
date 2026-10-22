@@ -17,8 +17,6 @@ sql-outside-db|src/conversation/models.py|imports sqlalchemy
 sql-outside-db|src/conversation/router.py|imports sqlalchemy
 sql-outside-db|src/conversation/service.py|imports sqlalchemy
 sql-outside-db|src/line/handler_registry.py|imports sqlalchemy
-sql-outside-db|src/line/identity.py|imports sqlalchemy
-sql-outside-db|src/line/liff_tasks.py|imports sqlalchemy
 sql-outside-db|src/line/parent_picker.py|imports sqlalchemy
 sql-outside-db|src/line/plot_picker.py|imports sqlalchemy
 sql-outside-db|src/line/router.py|imports sqlalchemy
@@ -42,8 +40,6 @@ table-owner|src/conversation/service.py|ref.farm_constant (owner: src/db/ref.py)
 table-owner|src/conversation/service.py|ref.plot_constant (owner: src/db/ref.py)
 table-owner|src/conversation/validation.py|form.field_validation_rule (owner: src/db/forms.py)
 table-owner|src/line/handler_registry.py|form.handler_registry (owner: src/db/forms.py)
-table-owner|src/line/identity.py|auth.line_identity (owner: src/db/auth.py)
-table-owner|src/line/identity.py|auth.user_account (owner: src/db/auth.py)
 table-owner|src/line/parent_picker.py|agriculture.farm (owner: src/db/agriculture.py)
 table-owner|src/line/parent_picker.py|agriculture.farm_activity (owner: src/db/agriculture.py)
 table-owner|src/line/parent_picker.py|agriculture.farmer_farm (owner: src/db/agriculture.py)
@@ -58,8 +54,6 @@ table-owner|src/line/plot_picker.py|agriculture.farm (owner: src/db/agriculture.
 table-owner|src/line/plot_picker.py|agriculture.farmer_farm (owner: src/db/agriculture.py)
 table-owner|src/line/plot_picker.py|agriculture.plot (owner: src/db/agriculture.py)
 table-owner|src/line/plot_picker.py|ref.plot_constant (owner: src/db/ref.py)
-table-owner|src/line/router.py|auth.line_identity (owner: src/db/auth.py)
-table-owner|src/line/router.py|auth.user_account (owner: src/db/auth.py)
 table-owner|src/line/temp_task_picker.py|chat.conversation (owner: src/db/chat.py)
 table-owner|src/line/temp_task_picker.py|form.assignment (owner: src/db/tasks.py)
 table-owner|src/line/temp_task_picker.py|form.response (owner: src/db/tasks.py)

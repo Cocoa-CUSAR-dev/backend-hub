@@ -7,9 +7,9 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src import db
 from src.clock import bangkok_now
 from src.database import async_session_maker
-from src.line.identity import lookup_line_user_ids
 from src.line.service import multicast_text_batched
 from src.reminders.queries import (
     already_reminded_since,
@@ -68,7 +68,7 @@ async def _run_reminder_check(session: AsyncSession, now: datetime) -> None:
         if not targets:
             continue
 
-        id_map = await lookup_line_user_ids(session, targets)
+        id_map = await db.auth.line_user_ids_for(session, targets)
         line_id_to_user = {id_map[uid]: uid for uid in targets if uid in id_map}
         line_user_ids = list(line_id_to_user)
 

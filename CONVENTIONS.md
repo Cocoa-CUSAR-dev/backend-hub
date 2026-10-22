@@ -92,15 +92,16 @@ router.py / chat/ / jobs/   ->   service.py   ->   db/*  and  line/ llm/ r2/ cli
 | **db/** | One `async def` per question, named by meaning. Return plain rows or dataclasses. | Check permissions, make business decisions, call services or clients |
 | **clients** | Wrap the outside service: timeouts, retries, one shared instance | Read the DB, make business decisions |
 
-**Service signature:** always `async def action(session, actor, ...)`, with `actor` second, so every caller has to say who is acting.
+**Service signature:** always `async def action(session: Session, actor: Actor, ...)`, with `actor` second, so every caller has to say who is acting. `Session` comes from `src/database.py`, so services never import sqlalchemy.
 
 ```python
 from src import db
 from src.actor import Actor, require
+from src.database import Session
 from src.exceptions import Forbidden, NotFound
 
 
-async def list_plots_of_farm(session, actor: Actor, farm_id: int) -> list[Plot]:
+async def list_plots_of_farm(session: Session, actor: Actor, farm_id: int) -> list[Plot]:
     require(actor, "read:farm:own")
     farm = await db.agriculture.get_farm(session, farm_id)
     if farm is None:
