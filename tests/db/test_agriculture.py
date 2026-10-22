@@ -257,3 +257,38 @@ async def test_plots_with_farm_name_can_narrow_to_a_farmer_and_a_farm(
     assert set(ids(everyone)) == {p_north, p_south, p_else}
     assert ids(one_farm) == [p_south]
     assert wrong_farm == []
+
+
+async def test_farm_activities_are_the_farmers_newest_with_their_farm_name(
+    db_session: AsyncSession,
+) -> None:
+    me, other = await _farmer(db_session), await _farmer(db_session)
+    mine, theirs = await _farm(db_session, me, "mine"), await _farm(db_session, other, "theirs")
+    kind = uuid4()
+    older = await insert(
+        db_session, "agriculture.farm_activity", farm_id=mine, created_at=datetime(2026, 8, 1)
+    )
+    newer = await insert(
+        db_session,
+        "agriculture.farm_activity",
+        farm_id=mine,
+        farm_activity_type_id=kind,
+        created_at=datetime(2026, 8, 2),
+    )
+    await insert(db_session, "agriculture.farm_activity", farm_id=theirs, created_at=NOW)
+
+    rows = await db.agriculture.farm_activities_of_farmer(db_session, me, limit=10)
+    capped = await db.agriculture.farm_activities_of_farmer(db_session, me, limit=1)
+
+    assert [(r.farm_activity_id, r.farm_name, r.farm_activity_type_id) for r in rows] == [
+        (newer, "mine", kind),
+        (older, "mine", None),
+    ]
+    assert [r.farm_activity_id for r in capped] == [newer]
+
+
+async def test_farm_names_cover_only_farms_that_exist(db_session: AsyncSession) -> None:
+    farm = await _farm(db_session, None, "north")
+
+    assert await db.agriculture.farm_names(db_session, [farm, uuid4()]) == {farm: "north"}
+    assert await db.agriculture.farm_names(db_session, []) == {}

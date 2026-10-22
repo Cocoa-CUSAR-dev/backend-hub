@@ -100,6 +100,14 @@ class PlotWithFarmRow:
     farm_name: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class FarmActivityRow:
+    farm_activity_id: UUID
+    created_at: datetime
+    farm_name: str | None
+    farm_activity_type_id: UUID | None
+
+
 _FARM_COLUMNS = """
     f.farm_id, f.farm_name, f.hub_id, f.geo_id, f.found_date, f.total_area,
     f.address_detail, f.subdistrict_id, f.district_id, f.province_id, f.zip_code,
@@ -271,3 +279,35 @@ async def plots_with_farm_name(
         {"farmer_id": farmer_id, "farm_id": farm_id},
     )
     return [PlotWithFarmRow(**row._mapping) for row in result]
+
+
+async def farm_activities_of_farmer(
+    session: AsyncSession, farmer_id: UUID, limit: int
+) -> list[FarmActivityRow]:
+    """The newest activities on this farmer's farms, with the farm's name."""
+    result = await session.execute(
+        text(
+            """
+            SELECT fa.farm_activity_id, fa.created_at, f.farm_name, fa.farm_activity_type_id
+            FROM agriculture.farm_activity fa
+            JOIN agriculture.farmer_farm ff ON ff.farm_id = fa.farm_id
+            JOIN agriculture.farm f ON f.farm_id = fa.farm_id
+            WHERE ff.farmer_id = :farmer_id
+            ORDER BY fa.created_at DESC
+            LIMIT :limit
+            """
+        ),
+        {"farmer_id": farmer_id, "limit": limit},
+    )
+    return [FarmActivityRow(**row._mapping) for row in result]
+
+
+async def farm_names(session: AsyncSession, farm_ids: list[UUID]) -> dict[UUID, str | None]:
+    """farm_id -> farm name, for the farms that exist."""
+    if not farm_ids:
+        return {}
+    result = await session.execute(
+        text("SELECT farm_id, farm_name FROM agriculture.farm WHERE farm_id = ANY(:ids)"),
+        {"ids": farm_ids},
+    )
+    return {row.farm_id: row.farm_name for row in result}

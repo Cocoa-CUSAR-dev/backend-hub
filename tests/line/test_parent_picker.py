@@ -1,11 +1,14 @@
 import uuid
-from datetime import datetime
-from types import SimpleNamespace
+from datetime import date, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.db.agriculture import FarmActivityRow
+from src.db.collection import HarvestRow
 from src.db.forms import ChildHandlerRow
+from src.db.processing import BatchRow
+from src.db.ref import Choice as RefChoice
 from src.line import handler_registry
 from src.line.parent_picker import (
     EMPTY_PROMPT,
@@ -112,29 +115,73 @@ async def test_the_registry_is_read_once_per_ttl(registry_read: AsyncMock) -> No
     assert registry_read.await_count == 1
 
 
-def _mock_session(rows: list) -> MagicMock:
-    session = MagicMock()
-    session.execute = AsyncMock(return_value=rows)
-    return session
+def _farm_id_and_name() -> tuple[uuid.UUID, str]:
+    return uuid.uuid4(), "สวนทดสอบ"
 
 
 async def test_choices_for_farm_activity_builds_labelled_options() -> None:
-    rows = [
-        SimpleNamespace(
-            id=uuid.uuid4(), created_at=datetime(2026, 8, 1), farm_name="สวนทดสอบ", type_name="ใส่ปุ๋ย"
-        )
+    type_id = uuid.uuid4()
+    activity = FarmActivityRow(
+        farm_activity_id=uuid.uuid4(),
+        created_at=datetime(2026, 8, 1),
+        farm_name="สวนทดสอบ",
+        farm_activity_type_id=type_id,
+    )
+    with (
+        patch(
+            "src.db.agriculture.farm_activities_of_farmer", new=AsyncMock(return_value=[activity])
+        ),
+        patch(
+            "src.db.ref.choices",
+            new=AsyncMock(return_value=[RefChoice(id=str(type_id), name="ใส่ปุ๋ย")]),
+        ),
+    ):
+        result = await choices_for(MagicMock(), "farm_activity", uuid.uuid4())
+
+    assert result == [
+        ParentOption(id=str(activity.farm_activity_id), label="ใส่ปุ๋ย 01/08/2026 — สวนทดสอบ")
     ]
-    session = _mock_session(rows)
 
-    result = await choices_for(session, "farm_activity", uuid.uuid4())
 
-    assert result == [ParentOption(id=str(rows[0].id), label="ใส่ปุ๋ย 01/08/2026 — สวนทดสอบ")]
+async def test_an_activity_whose_type_is_unknown_is_called_just_an_activity() -> None:
+    activity = FarmActivityRow(uuid.uuid4(), datetime(2026, 8, 1), None, None)
+    with (
+        patch(
+            "src.db.agriculture.farm_activities_of_farmer", new=AsyncMock(return_value=[activity])
+        ),
+        patch("src.db.ref.choices", new=AsyncMock(return_value=[])),
+    ):
+        [option] = await choices_for(MagicMock(), "farm_activity", uuid.uuid4())
+
+    assert option.label == "กิจกรรม 01/08/2026 — "
+
+
+async def test_choices_for_harvest_names_the_farm_or_else_the_hub() -> None:
+    farm, hub = uuid.uuid4(), uuid.uuid4()
+    on_farm = HarvestRow(uuid.uuid4(), date(2026, 8, 2), farm, hub)
+    at_hub = HarvestRow(uuid.uuid4(), date(2026, 8, 1), None, hub)
+    with (
+        patch("src.db.agriculture.farm_ids_of_farmer", new=AsyncMock(return_value=[farm])),
+        patch("src.db.processing.hub_ids_of_collector", new=AsyncMock(return_value=[hub])),
+        patch(
+            "src.db.collection.harvests_of", new=AsyncMock(return_value=[on_farm, at_hub])
+        ) as read,
+        patch("src.db.agriculture.farm_names", new=AsyncMock(return_value={farm: "สวนเหนือ"})),
+        patch("src.db.processing.hub_names", new=AsyncMock(return_value={hub: "ฮับกลาง"})),
+    ):
+        result = await choices_for(MagicMock(), "harvest", uuid.uuid4())
+
+    assert read.await_args.kwargs["farm_ids"] == [farm]
+    assert read.await_args.kwargs["hub_ids"] == [hub]
+    assert [o.label for o in result] == [
+        "เก็บเกี่ยว 02/08/2026 — สวนเหนือ",
+        "เก็บเกี่ยว 01/08/2026 — ฮับกลาง",
+    ]
 
 
 async def test_choices_for_batch_builds_labelled_options() -> None:
-    rows = [SimpleNamespace(id=uuid.uuid4(), created_at=datetime(2026, 8, 1), place="สถานี A")]
-    session = _mock_session(rows)
+    batch = BatchRow(uuid.uuid4(), datetime(2026, 8, 1), "สถานี A")
+    with patch("src.db.processing.batches_of_processor", new=AsyncMock(return_value=[batch])):
+        result = await choices_for(MagicMock(), "batch", uuid.uuid4())
 
-    result = await choices_for(session, "batch", uuid.uuid4())
-
-    assert result == [ParentOption(id=str(rows[0].id), label="แบทช์ 01/08/2026 — สถานี A")]
+    assert result == [ParentOption(id=str(batch.batch_id), label="แบทช์ 01/08/2026 — สถานี A")]
