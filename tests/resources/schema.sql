@@ -428,3 +428,77 @@ CREATE TABLE ref.grade_constant (
     grade_name character varying NOT NULL,
     CONSTRAINT pk_grade_constant PRIMARY KEY (grade_id)
 );
+
+-- docs-and-plan#265: what src/db/agriculture.py and src/db/storage.py read
+-- and write for the farm/plot routes. Columns as in the database repo's V1
+-- baseline (+ V7's storage.file.created_at), except that the NOT NULL
+-- province/district/subdistrict ids stay nullable here so older tests that
+-- insert a bare farm keep working.
+ALTER TABLE agriculture.farm
+    ADD COLUMN hub_id uuid,
+    ADD COLUMN geo_id uuid,
+    ADD COLUMN found_date date DEFAULT CURRENT_DATE,
+    ADD COLUMN total_area numeric,
+    ADD COLUMN address_detail character varying,
+    ADD COLUMN subdistrict_id uuid,
+    ADD COLUMN district_id uuid,
+    ADD COLUMN province_id uuid,
+    ADD COLUMN zip_code character varying,
+    ADD COLUMN contact_name character varying,
+    ADD COLUMN phone_number character varying,
+    ADD COLUMN line character varying,
+    ADD COLUMN facebook character varying,
+    ADD COLUMN created_at timestamp without time zone DEFAULT now() NOT NULL,
+    ADD COLUMN updated_at timestamp without time zone DEFAULT now() NOT NULL;
+ALTER TABLE agriculture.plot
+    ADD COLUMN total_area numeric,
+    ADD COLUMN land_ownership character varying,
+    ADD COLUMN cocoa_planted_area numeric,
+    ADD COLUMN has_chemical_use boolean DEFAULT false,
+    ADD COLUMN land_type_id uuid,
+    ADD COLUMN soil_type_id uuid,
+    ADD COLUMN water_source_id uuid,
+    ADD COLUMN watering_system_id uuid,
+    ADD COLUMN found_date date DEFAULT CURRENT_DATE,
+    ADD COLUMN created_at timestamp without time zone DEFAULT now() NOT NULL,
+    ADD COLUMN updated_at timestamp without time zone DEFAULT now() NOT NULL;
+
+CREATE SCHEMA storage;
+
+CREATE TABLE storage.file (
+    file_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    file_name character varying(255),
+    table_name character varying,
+    ref_id uuid NOT NULL,
+    code character varying,
+    original_name character varying(255),
+    file_extension character varying(20),
+    mime_type character varying(100),
+    file_size bigint,
+    storage_path character varying,
+    storage_provider character varying(50),
+    checksum character varying(128),
+    version integer DEFAULT 1,
+    is_public boolean DEFAULT false,
+    status character varying(20) DEFAULT 'active'::character varying,
+    uploaded_by uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL DEFAULT now(),
+    CONSTRAINT pk_file PRIMARY KEY (file_id)
+);
+
+-- The real geom column is PostGIS geometry(Geometry,4326). CI's Postgres has
+-- no PostGIS, so geom is text here and ST_GeomFromText is a stand-in that
+-- keeps the SRID and WKT it was given -- enough to check what was written.
+CREATE FUNCTION public.ST_GeomFromText(wkt text, srid integer) RETURNS text
+    LANGUAGE sql IMMUTABLE AS $$ SELECT 'SRID=' || srid || ';' || wkt $$;
+
+CREATE TABLE storage.geo (
+    geo_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    uploaded_by uuid NOT NULL,
+    geom text,
+    code character varying,
+    source_type character varying(20),
+    area_sq_m double precision,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_geo PRIMARY KEY (geo_id)
+);

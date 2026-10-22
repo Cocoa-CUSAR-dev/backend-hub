@@ -42,6 +42,11 @@ TAGS: list[dict[str, Any]] = [
         "description": "My tasks, the form to fill for each, and my answers. Task times "
         "(open_at, close_at) are Bangkok wall-clock written with a Z, as the mobile app expects.",
     },
+    {
+        "name": "agriculture",
+        "description": "Farms, plots and farm photos: register them and list mine. Photos are "
+        "private; lists carry a link to each farm's newest photo, valid for an hour.",
+    },
     {"name": "line", "description": "LINE webhook: every chat event from the LINE OA."},
     {"name": "liff", "description": "Endpoints the LIFF pages call from inside LINE."},
     {

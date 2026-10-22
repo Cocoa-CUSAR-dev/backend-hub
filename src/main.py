@@ -30,6 +30,7 @@ sentry_sdk.init(
 )
 
 from src.admin.router import router as admin_router
+from src.agriculture.router import router as agriculture_router
 from src.auth.router import router as auth_router
 from src.exceptions import register_exception_handlers
 from src.internal.router import router as internal_router
@@ -111,6 +112,7 @@ app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(admin_router)
 app.include_router(tasks_router)
+app.include_router(agriculture_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
 app.include_router(notifications_router)
