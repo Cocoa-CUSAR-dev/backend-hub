@@ -14,17 +14,15 @@ import hashlib
 import logging
 import os.path
 from dataclasses import asdict
-from datetime import date
 from uuid import UUID, uuid4
 
-from src import clock, db
+from src import clock, db, pagination, registration
 from src.actor import Actor, require
 from src.agriculture.schemas import (
     FarmCreatedOut,
     FarmImageOut,
     FarmIn,
     FarmOut,
-    GisPoint,
     PlotCreatedOut,
     PlotIn,
     PlotOut,
@@ -34,9 +32,6 @@ from src.exceptions import Forbidden, Invalid, NotFound, Unavailable
 from src.r2 import client as r2
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_PAGE_SIZE = 50
-MAX_PAGE_SIZE = 500
 
 # One rai is 1,600 m^2; plot areas are stored in rai.
 SQ_M_PER_RAI = 1600
@@ -54,41 +49,11 @@ def _caller(actor: Actor) -> UUID:
     return actor.user_id
 
 
-def _page(page: int, page_size: int) -> tuple[int, int]:
-    """(limit, offset), falling back the way Go did instead of failing."""
-    if page_size <= 0:
-        page_size = DEFAULT_PAGE_SIZE
-    page_size = min(page_size, MAX_PAGE_SIZE)
-    return page_size, max(page, 0) * page_size
-
-
-def _found_date(value: str) -> date:
-    """Blank means today (the farmer's day). Go silently stored year 1 for a
-    malformed date; this refuses it instead."""
-    if not value.strip():
-        return clock.bangkok_today()
-    try:
-        return date.fromisoformat(value.strip())
-    except ValueError:
-        raise Invalid(fields={"found_date": "Use YYYY-MM-DD"}) from None
-
-
-def _wkt_point(point: GisPoint) -> str:
-    return f"POINT({point.lng:f} {point.lat:f})"
-
-
-def _wkt_polygon(points: list[GisPoint]) -> str:
-    """A closed outline: the first point is repeated at the end. Coordinates
-    are lon lat with six decimals, as Go's %f wrote them."""
-    ring = [*points, points[0]]
-    return "POLYGON((" + ",".join(f"{p.lng:f} {p.lat:f}" for p in ring) + "))"
-
-
 async def create_farm(session: Session, actor: Actor, farm: FarmIn) -> FarmCreatedOut:
     """Register a farm owned by the caller, with its location or outline."""
     require(actor, "create:farm:own")
     user_id = _caller(actor)
-    found_date = _found_date(farm.found_date)
+    found_date = registration.found_date(farm.found_date)
     farm_id = uuid4()
     now = clock.utc_now()
     async with transaction(session):
@@ -112,11 +77,10 @@ async def create_farm(session: Session, actor: Actor, farm: FarmIn) -> FarmCreat
         )
         await db.agriculture.link_farmer(session, user_id, farm_id)
         if farm.gis:
-            wkt = _wkt_point(farm.gis[0]) if len(farm.gis) == 1 else _wkt_polygon(farm.gis)
             await db.storage.insert_geo(
                 session,
                 uploaded_by=user_id,
-                wkt=wkt,
+                wkt=registration.wkt_shape(farm.gis),
                 code=str(farm_id),
                 source_type="farm",
                 created_at=now,
@@ -132,7 +96,7 @@ async def create_plot(session: Session, actor: Actor, plot: PlotIn) -> PlotCreat
     """
     require(actor, "create:farm:own")
     user_id = _caller(actor)
-    found_date = _found_date(plot.found_date)
+    found_date = registration.found_date(plot.found_date)
     if not await db.agriculture.farm_exists(session, plot.farm_id):
         raise NotFound("Farm not found")
     if not await db.agriculture.farmer_owns_farm(session, user_id, plot.farm_id):
@@ -162,7 +126,7 @@ async def create_plot(session: Session, actor: Actor, plot: PlotIn) -> PlotCreat
             await db.storage.insert_geo(
                 session,
                 uploaded_by=user_id,
-                wkt=_wkt_polygon(plot.gis),
+                wkt=registration.wkt_polygon(plot.gis),
                 code=str(plot_id),
                 source_type="plot",
                 area_sq_m=plot.gis_area_m2,
@@ -197,12 +161,12 @@ async def _image_urls(session: Session, farm_ids: list[UUID]) -> dict[UUID, str]
 
 
 async def list_farms(
-    session: Session, actor: Actor, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+    session: Session, actor: Actor, *, page: int = 0, page_size: int = pagination.DEFAULT_PAGE_SIZE
 ) -> list[FarmOut]:
     """Farms (the caller's, or all with read:farm:all), each with its plots
     and a link to its newest photo."""
     farmer_id = _scope(actor)
-    limit, offset = _page(page, page_size)
+    limit, offset = pagination.window(page, page_size)
     farms = await db.agriculture.farms(session, farmer_id=farmer_id, limit=limit, offset=offset)
     farm_ids = [farm.farm_id for farm in farms]
     plots_by_farm: dict[UUID, list[PlotOut]] = {farm_id: [] for farm_id in farm_ids}
@@ -222,11 +186,11 @@ async def list_farms(
 
 
 async def list_plots(
-    session: Session, actor: Actor, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+    session: Session, actor: Actor, *, page: int = 0, page_size: int = pagination.DEFAULT_PAGE_SIZE
 ) -> list[PlotOut]:
     """Plots on the caller's farms, or all with read:farm:all."""
     farmer_id = _scope(actor)
-    limit, offset = _page(page, page_size)
+    limit, offset = pagination.window(page, page_size)
     plots = await db.agriculture.plots(session, farmer_id=farmer_id, limit=limit, offset=offset)
     return [PlotOut.model_validate(plot, from_attributes=True) for plot in plots]
 

@@ -9,6 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, File, UploadFile, status
 
+from src import pagination
 from src.agriculture import service
 from src.agriculture.schemas import (
     FarmCreatedOut,
@@ -38,7 +39,7 @@ async def list_farms(
     actor: CurrentActor,
     session: SessionDep,
     page: int = 0,
-    page_size: int = service.DEFAULT_PAGE_SIZE,
+    page_size: int = pagination.DEFAULT_PAGE_SIZE,
 ) -> list[FarmOut]:
     return await service.list_farms(session, actor, page=page, page_size=page_size)
 
@@ -72,6 +73,6 @@ async def list_plots(
     actor: CurrentActor,
     session: SessionDep,
     page: int = 0,
-    page_size: int = service.DEFAULT_PAGE_SIZE,
+    page_size: int = pagination.DEFAULT_PAGE_SIZE,
 ) -> list[PlotOut]:
     return await service.list_plots(session, actor, page=page, page_size=page_size)
