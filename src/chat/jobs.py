@@ -10,8 +10,8 @@ from typing import Any, cast
 from sqlalchemy import CursorResult, update
 
 from src.chat.constants import ConversationStatus
-from src.chat.models import Conversation
 from src.database import async_session_maker
+from src.db.models import Conversation
 
 logger = logging.getLogger(__name__)
 

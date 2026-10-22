@@ -1,4 +1,4 @@
-from src.chat.models import Conversation, ConversationAnswer
+from src.db.models import Conversation, ConversationAnswer
 
 
 def test_conversation_table_schema_and_columns() -> None:

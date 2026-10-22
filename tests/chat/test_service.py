@@ -5,7 +5,7 @@ import pytest
 
 from src.chat import service
 from src.chat.constants import ActiveSubstate, AnswerSource, ConversationStatus
-from src.chat.models import Conversation, ConversationAnswer
+from src.db.models import Conversation, ConversationAnswer
 from src.exceptions import ConversationNotFound, HandlerNotSupported, UpstreamServiceError
 from src.forms.schemas import FormDetail
 from src.line import parent_picker

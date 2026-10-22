@@ -41,10 +41,10 @@ from src.chat.constants import (
     AnswerSource,
     ConversationStatus,
 )
-from src.chat.models import Conversation, ConversationAnswer
 from src.chat.state_machine import on_guided_answer
 from src.chat.validation import parse_lat_lng, validate_answer
 from src.database import Session, async_session_maker
+from src.db.models import Conversation, ConversationAnswer
 from src.exceptions import ConversationNotFound, HandlerNotSupported
 from src.forms.schemas import FormDetail
 from src.line import parent_picker, plot_picker
@@ -1271,7 +1271,7 @@ async def _handle_parent_answer(
     On a match: stores the pick on conversation.parent_answer (NOT as a
     ConversationAnswer row -- there's no real form.question backing this
     step, and that table's question_id has a real FK, see
-    src/chat/models.py) and advances to the form's actual first
+    src/db/models.py) and advances to the form's actual first
     question, exactly like start_conversation's non-parent path.
     """
     choices = await parent_picker.choices_for(session, parent_kind, conversation.user_id)

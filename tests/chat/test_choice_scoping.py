@@ -12,8 +12,8 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.chat import service
-from src.chat.models import ConversationAnswer
 from src.config import settings
+from src.db.models import ConversationAnswer
 from src.forms.schemas import FormDetail
 from src.line import plot_picker
 

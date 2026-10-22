@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.chat import service
-from src.chat.models import ConversationAnswer
+from src.db.models import ConversationAnswer
 from src.exceptions import HandlerNotSupported
 from src.forms.schemas import FormDetail
 

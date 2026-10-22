@@ -19,7 +19,7 @@
 - New queries go in `src/db/<schema>.py`, in the file whose `Owns:` list has the table (CONVENTIONS.md §2).
 - New settings go in `src/config.py` (one `Settings` class). New errors go in `src/exceptions.py`. Clock reads go through `src/clock.py`.
 - Every service function takes `(session, actor, ...)` and calls `require(actor, "<perm>")` first (`src/actor.py`).
-- Name every table's PK `<entity>_id` (e.g. `conversation_id`), never a generic `id`. `src/models.py`'s `uuid_pk()` helps.
+- Name every table's PK `<entity>_id` (e.g. `conversation_id`), never a generic `id`. `src/db/models.py`'s `uuid_pk()` helps.
 - LLM calls go through `src/llm/client.py` only (`LLM_MODEL` / `LLM_API_KEY`), so the provider stays swappable.
 - Scheduled jobs: register in `src/jobs/scheduler.py` and keep the body a plain async function. That way it stays testable without APScheduler, and callable from `/internal/cron/*` on serverless hosts.
 - Required env vars for tests are set in `tests/conftest.py` before any `src` import, because `Settings()` is built at import time.

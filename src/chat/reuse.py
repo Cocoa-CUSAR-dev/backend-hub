@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from src.chat.constants import AnswerSource
-from src.chat.models import ConversationAnswer
+from src.db.models import ConversationAnswer
 from src.tasks.client import fetch_sanitized_autofill
 
 if TYPE_CHECKING:

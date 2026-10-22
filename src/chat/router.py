@@ -9,12 +9,12 @@ from src import db
 from src.chat import intent, reuse, service, text_parsing
 from src.chat.constants import PAUSE_LABEL, ActiveSubstate, ConversationStatus
 from src.chat.intent import Intent
-from src.chat.models import Conversation
 from src.chat.ui import messages
 from src.chat.ui.flex_builders import build_diary_flex, build_quick_ack_flex
 from src.chat.ui.schemas import QuickReplyOption
 from src.config import settings
 from src.database import Session, async_session_maker
+from src.db.models import Conversation
 from src.diary.client import generate_diary
 from src.exceptions import ConversationNotFound, UpstreamServiceError
 from src.forms.client import get_form

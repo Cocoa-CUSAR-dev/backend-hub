@@ -4,7 +4,7 @@ from sqlalchemy import DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped
 
-from src.models import TimestampMixin, uuid_pk
+from src.db.models import TimestampMixin, uuid_pk
 
 
 class _Base(DeclarativeBase):

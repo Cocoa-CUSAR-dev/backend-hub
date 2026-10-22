@@ -1,4 +1,4 @@
-from src.reminders.models import ReminderLog, ReminderSchedule
+from src.db.models import ReminderLog, ReminderSchedule
 
 
 def test_reminder_schedule_table_schema() -> None:
