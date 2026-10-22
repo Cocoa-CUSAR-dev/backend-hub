@@ -1,6 +1,6 @@
 import json
 from datetime import date, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +9,7 @@ from tests.db.conftest import insert
 
 
 async def _user(session: AsyncSession) -> UUID:
-    user_id = await insert(session, "auth.user_account", username="farmer")
+    user_id = await insert(session, "auth.user_account", username=f"farmer-{uuid4()}")
     assert user_id is not None
     return user_id
 
