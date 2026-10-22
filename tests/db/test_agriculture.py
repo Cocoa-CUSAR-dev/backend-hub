@@ -13,7 +13,7 @@ NOW = datetime(2026, 10, 22, 3, 0)
 
 
 async def _farmer(session: AsyncSession) -> UUID:
-    user_id = await insert(session, "auth.user_account", username="farmer")
+    user_id = await insert(session, "auth.user_account", username=f"farmer-{uuid4()}")
     assert user_id is not None
     return user_id
 
