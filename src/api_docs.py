@@ -37,6 +37,11 @@ TAGS: list[dict[str, Any]] = [
         "processor, researcher); each role has its own profile.",
     },
     {"name": "admin", "description": "Admin only: grant or remove researcher / admin roles."},
+    {
+        "name": "tasks",
+        "description": "My tasks, the form to fill for each, and my answers. Task times "
+        "(open_at, close_at) are Bangkok wall-clock written with a Z, as the mobile app expects.",
+    },
     {"name": "line", "description": "LINE webhook: every chat event from the LINE OA."},
     {"name": "liff", "description": "Endpoints the LIFF pages call from inside LINE."},
     {
