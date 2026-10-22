@@ -1,12 +1,12 @@
-"""HTTP surface for managing notify.reminder_schedule rows and who they are
-aimed at (notify.reminder_recipient) -- the write side of reminders that
+"""HTTP surface for managing reminder schedules and who they are aimed at
+(the recipient rules) -- the write side of reminders that
 isn't APScheduler-triggered (see scheduler.py/jobs.py for the delivery
 side). The only caller is web-backend (create-form page + the per-task
 reminder settings), never web-app directly.
 
 Deliberately no DELETE: a schedule is switched off with PATCH is_active=false
 (it also turns itself off once nobody owes the task, see jobs.py) so its
-history in notify.reminder_log keeps a schedule to point at.
+history in the send log keeps a schedule to point at.
 
 Gated by the same X-Service-Key trust model as src/notifications (reusing
 its dependency directly rather than a second copy of the same check).

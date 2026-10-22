@@ -10,7 +10,6 @@ from src.clock import bangkok_now
 from src.database import Session, async_session_maker, transaction
 from src.line.service import multicast_text_batched
 from src.reminders import service
-from src.reminders.queries import users_owing_task
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ async def _run_reminder_check(session: Session, now: datetime) -> None:
     # comparison doesn't depend on the database session's timezone.
     day_start = naive_now.replace(hour=0, minute=0, second=0, microsecond=0)
     for reminder in due:
-        owing = await users_owing_task(
+        owing = await service.users_owing_task(
             session, reminder.task_id, naive_now, schedule_id=reminder.schedule_id
         )
         if not owing:

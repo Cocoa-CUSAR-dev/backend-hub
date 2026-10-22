@@ -18,7 +18,7 @@ async def _run(*, due, owing, done, id_map, multicast_batched=None):
     multicast_batched = multicast_batched or AsyncMock(side_effect=lambda to, _msg: (to, []))
     with (
         patch("src.reminders.service.due_reminders", new=AsyncMock(return_value=due)),
-        patch("src.reminders.jobs.users_owing_task", new=AsyncMock(return_value=owing)),
+        patch("src.reminders.service.users_owing_task", new=AsyncMock(return_value=owing)),
         patch(
             "src.db.notify.already_reminded_since",
             new=AsyncMock(return_value=done),

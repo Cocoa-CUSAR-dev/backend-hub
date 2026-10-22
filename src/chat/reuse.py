@@ -11,7 +11,7 @@ ConversationAnswer rows (build_answer_rows) -- chatbot-specific concerns
 that have nowhere else to live.
 
 Raw data source: Go's GET /service/tasks/last-answer (src/tasks/client.py's
-fetch_last_answer, #100) -- the most recent COMPLETED form.response.answer
+fetch_last_answer, #100) -- the most recent COMPLETED answer
 for (farmer, handler), completely unfiltered.
 """
 

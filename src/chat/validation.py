@@ -2,7 +2,7 @@
 Answer step between GUIDED_AWAITING_FIXED_ANSWER and either the next
 question or a re-ask with guidance on the expected format.
 
-Rules come from Kotlin's form.field_validation_rule, keyed by field_name and
+Rules come from Kotlin's field validation rules, keyed by field_name and
 joined onto each question server-side (web-backend's FormRepository.kt --
 queryFormRecords LEFT JOINs FIELD_VALIDATION_RULE on field_name,
 toQuestionEntity maps it into Question.Entity.validationRule). GET
@@ -135,7 +135,7 @@ _VALIDATORS: dict[str, _Validator] = {
 def validate_answer(rule: dict[str, Any] | None, raw_text: str) -> str | None:
     """None if `raw_text` satisfies `rule`, or if `rule` is None -- questions
     with no validation_rule (OPTION/BOOLEAN/upload, or any field_name with
-    no row in form.field_validation_rule) pass through unchanged. Otherwise
+    no validation rule) pass through unchanged. Otherwise
     returns the rule's own error_message, ready to show the farmer as-is
     alongside the re-asked question.
     """

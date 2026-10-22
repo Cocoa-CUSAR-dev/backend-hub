@@ -17,7 +17,7 @@ from src.db.notify import Recipient
 from src.exceptions import InvalidReminderReference, ReminderNotFound
 from src.reminders import service
 from src.reminders.jobs import _run_reminder_check, check_and_send_reminders
-from src.reminders.queries import users_owing_task
+from src.reminders.service import users_owing_task
 from tests.integration.helpers import (
     seed_form_response,
     seed_task_form,

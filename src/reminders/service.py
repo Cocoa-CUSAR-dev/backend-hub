@@ -4,7 +4,7 @@ task title in src/db/tasks.py); this file only decides what goes together.
 """
 
 from dataclasses import dataclass
-from datetime import time
+from datetime import datetime, time
 from uuid import UUID
 
 from src import db
@@ -72,3 +72,52 @@ async def update_schedule(
             is_active=is_active,
             recipients=recipients,
         )
+
+
+async def users_owing_task(
+    session: Session,
+    task_id: UUID,
+    now: datetime,
+    schedule_id: UUID | None = None,
+) -> list[UUID]:
+    """LINE-reachable users who have not answered this task, while the task is
+    inside its open/close window.
+
+    With a `schedule_id`, also narrowed to the people that schedule is aimed
+    at: anyone holding a targeted role, plus any individually targeted user. A
+    schedule with no recipient rules -- every schedule created before
+    recipients existed -- is aimed at everyone, so this behaves exactly as it
+    always did for those.
+
+    US4-4: a task that has assignees is only for those people (a task with
+    none is for everyone, as before), so only they can owe it -- a reminder
+    must never name a task the person cannot see. Same rule as the task list.
+
+    Scoped to people with a linked LINE account on purpose: a LINE push is the
+    only delivery channel in the MVP (ADR 0006), so users with no linked
+    account are simply out of scope for a reminder -- not an error to report.
+    """
+    window = await db.tasks.task_window(session, task_id)
+    if window is None:
+        return []
+    if (window.open_at is not None and window.open_at > now) or (
+        window.close_at is not None and window.close_at < now
+    ):
+        return []
+
+    candidates = set(await db.auth.line_linked_user_ids(session))
+    candidates -= await db.tasks.responder_ids(session, task_id)
+
+    assignees = await db.tasks.assignee_ids(session, task_id)
+    if assignees:
+        candidates &= set(assignees)
+
+    if schedule_id is not None:
+        rules = await db.notify.recipients_of(session, schedule_id)
+        if rules:
+            targeted = {r.id for r in rules if r.type == "USER"}
+            targeted |= await db.auth.user_ids_with_any_role(
+                session, [r.id for r in rules if r.type == "ROLE"]
+            )
+            candidates &= targeted
+    return list(candidates)

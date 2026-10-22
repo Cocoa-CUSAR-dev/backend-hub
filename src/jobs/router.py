@@ -51,7 +51,7 @@ async def run_reminders() -> dict[str, str]:
     """Wire to a schedule that runs at least as often as the tightest
     reminder_schedule.time_of_day granularity you need -- the job itself
     only actually pushes when something is due AND not already logged
-    today (src/reminders/queries.py), so calling this more often than
+    today (src/db/notify.py), so calling this more often than
     necessary is harmless, just a few no-op DB reads.
     """
     await check_and_send_reminders()

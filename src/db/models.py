@@ -138,7 +138,7 @@ class ReminderSchedule(Base):
 class ReminderRecipient(Base):
     """One targeting rule for a schedule: a whole role (recipient_type
     'ROLE') or one person ('USER'). A schedule with no rows here reminds
-    everyone who still owes the task -- see users_owing_task in queries.py.
+    everyone who still owes the task -- see users_owing_task in src/reminders/service.py.
     """
 
     __tablename__ = "reminder_recipient"

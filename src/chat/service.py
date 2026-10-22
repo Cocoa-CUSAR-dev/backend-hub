@@ -704,11 +704,11 @@ async def _scope_question(
 
     1. Farmer scoping (PLOT_SCOPE_MODE=farmer): a farm or plot question
        offers only the farmer's own farms/plots. Kotlin sends the global
-       ref.farm_constant / ref.plot_constant lists -- every farm in the
+       farm and plot lists -- every farm in the
        system -- which until now reached the farmer as-is everywhere except
        the multi-choice plot picker.
     2. Parent filtering: a dependent question (Kotlin's dependsOn, from
-       form.field_dependency) offers only the choices whose parent_id is the
+       the field-dependency table) offers only the choices whose parent_id is the
        answer already given to its parent -- the plots of the farm just
        picked. Skipped when the parent isn't answered (or holds several
        answers), so nothing is hidden on a guess.

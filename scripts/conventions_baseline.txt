@@ -7,26 +7,9 @@ lib-outside-client|src/forms/client.py|imports httpx
 lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
 sql-outside-db|src/chat/dev_queries.py|imports sqlalchemy
-sql-outside-db|src/reminders/queries.py|imports sqlalchemy
 table-owner|src/chat/dev_queries.py|auth.user_account (owner: src/db/auth.py)
 table-owner|src/chat/dev_queries.py|form.field_validation_rule (owner: src/db/forms.py)
 table-owner|src/chat/dev_queries.py|form.question (owner: src/db/forms.py)
 table-owner|src/chat/dev_queries.py|form.section (owner: src/db/forms.py)
 table-owner|src/chat/dev_queries.py|form.task (owner: src/db/tasks.py)
 table-owner|src/chat/dev_queries.py|form.task_form (owner: src/db/forms.py)
-table-owner|src/chat/reuse.py|form.response (owner: src/db/tasks.py)
-table-owner|src/chat/service.py|form.field_dependency (owner: src/db/forms.py)
-table-owner|src/chat/service.py|ref.farm_constant (owner: src/db/ref.py)
-table-owner|src/chat/service.py|ref.plot_constant (owner: src/db/ref.py)
-table-owner|src/chat/validation.py|form.field_validation_rule (owner: src/db/forms.py)
-table-owner|src/reminders/queries.py|auth.line_identity (owner: src/db/auth.py)
-table-owner|src/reminders/queries.py|auth.user_role (owner: src/db/auth.py)
-table-owner|src/reminders/queries.py|form.assignment (owner: src/db/tasks.py)
-table-owner|src/reminders/queries.py|form.response (owner: src/db/tasks.py)
-table-owner|src/reminders/queries.py|form.task (owner: src/db/tasks.py)
-table-owner|src/reminders/queries.py|notify.reminder_recipient (owner: src/db/notify.py)
-table-owner|src/reminders/router.py|notify.reminder_log (owner: src/db/notify.py)
-table-owner|src/reminders/router.py|notify.reminder_recipient (owner: src/db/notify.py)
-table-owner|src/reminders/router.py|notify.reminder_schedule (owner: src/db/notify.py)
-table-owner|src/tasks/schemas.py|chat.conversation (owner: src/db/chat.py)
-table-owner|src/tasks/schemas.py|form.response (owner: src/db/tasks.py)
