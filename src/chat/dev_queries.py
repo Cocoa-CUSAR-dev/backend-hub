@@ -1,29 +1,26 @@
-"""All the direct-database reads used only by the dev test router
-(src/chat/dev_router.py) -- kept in one file on purpose, so anyone
-auditing "does this service touch form.*/auth.* directly anywhere" only
-has to check here, not hunt through router.py's request handlers too.
-
-This is a deliberate, dev-only exception to src/database.py's "never
-touches form.* directly" rule -- that rule is about the production
-read/write paths, which correctly go through Kotlin/Go (ADR 0001). None of
-the functions below are used by the real LINE webhook path.
+"""All the database reads used only by the dev test router
+(src/chat/dev_router.py), kept in one file so what is dev-only is easy to
+see. None of the functions below are used by the real LINE webhook path.
 
 The dev DB (chatbot/.env's DATABASE_URL) turned out to already have real-
-shaped form/user data (84 form.task_form rows, 35 auth.user_account rows) --
-not empty as first assumed, so database/seed/mock_forms.sql's rows are NOT
-used here. Instead this filters the picker down to the 4 "standalone"
-handlers (task-dissection-design.md) and reuses the existing `farmer01`
-account (role=farmer) as the test conversation owner.
+shaped form/user data (84 forms, 35 users) -- not empty as first assumed, so
+database/seed/mock_forms.sql's rows are NOT used here. Instead this filters
+the picker down to the 4 "standalone" handlers (task-dissection-design.md)
+and reuses the existing `farmer01` account (role=farmer) as the test
+conversation owner.
+
+The queries themselves are in src/db/; this file only picks which rows the
+dev picker offers and shapes them like the real Kotlin responses.
 """
 
 import json
 import logging
 import re
-from typing import cast
+from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import text
-
+from src import db
 from src.chat.schemas import FormSummary
 from src.database import Session
 from src.exceptions import ConversationNotFound, FormNotFound
@@ -57,19 +54,21 @@ async def list_testable_forms(session: Session) -> list[FormSummary]:
     own title is the real per-instance one (e.g. "... (20/04/2026)"). Using
     the wrong one made the picker show a wall of identical-looking buttons.
     """
-    rows = await session.execute(
-        text(
-            """
-            SELECT tf.task_id, tf.form_id AS task_form_id, t.title, tf.handler
-            FROM form.task_form tf
-            JOIN form.task t ON t.task_id = tf.task_id
-            WHERE tf.handler = ANY(:handlers)
-            ORDER BY tf.handler, t.open_at
-            """
-        ),
-        {"handlers": list(TESTABLE_HANDLERS)},
+    forms = await db.forms.forms_with_handlers(session, TESTABLE_HANDLERS)
+    briefs = await db.tasks.task_briefs(session, [f.task_id for f in forms])
+    listed = [(f, briefs[f.task_id]) for f in forms if f.task_id in briefs]
+    listed.sort(
+        key=lambda p: (p[0].handler or "", p[1].open_at is None, p[1].open_at or datetime.min)
     )
-    return [FormSummary(**dict(row._mapping)) for row in rows]
+    return [
+        FormSummary(
+            task_id=form.task_id,
+            task_form_id=form.form_id,
+            title=brief.title or "",
+            handler=form.handler or "",
+        )
+        for form, brief in listed
+    ]
 
 
 async def _load_choices(session: Session, field_name: str) -> list[dict[str, str]]:
@@ -95,14 +94,9 @@ async def _load_choices(session: Session, field_name: str) -> list[dict[str, str
     table = f"{base}_constant"
     name_col = f"{base}_name"
 
-    rows = await session.execute(
-        text(
-            f'SELECT "{field_name}" AS id, "{name_col}" AS name '
-            f'FROM ref."{table}" ORDER BY "{name_col}" LIMIT :limit'
-        ),
-        {"limit": _CHOICE_LIMIT},
-    )
-    return [{"id": str(row.id), "name": row.name} for row in rows]
+    choices = await db.ref.choices(session, table, field_name, name_col)
+    by_name = sorted(choices, key=lambda c: c.name or "")
+    return [{"id": c.id, "name": c.name} for c in by_name[:_CHOICE_LIMIT]]
 
 
 async def load_form_detail(session: Session, task_form_id: UUID) -> FormDetail:
@@ -110,25 +104,25 @@ async def load_form_detail(session: Session, task_form_id: UUID) -> FormDetail:
     FormDetail shape service.py expects, from the local `form.*` tables
     instead of a real Kotlin call. OPTION-type questions get a real
     `choices` list attached, same shape Kotlin's own response uses; every
-    question gets `validation_rule` from form.field_validation_rule, same
+    question gets `validation_rule` from the field validation rules, same
     LEFT JOIN on field_name web-backend's FormRepository.kt now does (null
     for OPTION/BOOLEAN/upload or any field_name with no rule row).
     """
-    rows = await session.execute(
-        text(
-            """
-            SELECT q.question_id, q.label, q.field_name, q.input_type, q.is_mandatory,
-                   q.sort_order, fvr.validation_rule
-            FROM form.question q
-            JOIN form.section s ON s.section_id = q.section_id
-            LEFT JOIN form.field_validation_rule fvr ON fvr.field_name = q.field_name
-            WHERE s.form_id = :task_form_id
-            ORDER BY q.sort_order
-            """
-        ),
-        {"task_form_id": str(task_form_id)},
-    )
-    questions = [dict(row._mapping) for row in rows]
+    rows = await db.forms.form_rows(session, task_form_id)
+    questions: list[dict[str, Any]] = [
+        {
+            "question_id": r.question_id,
+            "label": r.label,
+            "field_name": r.field_name,
+            "input_type": r.input_type,
+            "is_mandatory": r.is_mandatory,
+            "sort_order": r.question_sort_order,
+            "validation_rule": r.validation_rule,
+        }
+        for r in rows
+        if r.question_id is not None
+    ]
+    questions.sort(key=lambda q: (q["sort_order"] is None, q["sort_order"] or 0))
     if not questions:
         raise FormNotFound(f"No questions found for task_form_id={task_form_id}")
 
@@ -160,15 +154,9 @@ async def load_form_detail(session: Session, task_form_id: UUID) -> FormDetail:
 
 
 async def resolve_test_user_id(session: Session) -> UUID:
-    result = await session.execute(
-        text("SELECT user_id FROM auth.user_account WHERE username = :username"),
-        {"username": TEST_USERNAME},
-    )
-    user_id = result.scalar_one_or_none()
-    if user_id is None:
+    user = await db.auth.user_by_username(session, TEST_USERNAME)
+    if user is None:
         raise ConversationNotFound(
             f"Seed user '{TEST_USERNAME}' not found -- run database/seed/mock_forms.sql first"
         )
-    # A raw text() query loses static type info -- scalar_one_or_none() is
-    # Any here even though the column is a real uuid.
-    return cast(UUID, user_id)
+    return user.user_id

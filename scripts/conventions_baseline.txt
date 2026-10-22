@@ -1,15 +1,7 @@
 # Legacy code written before CONVENTIONS.md. This list may only shrink.
 # Fix an item -> run `python scripts/check_conventions.py --prune`.
 # Never add lines by hand: new code must follow the conventions.
-http-exception|src/exceptions.py|uses HTTPException
 lib-outside-client|src/diary/client.py|imports httpx
 lib-outside-client|src/forms/client.py|imports httpx
 lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
-sql-outside-db|src/chat/dev_queries.py|imports sqlalchemy
-table-owner|src/chat/dev_queries.py|auth.user_account (owner: src/db/auth.py)
-table-owner|src/chat/dev_queries.py|form.field_validation_rule (owner: src/db/forms.py)
-table-owner|src/chat/dev_queries.py|form.question (owner: src/db/forms.py)
-table-owner|src/chat/dev_queries.py|form.section (owner: src/db/forms.py)
-table-owner|src/chat/dev_queries.py|form.task (owner: src/db/tasks.py)
-table-owner|src/chat/dev_queries.py|form.task_form (owner: src/db/forms.py)

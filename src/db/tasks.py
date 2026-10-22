@@ -35,6 +35,14 @@ class TaskRow:
 
 
 @dataclass(frozen=True, slots=True)
+class TaskBrief:
+    """A task's name and when it opens, for lists that only need those."""
+
+    title: str | None
+    open_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
 class TaskWindow:
     """When a task accepts answers. None on either side means no limit there.
     Bangkok wall-clock, no zone stored."""
@@ -134,15 +142,15 @@ async def responder_ids(session: AsyncSession, task_id: UUID) -> set[UUID]:
     return set(result.scalars())
 
 
-async def task_titles(session: AsyncSession, task_ids: list[UUID]) -> dict[UUID, str | None]:
-    """task_id -> title, for the ids that exist. A task may have no title."""
+async def task_briefs(session: AsyncSession, task_ids: list[UUID]) -> dict[UUID, TaskBrief]:
+    """task_id -> title and opening time, for the ids that exist."""
     if not task_ids:
         return {}
     rows = await session.execute(
-        text("SELECT task_id, title FROM form.task WHERE task_id = ANY(:ids)"),
+        text("SELECT task_id, title, open_at FROM form.task WHERE task_id = ANY(:ids)"),
         {"ids": task_ids},
     )
-    return {row.task_id: row.title for row in rows}
+    return {row.task_id: TaskBrief(title=row.title, open_at=row.open_at) for row in rows}
 
 
 async def task_visible_to(session: AsyncSession, user_id: UUID, task_id: UUID) -> bool:

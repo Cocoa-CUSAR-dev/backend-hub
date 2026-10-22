@@ -23,8 +23,13 @@ async def due_reminders(session: Session, now_time: time) -> list[DueReminder]:
     """Active DAILY schedules whose time has already passed today, with the
     title of the task each is about (for the message text)."""
     due = await db.notify.due_schedules(session, now_time)
-    titles = await db.tasks.task_titles(session, [d.task_id for d in due])
-    return [DueReminder(d.schedule_id, d.task_id, titles.get(d.task_id)) for d in due]
+    briefs = await db.tasks.task_briefs(session, [d.task_id for d in due])
+    return [
+        DueReminder(
+            d.schedule_id, d.task_id, briefs[d.task_id].title if d.task_id in briefs else None
+        )
+        for d in due
+    ]
 
 
 async def create_schedule(
