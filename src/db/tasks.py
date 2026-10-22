@@ -43,6 +43,20 @@ class ResponseRow:
     answer: dict[str, Any] | None
 
 
+# Who may see a task: a task with assignment rows is only for those people;
+# a task with none is for everyone (every task from before assignments
+# existed). One copy, used by the task list and by the single-task reads.
+_VISIBLE_TO_USER = """
+    (
+        NOT EXISTS (SELECT 1 FROM form.assignment a WHERE a.task_id = t.task_id)
+        OR EXISTS (
+            SELECT 1 FROM form.assignment a
+            WHERE a.task_id = t.task_id AND a.user_id = :user_id
+        )
+    )
+"""
+
+
 async def tasks_for_user(
     session: AsyncSession,
     user_id: UUID,
@@ -59,7 +73,7 @@ async def tasks_for_user(
     """
     result = await session.execute(
         text(
-            """
+            f"""
             SELECT
                 t.task_id,
                 t.title,
@@ -72,13 +86,7 @@ async def tasks_for_user(
                 ) AS answered
             FROM form.task t
             WHERE (CAST(:open_on AS date) IS NULL OR DATE(t.open_at) = :open_on)
-              AND (
-                NOT EXISTS (SELECT 1 FROM form.assignment a WHERE a.task_id = t.task_id)
-                OR EXISTS (
-                    SELECT 1 FROM form.assignment a
-                    WHERE a.task_id = t.task_id AND a.user_id = :user_id
-                )
-              )
+              AND {_VISIBLE_TO_USER}
             ORDER BY t.open_at DESC, t.task_id
             LIMIT :limit OFFSET :offset
             """
@@ -86,6 +94,23 @@ async def tasks_for_user(
         {"user_id": user_id, "open_on": open_on, "limit": limit, "offset": offset},
     )
     return [TaskRow(**row._mapping) for row in result]
+
+
+async def task_visible_to(session: AsyncSession, user_id: UUID, task_id: UUID) -> bool:
+    """Whether the task exists and this user may see it (same rule as the
+    task list)."""
+    found = await session.execute(
+        text(
+            f"""
+            SELECT EXISTS (
+                SELECT 1 FROM form.task t
+                WHERE t.task_id = :task_id AND {_VISIBLE_TO_USER}
+            )
+            """
+        ),
+        {"user_id": user_id, "task_id": task_id},
+    )
+    return bool(found.scalar())
 
 
 async def latest_answer(

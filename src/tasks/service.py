@@ -116,8 +116,17 @@ async def get(session: Session, actor: Actor, task_id: UUID) -> dict[str, Any]:
 
 
 async def get_form(session: Session, actor: Actor, task_id: UUID) -> TaskFormOut:
-    """The form to fill for this task, plus its version for the app's cache."""
+    """The form to fill for this task, plus its version for the app's cache.
+
+    A task assigned only to other people is not found, the same as in the
+    task list (Go and Kotlin served any task's form to any farmer). Readers
+    with read:form:all (researchers) see every form.
+    """
     _require_form_reader(actor)
+    if not actor.can("read:form:all") and not await db.tasks.task_visible_to(
+        session, _caller(actor), task_id
+    ):
+        raise NotFound("No form for this task")
     task_form = await db.forms.form_of_task(session, task_id)
     if task_form is None:
         raise NotFound("No form for this task")

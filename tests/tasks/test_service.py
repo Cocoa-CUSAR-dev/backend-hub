@@ -51,9 +51,10 @@ def fake_db(monkeypatch: pytest.MonkeyPatch) -> dict[str, AsyncMock]:
         "responses_of_user": AsyncMock(return_value=[]),
         "forms_of_tasks": AsyncMock(return_value={}),
         "form_of_task": AsyncMock(return_value=None),
+        "task_visible_to": AsyncMock(return_value=True),
         "load_form": AsyncMock(return_value=None),
     }
-    for name in ("tasks_for_user", "latest_answer", "responses_of_user"):
+    for name in ("tasks_for_user", "latest_answer", "responses_of_user", "task_visible_to"):
         monkeypatch.setattr(db.tasks, name, fakes[name])
     for name in ("forms_of_tasks", "form_of_task"):
         monkeypatch.setattr(db.forms, name, fakes[name])
@@ -233,6 +234,32 @@ async def test_get_form_not_found_when_the_form_row_is_gone(
 
     with pytest.raises(NotFound):
         await service.get_form(SESSION, _actor(), task_id)
+
+
+async def test_get_form_of_a_task_assigned_to_others_is_not_found(
+    fake_db: dict[str, AsyncMock],
+) -> None:
+    me = _actor()
+    task_id = uuid4()
+    fake_db["task_visible_to"].return_value = False
+
+    with pytest.raises(NotFound):
+        await service.get_form(SESSION, me, task_id)
+
+    fake_db["task_visible_to"].assert_awaited_once_with(SESSION, me.user_id, task_id)
+    fake_db["form_of_task"].assert_not_awaited()
+
+
+async def test_researchers_get_any_form_without_the_assignment_check(
+    fake_db: dict[str, AsyncMock],
+) -> None:
+    fake_db["task_visible_to"].return_value = False
+
+    with pytest.raises(NotFound):  # no form row in this fake, but it got that far
+        await service.get_form(SESSION, _actor(frozenset({"read:form:all"})), uuid4())
+
+    fake_db["task_visible_to"].assert_not_awaited()
+    fake_db["form_of_task"].assert_awaited_once()
 
 
 async def test_get_form_forbidden_without_form_permission(fake_db: dict[str, AsyncMock]) -> None:

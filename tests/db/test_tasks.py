@@ -83,6 +83,23 @@ async def test_assigned_task_is_only_for_the_people_assigned(db_session: AsyncSe
     assert theirs not in ids
 
 
+async def test_task_visible_to_follows_the_same_assignment_rule(db_session: AsyncSession) -> None:
+    me = await _user(db_session)
+    other = await _user(db_session)
+    open_to_all = await _task(db_session, "everyone", datetime(2026, 10, 1, 8))
+    mine = await _task(db_session, "mine", datetime(2026, 10, 2, 8))
+    theirs = await _task(db_session, "theirs", datetime(2026, 10, 3, 8))
+    await insert(db_session, "form.assignment", task_id=mine, user_id=me)
+    await insert(db_session, "form.assignment", task_id=theirs, user_id=other)
+
+    visible = {
+        task: await db.tasks.task_visible_to(db_session, me, task)
+        for task in (open_to_all, mine, theirs, uuid4())
+    }
+
+    assert list(visible.values()) == [True, True, False, False]
+
+
 async def test_open_on_keeps_only_that_day(db_session: AsyncSession) -> None:
     me = await _user(db_session)
     await _task(db_session, "first", datetime(2026, 10, 1, 8))
