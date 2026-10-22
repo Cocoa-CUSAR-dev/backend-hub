@@ -85,6 +85,20 @@ CREATE TABLE form.response (
     CONSTRAINT fk_response_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id)
 );
 
+-- V1 baseline (+ V31's UNIQUE (task_id, user_id)): who a task is assigned to.
+-- temp_task_picker and the reminder query only ask whether a task has any
+-- rows and whether one of them is a given user's.
+CREATE TABLE form.assignment (
+    assignment_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    task_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    status character varying NOT NULL DEFAULT 'NOT_STARTED',
+    CONSTRAINT pk_assignment PRIMARY KEY (assignment_id),
+    CONSTRAINT uq_assignment_task_user UNIQUE (task_id, user_id),
+    CONSTRAINT fk_assignment_task FOREIGN KEY (task_id) REFERENCES form.task (task_id),
+    CONSTRAINT fk_assignment_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id)
+);
+
 CREATE TABLE form.question (
     question_id uuid DEFAULT gen_random_uuid() NOT NULL,
     section_id uuid NOT NULL,

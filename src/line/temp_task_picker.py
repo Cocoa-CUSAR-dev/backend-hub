@@ -48,9 +48,13 @@ async def list_pending_tasks(session: AsyncSession, user_id: UUID) -> list[Pendi
     """A task is "pending" if this user has no form.response row for it yet,
     OR its form is multiple-submit (in which case it stays listed no matter
     how many responses exist -- see the WHERE clause) -- mirrors
-    mobile-backend's real GetTasks logic (form_handler.go), rather
-    than form.assignment, which turns out to be unpopulated in this DB
-    despite existing in the schema. Deliberately blind to chat.conversation
+    mobile-backend's real GetTasks logic (form_handler.go).
+
+    US4-4 (docs-and-plan#236): also follows form.assignment, by the same rule
+    queryTasksForUser in mobile-backend applies (keep the two in step): a task
+    that has assignment rows is listed only to the people assigned, and a task
+    with none is listed to everyone, as it was before assignments were ever
+    written -- so no existing task disappears. Deliberately blind to chat.conversation
     status for this filter: a task with an ACTIVE/PAUSED-but-unconfirmed
     conversation still has no form.response row yet, so it already shows up
     here correctly -- has_conversation only changes how it's labeled/handled,
@@ -82,6 +86,13 @@ async def list_pending_tasks(session: AsyncSession, user_id: UUID) -> list[Pendi
                 OR NOT EXISTS (
                     SELECT 1 FROM form.response r
                     WHERE r.task_log_id = t.task_id AND r.user_id = :user_id
+                )
+            )
+            AND (
+                NOT EXISTS (SELECT 1 FROM form.assignment a WHERE a.task_id = t.task_id)
+                OR EXISTS (
+                    SELECT 1 FROM form.assignment a
+                    WHERE a.task_id = t.task_id AND a.user_id = :user_id
                 )
             )
             ORDER BY t.open_at DESC
