@@ -3,11 +3,10 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends
-from sqlalchemy import select
 
 from src import db
 from src.chat import intent, reuse, service, text_parsing
-from src.chat.constants import PAUSE_LABEL, ActiveSubstate, ConversationStatus
+from src.chat.constants import PAUSE_LABEL, ActiveSubstate
 from src.chat.intent import Intent
 from src.chat.ui import messages
 from src.chat.ui.flex_builders import build_diary_flex, build_quick_ack_flex
@@ -467,13 +466,7 @@ async def _reply_unsupported_message_type(event: MessageEvent) -> None:
         return
 
     async with async_session_maker() as session:
-        result = await session.execute(
-            select(Conversation).where(
-                Conversation.user_id == user_id,
-                Conversation.status == ConversationStatus.ACTIVE,
-            )
-        )
-        in_form = result.scalars().first() is not None
+        in_form = await db.chat.active_conversation(session, user_id) is not None
 
     if in_form:
         await reply_text(event.reply_token, messages.UNSUPPORTED_MESSAGE_TYPE_IN_FORM)
@@ -507,13 +500,7 @@ async def _handle_location_message(event: MessageEvent, message: LocationMessage
         return
 
     async with async_session_maker() as session:
-        result = await session.execute(
-            select(Conversation).where(
-                Conversation.user_id == user_id,
-                Conversation.status == ConversationStatus.ACTIVE,
-            )
-        )
-        conversation = result.scalars().first()
+        conversation = await db.chat.active_conversation(session, user_id)
         if conversation is None:
             await reply_text(
                 event.reply_token, messages.START_HINT, quick_reply=messages.START_QUICK_REPLY
@@ -570,13 +557,7 @@ async def _handle_message(event: MessageEvent) -> None:
                 await _reply_task_list(event.reply_token, session, user_id)
                 return
 
-            result = await session.execute(
-                select(Conversation).where(
-                    Conversation.user_id == user_id,
-                    Conversation.status == ConversationStatus.ACTIVE,
-                )
-            )
-            conversation = result.scalars().first()
+            conversation = await db.chat.active_conversation(session, user_id)
             if conversation is None:
                 # US2-11 (#184): the only branch this story replaces. Every
                 # OTHER path above stays exactly as it was -- in particular

@@ -112,7 +112,7 @@ class TestEditAndResumeReShowTheLocationPrompt:
 
         # No answer rows: begin_edit checks them first, to refuse an edit
         # after part of a several-answer submission was saved (chatbot#76).
-        with patch("src.chat.service._answered_rows", new=AsyncMock(return_value=[])):
+        with patch("src.db.chat.answers_of", new=AsyncMock(return_value=[])):
             reply = await service.begin_edit(
                 session,
                 conversation_id=conversation.conversation_id,

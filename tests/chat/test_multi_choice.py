@@ -22,7 +22,7 @@ from src.forms.schemas import FormDetail
 
 @pytest.fixture(autouse=True)
 def _record_submitted_in_memory():  # noqa: ANN202
-    """_record_submitted writes through its own real session (so the
+    """db.chat.record_submitted writes through its own real session (so the
     confirm lock is never released mid-fan-out -- see its docstring). These
     unit tests have no database, so they get an in-memory stand-in that
     records the same thing on the row; the real write is covered by
@@ -32,7 +32,7 @@ def _record_submitted_in_memory():  # noqa: ANN202
     async def record(row: ConversationAnswer, submitted: list[str]) -> None:
         row.answer = {**row.answer, "submitted": submitted}
 
-    with patch("src.chat.service._record_submitted", new=record):
+    with patch("src.db.chat.record_submitted", new=record):
         yield
 
 
@@ -258,7 +258,7 @@ class TestFanOut:
         But never by committing the caller's session -- that releases
         confirm_conversation's lock mid-fan-out and lets a second ยืนยัน send
         the remaining plots again (review on #76). Each record goes through
-        _record_submitted's own session instead.
+        db.chat.record_submitted's own session instead.
         """
         session = MagicMock(commit=AsyncMock())
         recorded: list[list[str]] = []
@@ -269,7 +269,7 @@ class TestFanOut:
 
         with (
             patch("src.chat.service.submit_task", new=AsyncMock()),
-            patch("src.chat.service._record_submitted", new=record),
+            patch("src.db.chat.record_submitted", new=record),
         ):
             await service._submit_per_choice(
                 session,

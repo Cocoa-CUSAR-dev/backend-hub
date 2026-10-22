@@ -4,14 +4,7 @@ if that diagram ever changes, and vice versa.
 
 from enum import StrEnum
 
-
-class ConversationStatus(StrEnum):
-    """Outer state machine -- persisted as chat_conversation.status."""
-
-    ACTIVE = "active"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+from src.db.models import ConversationStatus as ConversationStatus  # noqa: PLC0414
 
 
 class ActiveSubstate(StrEnum):

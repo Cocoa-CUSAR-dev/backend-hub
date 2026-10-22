@@ -7,9 +7,6 @@ lib-outside-client|src/forms/client.py|imports httpx
 lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
 sql-outside-db|src/chat/dev_queries.py|imports sqlalchemy
-sql-outside-db|src/chat/jobs.py|imports sqlalchemy
-sql-outside-db|src/chat/router.py|imports sqlalchemy
-sql-outside-db|src/chat/service.py|imports sqlalchemy
 sql-outside-db|src/line/handler_registry.py|imports sqlalchemy
 sql-outside-db|src/line/parent_picker.py|imports sqlalchemy
 sql-outside-db|src/line/plot_picker.py|imports sqlalchemy

@@ -5,13 +5,9 @@ instance (src/jobs/scheduler.py).
 """
 
 import logging
-from typing import Any, cast
 
-from sqlalchemy import CursorResult, update
-
-from src.chat.constants import ConversationStatus
+from src import db
 from src.database import async_session_maker
-from src.db.models import Conversation
 
 logger = logging.getLogger(__name__)
 
@@ -29,14 +25,6 @@ async def pause_idle_conversations() -> None:
     that's the separate Reminders/Notif. epic's job, not this one's.
     """
     async with async_session_maker() as session:
-        raw_result = await session.execute(
-            update(Conversation)
-            .where(Conversation.status == ConversationStatus.ACTIVE)
-            .values(status=ConversationStatus.PAUSED)
-        )
-        # session.execute()'s declared return type is the general Result[Any]
-        # -- an UPDATE always actually returns the CursorResult subtype that
-        # carries rowcount, this just tells mypy what we already know.
-        result = cast(CursorResult[Any], raw_result)
+        paused = await db.chat.pause_all_active(session)
         await session.commit()
-    logger.info("pause_idle_conversations: paused %d conversation(s)", result.rowcount)
+    logger.info("pause_idle_conversations: paused %d conversation(s)", paused)

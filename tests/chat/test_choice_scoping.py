@@ -11,6 +11,7 @@ tests/integration/test_choice_scoping.py).
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from src import db
 from src.chat import service
 from src.config import settings
 from src.db.models import ConversationAnswer
@@ -75,7 +76,7 @@ async def _scope(
 ) -> list[str]:
     conversation = MagicMock(conversation_id=uuid.uuid4(), user_id=uuid.uuid4())
     with (
-        patch.object(service, "_answered_rows", new=AsyncMock(return_value=answers or [])),
+        patch.object(db.chat, "answers_of", new=AsyncMock(return_value=answers or [])),
         patch.object(plot_picker, "farmer_owned_ids", new=AsyncMock(return_value=owned)),
     ):
         scoped = await service._scope_question(
@@ -146,7 +147,7 @@ class TestScopedQuestionStillRendersCorrectly:
         conversation = MagicMock(conversation_id=uuid.uuid4(), user_id=uuid.uuid4())
         with (
             patch.object(
-                service, "_answered_rows", new=AsyncMock(return_value=[_answer(farm_q, FARM_B)])
+                db.chat, "answers_of", new=AsyncMock(return_value=[_answer(farm_q, FARM_B)])
             ),
             patch.object(plot_picker, "farmer_owned_ids", new=AsyncMock(return_value=None)),
         ):

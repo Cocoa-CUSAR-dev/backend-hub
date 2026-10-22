@@ -30,10 +30,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, update
-from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm.attributes import set_committed_value
-
+from src import db
 from src.chat import llm_parsing, reuse, text_parsing
 from src.chat.constants import (
     PAUSE_LABEL,
@@ -43,9 +40,9 @@ from src.chat.constants import (
 )
 from src.chat.state_machine import on_guided_answer
 from src.chat.validation import parse_lat_lng, validate_answer
-from src.database import Session, async_session_maker
+from src.database import Session
 from src.db.models import Conversation, ConversationAnswer
-from src.exceptions import ConversationNotFound, HandlerNotSupported
+from src.exceptions import AnswerInFlight, ConversationNotFound, HandlerNotSupported
 from src.forms.schemas import FormDetail
 from src.line import parent_picker, plot_picker
 from src.tasks.client import submit_task
@@ -363,22 +360,6 @@ def _answered_question_ids(answer_rows: list[ConversationAnswer]) -> set[UUID]:
     return {row.question_id for row in answer_rows if not row.answer.get("selecting")}
 
 
-async def _answered_rows(
-    session: Session, conversation_id: UUID, *, refresh: bool = False
-) -> list[ConversationAnswer]:
-    """refresh=True re-reads rows this session may already hold (see
-    confirm_conversation: after waiting on a lock, a stale in-memory
-    `submitted` would re-send rows that another request already saved).
-    """
-    statement = select(ConversationAnswer).where(
-        ConversationAnswer.conversation_id == conversation_id
-    )
-    if refresh:
-        statement = statement.execution_options(populate_existing=True)
-    result = await session.execute(statement)
-    return list(result.scalars().all())
-
-
 def _format_answered_lines(questions: list[Question], answers: list[ConversationAnswer]) -> str:
     """Shared by the confirmation summary and the resume recap (US2-3) --
     both need "label: answer" per already-answered question, just with
@@ -590,7 +571,7 @@ async def multi_choice_options_for(
     if not is_multi_choice_question(question, form):
         return None
 
-    answer_rows = await _answered_rows(session, conversation.conversation_id)
+    answer_rows = await db.chat.answers_of(session, conversation.conversation_id)
     if any(
         row.answer.get("multi") and row.question_id != question.question_id for row in answer_rows
     ):
@@ -749,7 +730,7 @@ async def _scope_question(
         narrowed = [choice for choice in narrowed if choice.id in owned]
 
     if question.depends_on:
-        answer_rows = await _answered_rows(session, conversation.conversation_id)
+        answer_rows = await db.chat.answers_of(session, conversation.conversation_id)
         parent_value = _answered_value(answer_rows, questions_from_form(form), question.depends_on)
         if parent_value is not None:
             narrowed = [choice for choice in narrowed if choice.parent_id == parent_value]
@@ -804,7 +785,7 @@ async def _selection_row(session: Session, conversation: Conversation) -> Conver
     """
     if conversation.current_question_id is None:
         return None
-    rows = await _answered_rows(session, conversation.conversation_id)
+    rows = await db.chat.answers_of(session, conversation.conversation_id)
     return next((row for row in rows if row.question_id == conversation.current_question_id), None)
 
 
@@ -907,13 +888,7 @@ async def _locked_selection(
     retracted or edited, so yesterday's picker is still sitting in the chat
     with live buttons.
     """
-    conversation = (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.conversation_id == conversation_id)
-            .with_for_update()
-        )
-    ).scalar_one_or_none()
+    conversation = await db.chat.lock_conversation(session, conversation_id, wait=True)
     if conversation is None:
         raise ConversationNotFound()
     if conversation.status != ConversationStatus.ACTIVE:
@@ -1338,12 +1313,12 @@ async def _store_answer_and_advance(
     # second one for the same question_id, which _format_answered_lines and
     # confirm_conversation's own dict-comprehension would otherwise both
     # silently show/collapse in an order that isn't actually guaranteed (no
-    # ORDER BY on _answered_rows, and no unique constraint on
+    # ORDER BY on db.chat.answers_of, and no unique constraint on
     # (conversation_id, question_id) at the DB level). The normal
     # forward-only flow never finds an existing row here -- current_question_id
     # only ever advances to a not-yet-answered question -- so this is a
     # no-op behavior change for every path except editing.
-    answer_rows = await _answered_rows(session, conversation_id)
+    answer_rows = await db.chat.answers_of(session, conversation_id)
     existing_row = next(
         (row for row in answer_rows if row.question_id == conversation.current_question_id),
         None,
@@ -1395,10 +1370,6 @@ async def _store_answer_and_advance(
     )
 
 
-class _AnswerInFlight(Exception):
-    """Another message for this conversation is already being processed."""
-
-
 async def _lock_conversation(session: Session, conversation_id: UUID) -> Conversation:
     """Locks the conversation row for the rest of the caller's transaction --
     see handle_answer's comment for why, and why NOWAIT. Shared with
@@ -1406,30 +1377,10 @@ async def _lock_conversation(session: Session, conversation_id: UUID) -> Convers
     the same question can't both be stored: whichever gets the lock first
     wins, the other is dropped, same as two typed answers.
 
-    Raises _AnswerInFlight on lock contention (callers return None, i.e. no
+    Raises AnswerInFlight on lock contention (callers return None, i.e. no
     reply) and ConversationNotFound when the row is gone.
     """
-    try:
-        conversation = (
-            await session.execute(
-                select(Conversation)
-                .where(Conversation.conversation_id == conversation_id)
-                .with_for_update(nowait=True)
-            )
-        ).scalar_one_or_none()
-    except DBAPIError as exc:
-        # 55P03 = lock_not_available (Postgres SQLSTATE) -- checked on the
-        # code rather than the wrapped exception type, since SQLAlchemy's
-        # asyncpg dialect re-wraps the driver error (AsyncAdapt_asyncpg_dbapi
-        # .Error, not asyncpg's own LockNotAvailableError) but still proxies
-        # .sqlstate through from the original.
-        if getattr(exc.orig, "sqlstate", None) != "55P03":
-            raise
-        logger.info(
-            "conversation_id=%s already has an answer in flight -- dropping this message",
-            conversation_id,
-        )
-        raise _AnswerInFlight() from exc
+    conversation = await db.chat.lock_conversation(session, conversation_id, wait=False)
     if conversation is None:
         raise ConversationNotFound()
     return conversation
@@ -1456,7 +1407,7 @@ async def handle_answer(
     # flow doesn't try.
     try:
         conversation = await _lock_conversation(session, conversation_id)
-    except _AnswerInFlight:
+    except AnswerInFlight:
         return None
 
     # Checked before everything else below (parent-picker step, no open
@@ -1770,7 +1721,7 @@ async def handle_location(
     """
     try:
         conversation = await _lock_conversation(session, conversation_id)
-    except _AnswerInFlight:
+    except AnswerInFlight:
         return None
 
     questions = questions_from_form(form)
@@ -1932,29 +1883,9 @@ async def _submit_per_choice(
         # record is written through its own short session instead -- a
         # different table from the locked row, so it never waits on it --
         # and the lock stays held until confirm_conversation's final commit.
-        await _record_submitted(row, submitted)
+        await db.chat.record_submitted(row, submitted)
 
     return None
-
-
-async def _record_submitted(row: ConversationAnswer, submitted: list[str]) -> None:
-    """Durably records which choices reached Go, in its own transaction.
-
-    The in-memory copy is updated with set_committed_value, which does NOT
-    mark the row dirty. If the calling session flushed its own UPDATE of
-    this row, its transaction would hold the row lock while this session
-    waited on it -- a deadlock Postgres can't detect, since both
-    connections are held by the same request.
-    """
-    answer = {**row.answer, "submitted": submitted}
-    async with async_session_maker() as side_session:
-        await side_session.execute(
-            update(ConversationAnswer)
-            .where(ConversationAnswer.conversation_answer_id == row.conversation_answer_id)
-            .values(answer=answer)
-        )
-        await side_session.commit()
-    set_committed_value(row, "answer", answer)
 
 
 _ALREADY_SAVED = "บันทึกข้อมูลชุดนี้ไปแล้วครับ"
@@ -1980,14 +1911,9 @@ async def confirm_conversation(
     # BEFORE the lock was taken. Without it SQLAlchemy hands back that
     # already-loaded object with its pre-lock attributes, so the waiting
     # request would still see status ACTIVE and submit everything again.
-    conversation = (
-        await session.execute(
-            select(Conversation)
-            .where(Conversation.conversation_id == conversation_id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-    ).scalar_one_or_none()
+    conversation = await db.chat.lock_conversation(
+        session, conversation_id, wait=True, refresh=True
+    )
     if conversation is None:
         raise ConversationNotFound()
 
@@ -2025,7 +1951,7 @@ async def confirm_conversation(
     # backstop, so no future path can ship an unfinished answer to Go.
     answer_rows = [
         row
-        for row in await _answered_rows(session, conversation_id, refresh=True)
+        for row in await db.chat.answers_of(session, conversation_id, refresh=True)
         if not row.answer.get("selecting")
     ]
     multi_row = _multi_choice_row(answer_rows)
@@ -2211,7 +2137,7 @@ async def start_next_submission(
     carried = (
         [
             row
-            for row in await _answered_rows(session, conversation_id)
+            for row in await db.chat.answers_of(session, conversation_id)
             if row.question_id in flagged
         ]
         if flagged
@@ -2286,18 +2212,7 @@ async def pause_active_conversation(session: Session, *, user_id: UUID) -> None:
     "went quiet and never came back"; this one is the immediate, same-turn
     "farmer is deliberately switching tasks right now" case.
     """
-    conversation = (
-        (
-            await session.execute(
-                select(Conversation).where(
-                    Conversation.user_id == user_id,
-                    Conversation.status == ConversationStatus.ACTIVE,
-                )
-            )
-        )
-        .scalars()
-        .first()
-    )
+    conversation = await db.chat.active_conversation(session, user_id)
     if conversation is None:
         return
     conversation.status = ConversationStatus.PAUSED
@@ -2313,19 +2228,7 @@ async def find_resumable_conversation(
     start_conversation; COMPLETED/CANCELLED rows are correctly excluded, so
     a farmer can always begin again after either of those.
     """
-    return (
-        (
-            await session.execute(
-                select(Conversation).where(
-                    Conversation.user_id == user_id,
-                    Conversation.task_id == task_id,
-                    Conversation.status.in_([ConversationStatus.ACTIVE, ConversationStatus.PAUSED]),
-                )
-            )
-        )
-        .scalars()
-        .first()
-    )
+    return await db.chat.resumable_conversation(session, user_id, task_id)
 
 
 async def resume_conversation(
@@ -2346,7 +2249,7 @@ async def resume_conversation(
     await session.commit()
 
     questions = questions_from_form(form)
-    answer_rows = await _answered_rows(session, conversation.conversation_id)
+    answer_rows = await db.chat.answers_of(session, conversation.conversation_id)
     recap = _format_resume_recap(questions, answer_rows)
 
     pending_kind = (conversation.parent_answer or {}).get("pending_kind")
@@ -2436,7 +2339,7 @@ async def confirmation_prompt(
         raise ConversationNotFound()
 
     questions = questions_from_form(form)
-    answer_rows = await _answered_rows(session, conversation_id)
+    answer_rows = await db.chat.answers_of(session, conversation_id)
     return ConversationReply(
         conversation_id=conversation_id,
         substate=ActiveSubstate.AWAITING_CONFIRMATION,
@@ -2456,7 +2359,7 @@ async def editable_questions(
     """
     questions = questions_from_form(form)
     question_by_id = {q.question_id: q for q in questions}
-    answer_rows = await _answered_rows(session, conversation_id)
+    answer_rows = await db.chat.answers_of(session, conversation_id)
     answered_ids = {row.question_id for row in answer_rows if row.question_id in question_by_id}
     ordered = sorted(answered_ids, key=lambda qid: question_by_id[qid].sort_order)
     return [question_by_id[qid] for qid in ordered]
@@ -2476,7 +2379,7 @@ async def edit_blocked_reason(session: Session, *, conversation_id: UUID) -> str
       so letting the farmer "edit" them would promise something untrue.
     The farmer can still confirm (sends only what's missing) or cancel.
     """
-    already = _already_submitted(await _answered_rows(session, conversation_id))
+    already = _already_submitted(await db.chat.answers_of(session, conversation_id))
     if not already:
         return None
     return (
@@ -2508,7 +2411,7 @@ async def begin_edit(
     # still be tapped after part of the submission went through.
     blocked = await edit_blocked_reason(session, conversation_id=conversation_id)
     if blocked is not None:
-        answer_rows = await _answered_rows(session, conversation_id)
+        answer_rows = await db.chat.answers_of(session, conversation_id)
         return ConversationReply(
             conversation_id=conversation_id,
             substate=ActiveSubstate.AWAITING_CONFIRMATION,

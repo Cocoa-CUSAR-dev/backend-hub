@@ -17,6 +17,7 @@ They are not mapped classes.
 
 import uuid
 from datetime import datetime, time
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, func
@@ -66,6 +67,18 @@ Table(
 
 
 # ---- chat ----------------------------------------------------------------
+
+
+class ConversationStatus(StrEnum):
+    """Outer state machine -- persisted as chat.conversation.status. Kept in
+    sync with target-architecture.md #4. Lives here, beside the column, so
+    src/db/chat.py can use it without importing the chatbot package.
+    """
+
+    ACTIVE = "active"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class Conversation(Base):
