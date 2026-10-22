@@ -12,7 +12,7 @@ The one backend for the Cocoa Supply Chain Databank (Is Thai Cacao). It started 
 
 | Part | Status |
 |---|---|
-| LINE chatbot (webhook, LIFF, conversation, reminders) | here, being reorganised into the conventions' layout |
+| LINE chatbot (webhook, LIFF, conversation, reminders) | moved into `chat/`, `jobs/`, `line/client.py` and `reminders/`; all of its SQL is in `src/db/` and the conventions check passes with only the Kotlin/Go clients left in the baseline. Still to do: its services take an `actor` and check permissions, and `chat/service.py` stops editing ORM objects in place |
 | Foundation: one `config.py`, one `exceptions.py`, `actor.py`, `clock.py`, `src/db/` owners, conventions check in CI | done |
 | Login + roles (from Kotlin + Go) | next |
 | Mobile endpoints (from Go) / web endpoints (from Kotlin) | planned |
