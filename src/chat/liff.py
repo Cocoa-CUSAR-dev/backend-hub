@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from src import db
 from src.auth import tokens
+from src.auth.service import load_actor
 from src.chat import reuse, service
 from src.chat.constants import ActiveSubstate
 from src.chat.ui.schemas import QuickReplyOption
@@ -33,8 +34,9 @@ from src.exceptions import (
 from src.forms.client import get_form
 from src.line import liff, parent_picker
 from src.line.service import push_autofill_offer, push_confirm_prompt, push_text
-from src.tasks.client import fetch_last_answer, fetch_pending_tasks
-from src.tasks.schemas import TaskListItem
+from src.tasks import service as tasks_service
+from src.tasks.client import fetch_last_answer
+from src.tasks.schemas import TaskOut
 
 router = APIRouter(prefix="/line/liff", tags=["liff"])
 logger = logging.getLogger(__name__)
@@ -92,15 +94,23 @@ LiffUserDep = Annotated[ResolvedLiffUser, Depends(resolve_liff_user)]
 
 
 @router.get("/tasks")
-async def list_pending_tasks(liff_user: LiffUserDep) -> list[TaskListItem]:
-    """The to-do list itself. Filters out COMPLETED here, not in Go --
-    fetch_pending_tasks/GetTasksForUser is a generic "list tasks for a
-    user_id" building block (see that function's own docstring); "pending"
-    is this caller's notion, same division of responsibility
-    temp_task_picker.list_pending_tasks already had.
+async def list_pending_tasks(liff_user: LiffUserDep, session: SessionDep) -> list[TaskOut]:
+    """The to-do list itself: tasks.service.list_for, the function the mobile
+    app's task list uses, minus the COMPLETED ones. "Pending" is this caller's
+    notion; the service lists every task with its status, newest first, and a
+    multiple-submit form never reaches COMPLETED, so it stays.
     """
-    tasks = await fetch_pending_tasks(user_id=str(liff_user.user_id))
-    return [task for task in tasks if task.status != "COMPLETED"]
+    actor = await load_actor(session, liff_user.user_id, "liff")
+    tasks: list[TaskOut] = []
+    page = 0
+    while True:
+        rows = await tasks_service.list_for(
+            session, actor, page=page, page_size=tasks_service.MAX_PAGE_SIZE
+        )
+        tasks += [t for t in rows if t.task_form_id is not None and t.status != "COMPLETED"]
+        if len(rows) < tasks_service.MAX_PAGE_SIZE:
+            return tasks
+        page += 1
 
 
 class StartTaskRequest(BaseModel):

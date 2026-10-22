@@ -13,9 +13,9 @@ from datetime import UTC, datetime
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.line.temp_task_picker import list_pending_tasks
 from src.reminders.service import users_owing_task
 from tests.integration.helpers import (
+    pending_tasks_of,
     seed_form_response,
     seed_task_form,
     seed_user_with_line_identity,
@@ -47,7 +47,7 @@ class TestPickerFollowsAssignments:
         a, b = await _farmer(db_session), await _farmer(db_session)
 
         for user in (a, b):
-            assert [t.task_id for t in await list_pending_tasks(db_session, user)] == [task_id]
+            assert [t.task_id for t in await pending_tasks_of(db_session, user)] == [task_id]
 
     async def test_an_assigned_task_is_listed_only_for_its_assignees(
         self, db_session: AsyncSession
@@ -56,8 +56,8 @@ class TestPickerFollowsAssignments:
         a, b = await _farmer(db_session), await _farmer(db_session)
         await _assign(db_session, task_id=task_id, user_id=a)
 
-        assert [t.task_id for t in await list_pending_tasks(db_session, a)] == [task_id]
-        assert await list_pending_tasks(db_session, b) == []
+        assert [t.task_id for t in await pending_tasks_of(db_session, a)] == [task_id]
+        assert await pending_tasks_of(db_session, b) == []
 
     async def test_only_the_task_assigned_to_someone_else_drops_out(
         self, db_session: AsyncSession
@@ -69,7 +69,7 @@ class TestPickerFollowsAssignments:
         await _assign(db_session, task_id=mine, user_id=me)
         await _assign(db_session, task_id=theirs, user_id=other)
 
-        listed = {t.task_id for t in await list_pending_tasks(db_session, me)}
+        listed = {t.task_id for t in await pending_tasks_of(db_session, me)}
 
         assert listed == {legacy, mine}
 
@@ -83,7 +83,7 @@ class TestPickerFollowsAssignments:
         await _assign(db_session, task_id=task_id, user_id=me)
         await seed_form_response(db_session, task_id=task_id, user_id=me)
 
-        assert [t.task_id for t in await list_pending_tasks(db_session, me)] == [task_id]
+        assert [t.task_id for t in await pending_tasks_of(db_session, me)] == [task_id]
 
     async def test_an_assigned_single_submit_task_disappears_once_submitted(
         self, db_session: AsyncSession
@@ -93,7 +93,7 @@ class TestPickerFollowsAssignments:
         await _assign(db_session, task_id=task_id, user_id=me)
         await seed_form_response(db_session, task_id=task_id, user_id=me)
 
-        assert await list_pending_tasks(db_session, me) == []
+        assert await pending_tasks_of(db_session, me) == []
 
 
 class TestReminderFollowsAssignments:

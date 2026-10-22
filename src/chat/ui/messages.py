@@ -40,6 +40,12 @@ NOT_LINKED = "ขออภัยครับ บัญชี LINE นี้ย�
 
 NO_PENDING_TASKS = "ตอนนี้ยังไม่มีงานที่ต้องบันทึกครับ ขอบคุณมากนะครับ"
 
+# The LINE account is linked, but the account has no role yet (it registered and
+# never became a farmer, hub collector or processor), so it has no forms to fill.
+NO_FORM_ACCESS = (
+    "ขออภัยครับ บัญชีนี้ยังไม่ได้ลงทะเบียนเป็นเกษตรกร ผู้รวบรวม หรือผู้แปรรูป\nรบกวนลงทะเบียนในแอปก่อนนะครับ"
+)
+
 # #186 item 2: a sticker/photo/location/etc. used to be logged and silently
 # dropped, leaving the farmer staring at no reply at all. Two variants --
 # mid-form the farmer is being asked something specific, so pointing them at
