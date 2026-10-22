@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     LINE_CHANNEL_SECRET: str
     LINE_CHANNEL_ACCESS_TOKEN: str
     LIFF_ID: str = ""
+    # LINE Login channels whose LIFF ID tokens may sign in through
+    # POST /api/v1/auth/line/*, besides the one LIFF_ID belongs to -- e.g.
+    # the mobile app's own LIFF link page if it lives on another channel.
+    # JSON list in .env: LINE_LOGIN_CHANNEL_IDS=["1234567890"]
+    LINE_LOGIN_CHANNEL_IDS: list[str] = []
     # US2-6 (docs-and-plan#133): base URL for the diary card's "view full
     # history" button; src/sso/client.py appends a short-lived ?token=.
     WEB_APP_URL: str = ""

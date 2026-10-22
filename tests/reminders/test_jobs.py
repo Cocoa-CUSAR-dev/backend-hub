@@ -24,7 +24,7 @@ async def _run(*, due, owing, done, id_map, multicast_batched=None):
             new=AsyncMock(return_value=done),
         ),
         patch(
-            "src.reminders.jobs.lookup_line_user_ids",
+            "src.db.auth.line_user_ids_for",
             new=AsyncMock(return_value=id_map),
         ),
         patch("src.reminders.jobs.multicast_text_batched", new=multicast_batched),

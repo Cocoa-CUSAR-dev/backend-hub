@@ -24,7 +24,7 @@ from src.main import app
 from src.tasks.schemas import TaskListItem
 
 # Shaped like a real LIFF ID ("{channelId}-{randomId}", LINE's own format)
-# so _channel_id_from_liff_id has something valid to split on. Scoped to
+# so liff.channel_id_from_liff_id has something valid to split on. Scoped to
 # this module (not conftest.py's global env vars) -- test_config.py asserts
 # the real, unconfigured default is "".
 _TEST_LIFF_ID = "1234567890-abcdefgh"
@@ -66,7 +66,7 @@ async def test_resolve_liff_user_raises_not_linked_when_no_identity_row() -> Non
             "src.line.liff_tasks.liff.verify_id_token",
             AsyncMock(return_value={"sub": "Uabc"}),
         ),
-        patch("src.line.liff_tasks.identity.lookup_user_id", AsyncMock(return_value=None)),
+        patch("src.db.auth.user_id_for_line", AsyncMock(return_value=None)),
         pytest.raises(LineAccountNotLinked),
     ):
         await liff_tasks.resolve_liff_user(session=MagicMock(), authorization="Bearer tok")
@@ -79,7 +79,7 @@ async def test_resolve_liff_user_returns_resolved_user_on_success() -> None:
             "src.line.liff_tasks.liff.verify_id_token",
             AsyncMock(return_value={"sub": "Uabc"}),
         ),
-        patch("src.line.liff_tasks.identity.lookup_user_id", AsyncMock(return_value=user_id)),
+        patch("src.db.auth.user_id_for_line", AsyncMock(return_value=user_id)),
     ):
         result = await liff_tasks.resolve_liff_user(session=MagicMock(), authorization="Bearer tok")
 
@@ -91,7 +91,7 @@ async def test_resolve_liff_user_derives_channel_id_from_liff_id() -> None:
     verify_mock = AsyncMock(return_value={"sub": "Uabc"})
     with (
         patch("src.line.liff_tasks.liff.verify_id_token", verify_mock),
-        patch("src.line.liff_tasks.identity.lookup_user_id", AsyncMock(return_value=uuid4())),
+        patch("src.db.auth.user_id_for_line", AsyncMock(return_value=uuid4())),
     ):
         await liff_tasks.resolve_liff_user(session=MagicMock(), authorization="Bearer tok")
 

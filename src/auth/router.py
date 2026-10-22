@@ -2,7 +2,16 @@ from fastapi import APIRouter, status
 
 from src.auth import service
 from src.auth.dependencies import CurrentActor, SessionDep
-from src.auth.schemas import LoginIn, RefreshIn, RegisterIn, ResetPasswordIn, TokenPairOut
+from src.auth.schemas import (
+    LineLinkIn,
+    LineLoginIn,
+    LoginIn,
+    RefreshIn,
+    RegisterIn,
+    ResetPasswordIn,
+    SsoExchangeIn,
+    TokenPairOut,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -43,3 +52,18 @@ async def reset_password(
     body: ResetPasswordIn, actor: CurrentActor, session: SessionDep
 ) -> TokenPairOut:
     return await service.reset_password(session, actor, body.new_password)
+
+
+@router.post("/line/login", summary="LIFF: swap a LINE ID token for a token pair")
+async def line_login(body: LineLoginIn, session: SessionDep) -> TokenPairOut:
+    return await service.line_login(session, body.id_token)
+
+
+@router.post("/line/link", summary="Link a LINE account to an existing account and sign in")
+async def line_link(body: LineLinkIn, session: SessionDep) -> TokenPairOut:
+    return await service.line_link(session, body.id_token, body.username, body.password)
+
+
+@router.post("/sso/exchange", summary="Redeem the one-time link from the LINE diary card")
+async def sso_exchange(body: SsoExchangeIn, session: SessionDep) -> TokenPairOut:
+    return await service.sso_exchange(session, body.token)

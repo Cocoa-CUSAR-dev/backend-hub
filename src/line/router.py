@@ -15,6 +15,7 @@ from linebot.v3.webhooks import (
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src import db
 from src.config import settings
 from src.conversation import intent, reuse, service, text_parsing
 from src.conversation.constants import PAUSE_LABEL, ActiveSubstate, ConversationStatus
@@ -24,7 +25,7 @@ from src.database import async_session_maker
 from src.diary.client import generate_diary
 from src.exceptions import ConversationNotFound, UpstreamServiceError
 from src.forms.client import get_form
-from src.line import identity, messages, parent_picker, temp_task_picker
+from src.line import messages, parent_picker, temp_task_picker
 from src.line.dependencies import parse_line_events
 from src.line.flex_builders import build_diary_flex, build_quick_ack_flex
 from src.line.schemas import QuickReplyOption
@@ -151,14 +152,12 @@ async def _reply(reply_token: str, reply: service.ConversationReply) -> None:
 async def _resolve_user_id(line_user_id: str) -> UUID | None:
     """LINE user_id -> auth.user_account.user_id, via auth.line_identity.
 
-    Only the lookup half is implemented (src/line/identity.py) -- HOW a row
-    gets into auth.line_identity in the first place (pairing code, OAuth,
-    something else) is ADR 0002, still reopened/undecided by the team. A
-    farmer with no linked row yet correctly gets None here; callers must
-    handle that, not assume resolution always succeeds.
+    Rows are created by POST /api/v1/auth/line/link (src/auth). A farmer
+    with no linked row yet correctly gets None here; callers must handle
+    that, not assume resolution always succeeds.
     """
     async with async_session_maker() as session:
-        user_id = await identity.lookup_user_id(session, line_user_id)
+        user_id = await db.auth.user_id_for_line(session, line_user_id)
 
     if user_id is None:
         logger.warning(

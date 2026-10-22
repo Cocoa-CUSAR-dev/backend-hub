@@ -10,7 +10,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.line.identity import lookup_line_user_ids
+from src import db
 from src.line.service import multicast_text_batched, push_text
 from src.notifications.schemas import FailedRecipient, SendNotificationResponse
 
@@ -48,7 +48,7 @@ async def send_notification(
     session: AsyncSession, user_ids: Sequence[UUID], message: str
 ) -> SendNotificationResponse:
     ordered = _dedupe(user_ids)
-    id_map = await lookup_line_user_ids(session, ordered)
+    id_map = await db.auth.line_user_ids_for(session, ordered)
 
     resolved = [uid for uid in ordered if uid in id_map]
     failed = [

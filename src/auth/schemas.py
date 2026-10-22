@@ -22,6 +22,20 @@ class ResetPasswordIn(BaseModel):
     new_password: str
 
 
+class LineLoginIn(BaseModel):
+    id_token: str = Field(min_length=1, description="liff.getIDToken()")
+
+
+class LineLinkIn(BaseModel):
+    id_token: str = Field(min_length=1, description="liff.getIDToken()")
+    username: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+class SsoExchangeIn(BaseModel):
+    token: str = Field(min_length=1, description="One-time token from the LINE diary card link")
+
+
 class SessionUser(BaseModel):
     user_id: UUID
     username: str

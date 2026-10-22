@@ -15,7 +15,8 @@ from src.clock import utc_now_naive
 from src.config import settings
 from src.database import Session, transaction
 from src.db.auth import UserRow
-from src.exceptions import Conflict, Unauthorized
+from src.exceptions import Conflict, InvalidLiffToken, LineAccountNotLinked, Unauthorized
+from src.line import liff
 
 _WRONG_LOGIN = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
 # Two requests racing with the same refresh token (two browser tabs, a retry)
@@ -118,6 +119,68 @@ async def reset_password(session: Session, actor: Actor, new_password: str) -> T
         await db.auth.set_password(session, actor.user_id, passwords.hash_password(new_password))
         await db.auth.revoke_all_refresh_tokens(session, actor.user_id)
         user = await db.auth.user_by_id(session, actor.user_id)
+        if user is None:
+            raise Unauthorized("Account no longer exists")
+        return await issue_session(session, user)
+
+
+# ---- LINE ------------------------------------------------------------------
+
+
+async def line_login(session: Session, id_token: str) -> TokenPairOut:
+    """LIFF: swap a LINE ID token for our own token pair, once. After this the
+    LIFF page uses Bearer like every other client, instead of LINE verifying
+    on every request. 403 if this LINE account isn't linked yet.
+    """
+    claims = await liff.verify_for_any_channel(id_token)
+    line_user_id = claims.get("sub")
+    if not line_user_id:
+        raise InvalidLiffToken("LIFF token had no sub claim")
+    user_id = await db.auth.user_id_for_line(session, line_user_id)
+    user = await db.auth.user_by_id(session, user_id) if user_id else None
+    if user is None:
+        raise LineAccountNotLinked
+    async with transaction(session):
+        return await issue_session(session, user)
+
+
+async def line_link(session: Session, id_token: str, username: str, password: str) -> TokenPairOut:
+    """Link a LINE account to an existing account (username + password),
+    then sign in. Replaces mobile-backend's POST /public/liff/link.
+    """
+    user = await db.auth.user_by_username(session, username.strip())
+    if user is None or not passwords.verify_password(password, user.password_hash):
+        raise Unauthorized(_WRONG_LOGIN)
+    claims = await liff.verify_for_any_channel(id_token)
+    line_user_id = claims.get("sub")
+    if not line_user_id:
+        raise InvalidLiffToken("LIFF token had no sub claim")
+    async with transaction(session):
+        if not await db.auth.link_line(session, user.user_id, line_user_id, claims.get("name")):
+            raise Conflict("บัญชี LINE นี้ถูกผูกกับบัญชีผู้ใช้ไปแล้ว")
+        return await issue_session(session, user)
+
+
+# ---- SSO (LINE diary card -> web app) --------------------------------------
+
+
+def sso_mint(user_id: UUID) -> str:
+    """One-time, short-lived token for a link the chatbot pushes to LINE.
+    In-process: no HTTP call to another server.
+    """
+    token, _, _ = tokens.issue_sso_token(user_id)
+    return token
+
+
+async def sso_exchange(session: Session, token: str) -> TokenPairOut:
+    """Redeem an SSO token for a normal token pair. Works once per token: a
+    forwarded or screenshotted link can't be used again.
+    """
+    user_id, jti, expires_at = tokens.read_sso_token(token)
+    async with transaction(session):
+        if not await db.auth.claim_sso_token(session, jti, expires_at.replace(tzinfo=None)):
+            raise Unauthorized("This link has already been used")
+        user = await db.auth.user_by_id(session, user_id)
         if user is None:
             raise Unauthorized("Account no longer exists")
         return await issue_session(session, user)

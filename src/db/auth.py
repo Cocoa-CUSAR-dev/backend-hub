@@ -15,6 +15,7 @@ All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2
 Other code calls the functions here.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -239,6 +240,19 @@ async def user_id_for_line(session: AsyncSession, line_user_id: str) -> UUID | N
             {"l": line_user_id},
         )
     ).scalar_one_or_none()
+
+
+async def line_user_ids_for(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUID, str]:
+    """user_id -> LINE user_id, for pushing to people. Users with no LINE
+    link are simply absent; callers decide what to do with them.
+    """
+    if not user_ids:
+        return {}
+    rows = await session.execute(
+        text("SELECT user_id, line_user_id FROM auth.line_identity WHERE user_id = ANY(:ids)"),
+        {"ids": list(user_ids)},
+    )
+    return {row.user_id: row.line_user_id for row in rows}
 
 
 async def link_line(
