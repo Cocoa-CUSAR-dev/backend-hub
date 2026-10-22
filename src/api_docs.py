@@ -37,6 +37,11 @@ TAGS: list[dict[str, Any]] = [
         "processor, researcher); each role has its own profile.",
     },
     {"name": "admin", "description": "Admin only: grant or remove researcher / admin roles."},
+    {
+        "name": "agriculture",
+        "description": "Farms, plots and farm photos: register them and list mine. Photos are "
+        "private; lists carry a link to each farm's newest photo, valid for an hour.",
+    },
     {"name": "line", "description": "LINE webhook: every chat event from the LINE OA."},
     {"name": "liff", "description": "Endpoints the LIFF pages call from inside LINE."},
     {

@@ -28,6 +28,8 @@ dependencies = [
     "dateparser>=1.2",
     # src/r2/client.py: farm photos in Cloudflare R2 (S3-compatible API).
     "boto3>=1.35",
+    # FastAPI's UploadFile (multipart form) for the farm photo upload.
+    "python-multipart>=0.0.12",
 ]
 
 [project.optional-dependencies]
