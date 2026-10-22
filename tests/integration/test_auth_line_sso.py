@@ -111,3 +111,21 @@ async def test_liff_door_accepts_our_own_token_without_calling_line(
         )
     line_verify.assert_not_awaited()
     assert (resolved.user_id, resolved.line_user_id) == (user_id, "Uliff5")
+
+
+async def test_line_webhook_actor_has_every_role(db_session: AsyncSession) -> None:
+    user_id = await seed_user(
+        db_session,
+        "0812000006",
+        "secret1",
+        roles={"farmer": ["read:farm:own"], "processor": ["read:profile:own"]},
+    )
+    await db.auth.link_line(db_session, user_id, "Uchat6", None)
+    await db_session.commit()
+
+    actor = await service.actor_for_line(db_session, "Uchat6")
+    assert actor is not None
+    assert (actor.user_id, actor.channel) == (user_id, "line")
+    assert actor.roles == {"farmer", "processor"}
+    assert actor.perms == {"read:farm:own", "read:profile:own"}
+    assert await service.actor_for_line(db_session, "Unobody") is None

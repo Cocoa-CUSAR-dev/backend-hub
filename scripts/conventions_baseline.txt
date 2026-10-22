@@ -9,7 +9,6 @@ lib-outside-client|src/line/liff.py|imports httpx
 lib-outside-client|src/line/rich_menu.py|imports linebot
 lib-outside-client|src/line/router.py|imports linebot
 lib-outside-client|src/line/service.py|imports linebot
-lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
 sql-outside-db|src/conversation/dev_queries.py|imports sqlalchemy
 sql-outside-db|src/conversation/jobs.py|imports sqlalchemy

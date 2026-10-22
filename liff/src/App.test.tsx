@@ -42,6 +42,8 @@ function task(overrides: Partial<PendingTask>): PendingTask {
 let outstanding: PendingTask[] = [];
 let failNextList = false;
 let failNextStart = false;
+let expireNextList = false;
+let notLinked = false;
 const requests: { method: string; url: string; headers: Headers; body?: unknown }[] = [];
 
 function fakeBackend(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -53,7 +55,17 @@ function fakeBackend(input: RequestInfo | URL, init: RequestInit = {}): Promise<
     headers: new Headers(init.headers),
     body: init.body ? JSON.parse(String(init.body)) : undefined,
   });
+  if (method === "POST" && url === `${API}/api/v1/auth/line/login`) {
+    if (notLinked) {
+      return Promise.resolve(Response.json({ detail: "not linked" }, { status: 403 }));
+    }
+    return Promise.resolve(Response.json({ access_token: "hub-access-token" }));
+  }
   if (method === "GET" && url === `${API}/line/liff/tasks`) {
+    if (expireNextList) {
+      expireNextList = false;
+      return Promise.resolve(new Response("expired", { status: 401 }));
+    }
     if (failNextList) {
       failNextList = false;
       return Promise.resolve(new Response("upstream down", { status: 502 }));
@@ -86,6 +98,8 @@ beforeEach(() => {
   outstanding = [];
   failNextList = false;
   failNextStart = false;
+  expireNextList = false;
+  notLinked = false;
   requests.length = 0;
   vi.stubGlobal("fetch", vi.fn(fakeBackend));
   liff.isLoggedIn.mockReturnValue(true);
@@ -123,15 +137,36 @@ describe("to-do list", () => {
     expect(first.querySelector(".due-row--overdue")).toBeNull();
   });
 
-  it("asks the backend as the logged-in farmer, with the LIFF ID token", async () => {
+  it("swaps the LIFF ID token for our own token once, then asks with that", async () => {
     outstanding = [task({})];
     await renderApp();
 
     await waitFor(() => expect(cards()).toHaveLength(1));
     expect(liff.init).toHaveBeenCalledWith({ liffId: "1234567890-abcdefgh" });
+    const login = requests.filter((r) => r.url === `${API}/api/v1/auth/line/login`);
+    expect(login).toHaveLength(1);
+    expect(login[0].body).toEqual({ id_token: "liff-id-token" });
     const list = requests.find((r) => r.method === "GET");
     expect(list?.url).toBe(`${API}/line/liff/tasks`);
-    expect(list?.headers.get("Authorization")).toBe("Bearer liff-id-token");
+    expect(list?.headers.get("Authorization")).toBe("Bearer hub-access-token");
+  });
+
+  it("signs in again and retries once when the token has expired", async () => {
+    outstanding = [task({})];
+    expireNextList = true;
+    await renderApp();
+
+    await waitFor(() => expect(cards()).toHaveLength(1));
+    const logins = requests.filter((r) => r.url === `${API}/api/v1/auth/line/login`);
+    expect(logins).toHaveLength(2);
+  });
+
+  it("tells a farmer whose LINE account is not linked yet", async () => {
+    notLinked = true;
+    await renderApp();
+
+    expect(await screen.findByText(/ยังไม่ได้เชื่อมกับบัญชีในระบบ/)).toBeTruthy();
+    expect(requests.some((r) => r.url === `${API}/line/liff/tasks`)).toBe(false);
   });
 
   it("says there is nothing to do when nothing is outstanding", async () => {
@@ -187,10 +222,10 @@ describe("opening a task", () => {
     await userEvent.click(within(cards()[1]).getByRole("button", { name: /เปิด/ }));
 
     await waitFor(() => expect(liff.closeWindow).toHaveBeenCalledTimes(1));
-    const start = requests.find((r) => r.method === "POST");
+    const start = requests.find((r) => r.method === "POST" && r.url.endsWith("/start"));
     expect(start?.url).toBe(`${API}/line/liff/tasks/t-2/start`);
     expect(start?.body).toEqual({ task_form_id: "f-2", handler: "fertilizer" });
-    expect(start?.headers.get("Authorization")).toBe("Bearer liff-id-token");
+    expect(start?.headers.get("Authorization")).toBe("Bearer hub-access-token");
   });
 
   it("shows the error and lets the farmer reload when starting fails", async () => {

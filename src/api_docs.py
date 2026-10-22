@@ -36,7 +36,10 @@ TAGS: list[dict[str, Any]] = [
         "description": "My account. One person can hold several roles (farmer, hub collector, "
         "processor, researcher); each role has its own profile.",
     },
-    {"name": "admin", "description": "Admin only: grant or remove researcher / admin roles."},
+    {
+        "name": "admin",
+        "description": "Admin only: create researcher or admin accounts; grant or remove roles.",
+    },
     {
         "name": "tasks",
         "description": "My tasks, the form to fill for each, and my answers. Task times "
