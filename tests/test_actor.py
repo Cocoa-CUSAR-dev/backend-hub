@@ -11,7 +11,7 @@ def _farmer_and_processor() -> Actor:
         user_id=uuid.uuid4(),
         roles=frozenset({"farmer", "processor"}),
         perms=frozenset({"read:farm:own", "read:batch:own"}),
-        channel="mobile",
+        channel="api",
     )
 
 

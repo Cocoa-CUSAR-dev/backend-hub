@@ -26,6 +26,11 @@ the field.
 
 TAGS: list[dict[str, Any]] = [
     {"name": "system", "description": "Health check for the host."},
+    {
+        "name": "auth",
+        "description": "Sign in, refresh, sign out. Every login-like call returns the same "
+        "token pair in the body; send `access_token` as `Authorization: Bearer`.",
+    },
     {"name": "line", "description": "LINE webhook: every chat event from the LINE OA."},
     {"name": "liff", "description": "Endpoints the LIFF pages call from inside LINE."},
     {

@@ -29,6 +29,7 @@ sentry_sdk.init(
     before_send=scrub_sso_token,
 )
 
+from src.auth.router import router as auth_router
 from src.exceptions import register_exception_handlers
 from src.internal.router import router as internal_router
 from src.line.liff_tasks import router as liff_tasks_router
@@ -103,6 +104,7 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "version": settings.APP_VERSION}
 
 
+app.include_router(auth_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
 app.include_router(notifications_router)

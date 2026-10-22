@@ -40,6 +40,22 @@ class Settings(BaseSettings):
     # ---- database -------------------------------------------------------
     DATABASE_URL: str
 
+    # ---- auth (src/auth, CONVENTIONS.md §5) -----------------------------
+    # Signs every access token. Must be the same value web-backend and
+    # mobile-backend use while they still run, so they accept hub tokens.
+    JWT_KEY: str
+    # Access tokens are short because roles live inside them; clients refresh
+    # automatically. The refresh token slides: each use issues a new one with
+    # a fresh lifetime, so a farmer who opens the app at least once every
+    # REFRESH_TOKEN_TTL_DAYS never has to type the password again.
+    ACCESS_TOKEN_TTL_SECONDS: int = 3600
+    REFRESH_TOKEN_TTL_DAYS: int = 90
+    # One-time token in the LINE diary card's "open the web app" link.
+    SSO_TOKEN_TTL_SECONDS: int = 900
+    # Researchers sign themselves up with this code (given out by the team).
+    # Empty disables researcher self sign-up.
+    RESEARCHER_SIGNUP_CODE: str = ""
+
     # ---- old backends (until the merge is finished) ---------------------
     KOTLIN_BACKEND_URL: str
     GO_BACKEND_URL: str

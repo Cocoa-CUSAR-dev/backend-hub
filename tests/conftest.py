@@ -17,6 +17,8 @@ os.environ.setdefault("GO_SERVICE_KEY", "test-service-key")
 os.environ.setdefault("KOTLIN_SERVICE_KEY", "test-service-key")
 os.environ.setdefault("CHATBOT_SERVICE_KEY", "test-service-key")
 os.environ.setdefault("CRON_SECRET", "test-cron-secret")
+os.environ.setdefault("JWT_KEY", "test-jwt-key-that-is-at-least-32-bytes-long")
+os.environ.setdefault("RESEARCHER_SIGNUP_CODE", "test-researcher-code")
 os.environ.setdefault("LINE_CHANNEL_SECRET", "test-secret")
 os.environ.setdefault("LINE_CHANNEL_ACCESS_TOKEN", "test-token")
 # Most tests use fake farm/plot choices with no agriculture.farmer_farm rows
