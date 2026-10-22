@@ -225,3 +225,40 @@ async def test_admin_grants_and_removes_roles(
         f"{ADMIN}/users/{admin_id}/roles/admin", headers=_bearer(admin)
     )
     assert self_demote.status_code == 403
+
+
+async def test_admin_creates_a_researcher_who_must_reset_password(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _seed_roles(db_session)
+    await seed_role(db_session, "admin", ["update:role:any", "create:user:any"])
+    await seed_user(db_session, "admin02", "admin-pass", roles={"admin": ["create:user:any"]})
+    admin = (
+        await client.post(f"{AUTH}/login", json={"username": "admin02", "password": "admin-pass"})
+    ).json()
+    body = {
+        "username": "researcher01",
+        "temporary_password": "temp-pass",
+        "first_name": "Ann",
+        "organization": "CU",
+    }
+
+    by_nobody = await client.post(
+        f"{ADMIN}/users", json=body, headers=_bearer(await _new_account(client, "0811000009"))
+    )
+    assert by_nobody.status_code == 403
+
+    created = await client.post(f"{ADMIN}/users", json=body, headers=_bearer(admin))
+    assert created.status_code == 201
+    assert created.json()["roles"] == ["researcher"]
+    again = await client.post(f"{ADMIN}/users", json=body, headers=_bearer(admin))
+    assert again.status_code == 409
+
+    first_login = (
+        await client.post(
+            f"{AUTH}/login", json={"username": "researcher01", "password": "temp-pass"}
+        )
+    ).json()
+    assert first_login["user"]["must_reset_password"] is True
+    me = (await client.get(ME, headers=_bearer(first_login))).json()
+    assert me["profiles"]["researcher"]["organization"] == "CU"
