@@ -360,3 +360,71 @@ INSERT INTO form.handler_registry (handler, parent_handler, parent_field) VALUES
     ('harvest_grade_detail', 'harvest', 'harvest_id'),
     ('fermentation_batch', 'batch', 'batch_id'),
     ('drying_batch', 'batch', 'batch_id');
+
+-- docs-and-plan#261: what src/db/tasks.py, src/db/forms.py and src/db/ref.py
+-- read for the mobile task routes (GET /api/v1/tasks...). Columns the
+-- tables above left out, plus form.section / field_validation_rule /
+-- field_dependency and a few ref tables, all shaped as in the database repo
+-- (V1 baseline, V9, V16, V21, V30). The new tables have no FKs so older
+-- tests that insert questions with made-up section ids keep working.
+ALTER TABLE form.task
+    ADD COLUMN description character varying DEFAULT ''::character varying;
+ALTER TABLE form.task_form
+    ADD COLUMN description character varying,
+    ADD COLUMN version integer NOT NULL DEFAULT 1;
+ALTER TABLE form.question
+    ADD COLUMN description character varying,
+    ADD COLUMN default_value jsonb,
+    ADD COLUMN is_active boolean DEFAULT true,
+    ADD COLUMN carry_forward boolean NOT NULL DEFAULT false;
+ALTER TABLE form.response
+    ADD COLUMN submitted_at timestamp without time zone DEFAULT now(),
+    ADD COLUMN answer jsonb,
+    ADD COLUMN status character varying,
+    ADD COLUMN task_form_id uuid;
+
+CREATE TABLE form.section (
+    section_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    form_id uuid NOT NULL,
+    title character varying,
+    description character varying,
+    sort_order integer,
+    is_active boolean DEFAULT true,
+    CONSTRAINT pk_section PRIMARY KEY (section_id)
+);
+
+CREATE TABLE form.field_validation_rule (
+    field_name character varying PRIMARY KEY,
+    validation_rule jsonb NOT NULL
+);
+
+CREATE TABLE form.field_dependency (
+    child_field character varying NOT NULL,
+    parent_field character varying NOT NULL,
+    link_table character varying NOT NULL,
+    link_column character varying NOT NULL,
+    label_th character varying NOT NULL,
+    CONSTRAINT pk_field_dependency PRIMARY KEY (child_field, parent_field)
+);
+
+CREATE SCHEMA ref;
+
+-- A synced copy of agriculture.plot, sharing plot_id: no farm_id of its own,
+-- which is why a dependent choice's parent comes from the link table.
+CREATE TABLE ref.plot_constant (
+    plot_id uuid NOT NULL,
+    plot_name character varying,
+    CONSTRAINT pk_plot_constant PRIMARY KEY (plot_id)
+);
+
+CREATE TABLE ref.province_constant (
+    province_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    province_name_th character varying,
+    CONSTRAINT pk_province_constant PRIMARY KEY (province_id)
+);
+
+CREATE TABLE ref.grade_constant (
+    grade_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    grade_name character varying NOT NULL,
+    CONSTRAINT pk_grade_constant PRIMARY KEY (grade_id)
+);
