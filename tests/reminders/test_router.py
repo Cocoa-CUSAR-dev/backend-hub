@@ -221,7 +221,7 @@ async def test_patch_updates_only_the_fields_sent(client: AsyncClient) -> None:
 
 
 async def test_patch_unknown_schedule_is_404(client: AsyncClient) -> None:
-    from src.reminders.exceptions import ReminderNotFound
+    from src.exceptions import ReminderNotFound
 
     with patch(
         "src.reminders.router.update_reminder_schedule",
@@ -234,7 +234,7 @@ async def test_patch_unknown_schedule_is_404(client: AsyncClient) -> None:
 
 
 async def test_bad_reference_is_422(client: AsyncClient) -> None:
-    from src.reminders.exceptions import InvalidReminderReference
+    from src.exceptions import InvalidReminderReference
 
     with patch(
         "src.reminders.router.create_reminder_schedule",

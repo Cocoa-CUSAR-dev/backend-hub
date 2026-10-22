@@ -14,14 +14,12 @@ from uuid import UUID, uuid4
 import pytest
 from httpx import AsyncClient
 
+from src.config import settings
 from src.conversation.constants import ActiveSubstate
 from src.conversation.service import Choice, ConversationReply
 from src.database import get_session
-from src.exceptions import UpstreamServiceError
+from src.exceptions import InvalidLiffToken, LineAccountNotLinked, UpstreamServiceError
 from src.line import liff_tasks
-from src.line.config import line_settings
-from src.line.exceptions import LineAccountNotLinked
-from src.line.liff import InvalidLiffToken
 from src.main import app
 from src.tasks.schemas import TaskListItem
 
@@ -38,7 +36,7 @@ async def _no_db_session():
 
 @pytest.fixture(autouse=True)
 def _liff_id_configured(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(line_settings, "LIFF_ID", _TEST_LIFF_ID)
+    monkeypatch.setattr(settings, "LIFF_ID", _TEST_LIFF_ID)
 
 
 def setup_function() -> None:

@@ -10,15 +10,15 @@ be broken.
 from unittest.mock import AsyncMock, patch
 
 from src.conversation import intent
-from src.llm.exceptions import LLMUnavailable
+from src.exceptions import LLMUnavailable
 
 
 def _with_key(key: str = "test-key"):  # noqa: ANN202
-    return patch.object(intent.llm_settings, "LLM_API_KEY", key)
+    return patch.object(intent.settings, "LLM_API_KEY", key)
 
 
 def _with_flag(enabled: bool):  # noqa: ANN202
-    return patch.object(intent.llm_settings, "INTENT_ROUTING_ENABLED", enabled)
+    return patch.object(intent.settings, "INTENT_ROUTING_ENABLED", enabled)
 
 
 def _classified(

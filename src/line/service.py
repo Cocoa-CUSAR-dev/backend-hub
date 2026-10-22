@@ -19,7 +19,7 @@ from linebot.v3.messaging import (
     TextMessage,
 )
 
-from src.line.config import line_settings
+from src.config import settings
 from src.line.flex_builders import build_multi_choice_flex
 from src.line.schemas import QuickReplyOption
 
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # LINE's multicast endpoint accepts at most 500 recipients per call.
 _MULTICAST_LIMIT = 500
 
-_configuration = Configuration(access_token=line_settings.LINE_CHANNEL_ACCESS_TOKEN)
+_configuration = Configuration(access_token=settings.LINE_CHANNEL_ACCESS_TOKEN)
 
 _QUICK_REPLY_LABEL_MAX = 20  # LINE's own platform limit on a button's label
 

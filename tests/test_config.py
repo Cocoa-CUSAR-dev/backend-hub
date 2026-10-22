@@ -15,3 +15,17 @@ def test_settings_default_values() -> None:
     assert settings.CORS_ORIGINS == ["http://localhost:5173"]
     assert settings.APP_VERSION == "0.1.0"
     assert settings.ENVIRONMENT == Environment.LOCAL
+
+
+def test_api_docs_default_on_except_production() -> None:
+    from src.config import Settings
+
+    base = {"API_DOCS_ENABLED": None}
+    assert settings.model_copy(update={**base, "ENVIRONMENT": Environment.STAGING}).docs_enabled
+    assert not settings.model_copy(
+        update={**base, "ENVIRONMENT": Environment.PRODUCTION}
+    ).docs_enabled
+    forced = settings.model_copy(
+        update={"API_DOCS_ENABLED": True, "ENVIRONMENT": Environment.PRODUCTION}
+    )
+    assert isinstance(forced, Settings) and forced.docs_enabled

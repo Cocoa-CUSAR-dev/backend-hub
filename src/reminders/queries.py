@@ -19,7 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.reminders.exceptions import InvalidReminderReference, ReminderNotFound
+from src.exceptions import InvalidReminderReference, ReminderNotFound
 from src.reminders.schemas import RecipientRule
 
 

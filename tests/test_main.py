@@ -1,20 +1,26 @@
 from httpx import AsyncClient
 
-from src.exceptions import ServiceException, UpstreamServiceError
-from src.main import service_exception_handler
+from src.exceptions import AppError, Invalid, UpstreamServiceError, app_error_handler
 
 
 async def test_service_exception_handler_returns_its_status_code_and_detail() -> None:
-    response = await service_exception_handler(None, ServiceException("something specific"))
+    response = await app_error_handler(None, AppError("something specific"))
 
     assert response.status_code == 400
     assert response.body == b'{"detail":"something specific"}'
 
 
 async def test_service_exception_handler_uses_the_subclasss_own_status_code() -> None:
-    response = await service_exception_handler(None, UpstreamServiceError())
+    response = await app_error_handler(None, UpstreamServiceError())
 
     assert response.status_code == 502
+
+
+async def test_invalid_includes_field_errors() -> None:
+    response = await app_error_handler(None, Invalid(fields={"yield_kg": "must be >= 0"}))
+
+    assert response.status_code == 422
+    assert response.body == b'{"detail":"Invalid input","fields":{"yield_kg":"must be >= 0"}}'
 
 
 async def test_dev_conversation_router_is_registered_in_local_environment(
@@ -30,6 +36,23 @@ async def test_dev_conversation_router_is_registered_in_local_environment(
 async def test_openapi_is_exposed_when_not_deployed(client: AsyncClient) -> None:
     response = await client.get("/openapi.json")
     assert response.status_code == 200
+
+
+async def test_swagger_and_redoc_pages_are_served(client: AsyncClient) -> None:
+    assert (await client.get("/docs")).status_code == 200
+    assert (await client.get("/redoc")).status_code == 200
+
+
+async def test_openapi_documents_every_tag_it_uses(client: AsyncClient) -> None:
+    spec = (await client.get("/openapi.json")).json()
+    assert spec["info"]["title"] == "Cocoa Backend Hub API"
+    declared = {t["name"] for t in spec["tags"]}
+    used = {
+        tag for path in spec["paths"].values() for op in path.values() for tag in op.get("tags", [])
+    }
+    # A router with a tag missing from src/api_docs.py shows up unexplained.
+    assert used <= declared
+    assert all(op.get("tags") for path in spec["paths"].values() for op in path.values())
 
 
 # ----------------------------------------------------------------------

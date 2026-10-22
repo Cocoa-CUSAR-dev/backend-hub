@@ -16,9 +16,9 @@ from linebot.v3.messaging import (
     RichMenuSize,
 )
 
-from src.line.config import line_settings
+from src.config import settings
 
-_configuration = Configuration(access_token=line_settings.LINE_CHANNEL_ACCESS_TOKEN)
+_configuration = Configuration(access_token=settings.LINE_CHANNEL_ACCESS_TOKEN)
 
 
 async def create_rich_menu(

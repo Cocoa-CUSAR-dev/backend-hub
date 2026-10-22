@@ -27,10 +27,9 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.conversation import intent
-from src.forms.config import forms_settings
 from src.line import messages
-from src.line.config import line_settings
 from src.tasks.schemas import TaskSubmission
 from tests.integration.helpers import (
     build_form_response,
@@ -48,7 +47,7 @@ TASK_TITLE = "บันทึกการใส่ปุ๋ย"
 
 async def _post(client: AsyncClient, body: bytes) -> Any:
     """Delivers one webhook event and returns the single message replied."""
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
             "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
@@ -143,7 +142,7 @@ class TestHappyPath:
 
         submit_task = AsyncMock()
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             with patch("src.conversation.service.submit_task", new=submit_task):

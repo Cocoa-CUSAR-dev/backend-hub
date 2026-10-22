@@ -11,8 +11,7 @@ from src.conversation.dev_queries import (
     load_form_detail,
     resolve_test_user_id,
 )
-from src.conversation.exceptions import ConversationNotFound
-from src.forms.exceptions import FormNotFound
+from src.exceptions import ConversationNotFound, FormNotFound
 
 
 def _rows(mappings: list[dict]) -> list[SimpleNamespace]:

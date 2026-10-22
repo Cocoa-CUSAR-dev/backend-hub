@@ -21,8 +21,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from src.line.temp_task_picker import list_pending_tasks
 from tests.integration.helpers import (
     build_form_response,
@@ -47,7 +46,7 @@ async def _seed_response(session: AsyncSession, *, task_id: uuid.UUID, user_id: 
 
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
     body = build_postback_event(line_user_id=line_user_id, data=data)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
         "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
@@ -168,7 +167,7 @@ class TestAddAnotherCarriesParentForward:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             reply_message = await _send_postback(
@@ -239,7 +238,7 @@ class TestAddAnotherCarriesParentForward:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             await _send_postback(
@@ -316,7 +315,7 @@ class TestAddAnotherCarriesFlaggedAnswersForward:
         form_response: dict[str, Any],
     ) -> str:
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             reply_message = await _send_postback(

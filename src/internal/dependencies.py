@@ -3,8 +3,8 @@ from typing import Annotated
 
 from fastapi import Header
 
-from src.internal.config import internal_settings
-from src.internal.exceptions import InvalidCronSecret
+from src.config import settings
+from src.exceptions import InvalidCronSecret
 
 
 async def require_cron_secret(
@@ -17,6 +17,6 @@ async def require_cron_secret(
     our side, and it's an equally normal header for a GitHub Actions
     schedule (or anything else external) to send the same secret in.
     """
-    expected = f"Bearer {internal_settings.CRON_SECRET}"
+    expected = f"Bearer {settings.CRON_SECRET}"
     if not authorization or not secrets.compare_digest(authorization, expected):
         raise InvalidCronSecret()

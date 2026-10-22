@@ -2,9 +2,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.exceptions import UpstreamServiceError
+from src.exceptions import HandlerNotSupported, UpstreamServiceError
 from src.tasks.client import submit_task
-from src.tasks.exceptions import HandlerNotSupported
 from src.tasks.schemas import TaskSubmission
 
 

@@ -25,9 +25,8 @@ from typing import Any
 
 import httpx
 
-from src.exceptions import UpstreamServiceError
-from src.forms.config import forms_settings
-from src.forms.exceptions import FormNotFound
+from src.config import settings
+from src.exceptions import FormNotFound, UpstreamServiceError
 from src.forms.schemas import FormDetail
 from src.request_id import REQUEST_ID_HEADER, get_request_id
 
@@ -55,13 +54,11 @@ async def get_form(form_id: str) -> FormDetail:
     # deploy/restart; once warm, real calls land in ~1-2s. Same timeout,
     # same reasoning mobile-backend's own Kotlin-calling client already
     # uses (form_handler.go's webBackendClient).
-    async with httpx.AsyncClient(
-        base_url=forms_settings.KOTLIN_BACKEND_URL, timeout=30.0
-    ) as client:
+    async with httpx.AsyncClient(base_url=settings.KOTLIN_BACKEND_URL, timeout=30.0) as client:
         response = await client.get(
             f"/service/forms/{form_id}",
             headers={
-                "X-Service-Key": forms_settings.KOTLIN_SERVICE_KEY,
+                "X-Service-Key": settings.KOTLIN_SERVICE_KEY,
                 REQUEST_ID_HEADER: get_request_id(),
             },
         )

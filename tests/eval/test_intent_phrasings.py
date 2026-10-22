@@ -19,12 +19,12 @@ from unittest.mock import patch
 
 import pytest
 
+from src.config import settings
 from src.conversation import intent
-from src.llm.config import llm_settings
-from src.llm.exceptions import LLMUnavailable
+from src.exceptions import LLMUnavailable
 
 pytestmark = pytest.mark.skipif(
-    not (os.getenv("RUN_LLM_EVAL") and llm_settings.LLM_API_KEY),
+    not (os.getenv("RUN_LLM_EVAL") and settings.LLM_API_KEY),
     reason="live LLM eval: set RUN_LLM_EVAL=1 and LLM_API_KEY to run",
 )
 

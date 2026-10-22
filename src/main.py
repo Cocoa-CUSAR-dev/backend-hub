@@ -2,16 +2,15 @@
 # first-party imports (router setup, Pydantic/SQLAlchemy construction, etc.
 # -- anything that could fail at import time), which is why they follow a
 # non-import statement instead of being grouped at the very top.
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import sentry_sdk
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from src import api_docs
 from src.config import settings
 from src.sentry_scrub import scrub_sso_token  # stdlib-only: safe to import before init
 
@@ -30,7 +29,7 @@ sentry_sdk.init(
     before_send=scrub_sso_token,
 )
 
-from src.exceptions import ServiceException
+from src.exceptions import register_exception_handlers
 from src.internal.router import router as internal_router
 from src.line.liff_tasks import router as liff_tasks_router
 from src.line.router import router as line_router
@@ -58,7 +57,7 @@ if not settings.ENVIRONMENT.is_deployed:
 # the real trigger path on Vercel (wired to Vercel Cron / an external
 # scheduler instead); on a persistent host (Render, a VM, local `uvicorn`)
 # this is unset and the scheduler starts exactly as before.
-_IS_SERVERLESS = bool(os.environ.get("VERCEL"))
+_IS_SERVERLESS = bool(settings.VERCEL)
 
 
 @asynccontextmanager
@@ -72,10 +71,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    title="Cocoa Chatbot Service",
+    title=api_docs.TITLE,
+    description=api_docs.DESCRIPTION,
     version=settings.APP_VERSION,
     lifespan=lifespan,
-    openapi_url="/openapi.json" if not settings.ENVIRONMENT.is_deployed else None,
+    openapi_tags=api_docs.TAGS,
+    # /docs (Swagger UI) and /redoc follow openapi_url: None hides all three.
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    swagger_ui_parameters=api_docs.SWAGGER_UI_PARAMETERS,
 )
 
 app.add_middleware(
@@ -90,12 +95,10 @@ app.add_middleware(
 app.add_middleware(BaseHTTPMiddleware, dispatch=request_id_middleware)
 
 
-@app.exception_handler(ServiceException)
-async def service_exception_handler(request: Request, exc: ServiceException) -> JSONResponse:
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+register_exception_handlers(app)
 
 
-@app.get("/health")
+@app.get("/health", tags=["system"])
 async def health() -> dict[str, str]:
     return {"status": "ok", "version": settings.APP_VERSION}
 

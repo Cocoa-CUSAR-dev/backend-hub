@@ -9,16 +9,10 @@ httpx directly, same as src/forms and src/tasks.
 from typing import Any, cast
 
 import httpx
-from fastapi import status
 
-from src.exceptions import ServiceException, UpstreamServiceError
+from src.exceptions import InvalidLiffToken, UpstreamServiceError
 
 _VERIFY_URL = "https://api.line.me/oauth2/v2.1/verify"
-
-
-class InvalidLiffToken(ServiceException):
-    status_code = status.HTTP_400_BAD_REQUEST
-    detail = "Invalid or expired LIFF ID token"
 
 
 async def verify_id_token(id_token: str, channel_id: str) -> dict[str, Any]:

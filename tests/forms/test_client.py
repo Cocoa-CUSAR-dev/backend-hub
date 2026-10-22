@@ -2,9 +2,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.exceptions import UpstreamServiceError
+from src.exceptions import FormNotFound, UpstreamServiceError
 from src.forms.client import _camel_to_snake, _convert_keys, get_form
-from src.forms.exceptions import FormNotFound
 
 
 def test_camel_to_snake_converts_common_cases() -> None:

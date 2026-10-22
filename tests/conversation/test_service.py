@@ -5,12 +5,10 @@ import pytest
 
 from src.conversation import service
 from src.conversation.constants import ActiveSubstate, AnswerSource, ConversationStatus
-from src.conversation.exceptions import ConversationNotFound
 from src.conversation.models import Conversation, ConversationAnswer
-from src.exceptions import UpstreamServiceError
+from src.exceptions import ConversationNotFound, HandlerNotSupported, UpstreamServiceError
 from src.forms.schemas import FormDetail
 from src.line import parent_picker
-from src.tasks.exceptions import HandlerNotSupported
 
 
 def _form(*, mandatory_flags: list[bool]) -> tuple[FormDetail, list[uuid.UUID]]:

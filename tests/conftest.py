@@ -1,7 +1,7 @@
-"""Sets dummy env vars BEFORE any `src` import happens -- every config.py in
-this project instantiates its Settings object at module import time, so real
-values (or at least placeholders) must exist before `import src.main` runs
-anywhere, including in CI with no real .env file.
+"""Sets dummy env vars BEFORE any `src` import happens -- src/config.py
+builds its Settings object at import time, so real values (or at least
+placeholders) must exist before `import src.main` runs anywhere, including
+in CI with no real .env file.
 """
 
 import os
@@ -21,7 +21,7 @@ os.environ.setdefault("LINE_CHANNEL_SECRET", "test-secret")
 os.environ.setdefault("LINE_CHANNEL_ACCESS_TOKEN", "test-token")
 # Most tests use fake farm/plot choices with no agriculture.farmer_farm rows
 # behind them, so they run unscoped; the US2-13 scoping tests switch to
-# "farmer" explicitly. Production defaults to "farmer" (src/line/config.py).
+# "farmer" explicitly. Production defaults to "farmer" (src/config.py).
 os.environ.setdefault("PLOT_SCOPE_MODE", "all")
 
 from src.main import app  # noqa: E402 -- must come after the env vars above

@@ -10,12 +10,11 @@ import pytest
 import respx
 from httpx import Response
 
+from src.config import settings
 from src.diary.client import generate_diary
-from src.diary.config import diary_settings
-from src.diary.exceptions import DiaryNotAvailable
-from src.exceptions import UpstreamServiceError
+from src.exceptions import DiaryNotAvailable, UpstreamServiceError
 
-_URL = f"{diary_settings.KOTLIN_BACKEND_URL}/service/diaries/generate"
+_URL = f"{settings.KOTLIN_BACKEND_URL}/service/diaries/generate"
 
 
 @respx.mock
@@ -27,7 +26,7 @@ async def test_returns_the_diary_text_and_sends_the_service_key() -> None:
     assert await generate_diary("u-1") == "วันนี้ใส่ปุ๋ย"
     request = route.calls.last.request
     assert json.loads(request.content) == {"userId": "u-1"}
-    assert request.headers["X-Service-Key"] == diary_settings.KOTLIN_SERVICE_KEY
+    assert request.headers["X-Service-Key"] == settings.KOTLIN_SERVICE_KEY
 
 
 @respx.mock

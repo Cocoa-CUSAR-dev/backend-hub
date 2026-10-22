@@ -16,8 +16,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_text_message_event,
@@ -42,7 +41,7 @@ async def _current_question_id(
 
 async def _send_answer(client: AsyncClient, *, line_user_id: str, text_content: str) -> AsyncMock:
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
         "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
@@ -96,10 +95,10 @@ class TestGuidedFlowRoundTrip:
         )
 
         body = build_text_message_event(line_user_id=line_user_id, text_content="คำตอบที่ถูกต้อง")
-        signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+        signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             with patch(
@@ -164,7 +163,7 @@ class TestReAskLoop:
     def _mock_form(
         self, *, task_form_id: uuid.UUID, question_1: uuid.UUID, question_2: uuid.UUID
     ) -> None:
-        respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+        respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
             return_value=Response(
                 200,
                 json=build_form_response(
@@ -341,7 +340,7 @@ class TestAdditionalFieldTypes:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
 
@@ -402,7 +401,7 @@ class TestChoiceResolution:
         input_type: str,
         choices: list[dict[str, str]] | None,
     ) -> None:
-        respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+        respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
             return_value=Response(
                 200,
                 json=build_form_response(
@@ -570,7 +569,7 @@ class TestSkipButton:
         question_2: uuid.UUID,
         validation_rule: dict[str, Any] | None,
     ) -> None:
-        respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+        respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
             return_value=Response(
                 200,
                 json=build_form_response(

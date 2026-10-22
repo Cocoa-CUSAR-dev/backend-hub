@@ -26,6 +26,8 @@ import math
 from datetime import date, datetime
 from typing import Any, Protocol
 
+from src.clock import bangkok_now, bangkok_today
+
 
 class _Validator(Protocol):
     def __call__(self, text: str, rule: dict[str, Any]) -> bool: ...
@@ -69,7 +71,7 @@ def _valid_date(text: str, rule: dict[str, Any]) -> bool:
         value = date.fromisoformat(text.strip())
     except ValueError:
         return False
-    return not (rule.get("max_date") == "today" and value > date.today())
+    return not (rule.get("max_date") == "today" and value > bangkok_today())
 
 
 def _valid_datetime(text: str, rule: dict[str, Any]) -> bool:
@@ -77,7 +79,7 @@ def _valid_datetime(text: str, rule: dict[str, Any]) -> bool:
         value = datetime.fromisoformat(text.strip())
     except ValueError:
         return False
-    return not (rule.get("max_date") == "today" and value > datetime.now())
+    return not (rule.get("max_date") == "today" and value > bangkok_now().replace(tzinfo=None))
 
 
 def parse_lat_lng(text: str) -> tuple[float, float] | None:

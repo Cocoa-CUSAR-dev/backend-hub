@@ -18,8 +18,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
-      - run: ruff check src tests
-      - run: ruff format --check src tests
+      - run: ruff check src tests scripts
+      - run: ruff format --check src tests scripts
+      # CONVENTIONS.md §12: one owner per table / outside service / setting.
+      # Legacy code is listed in scripts/conventions_baseline.txt, which may
+      # only shrink -- any new violation fails here.
+      - run: python scripts/check_conventions.py
 
   typecheck:
     runs-on: ubuntu-latest

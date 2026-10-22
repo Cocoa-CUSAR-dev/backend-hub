@@ -18,11 +18,9 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
+from src.config import settings
 from src.line import parent_picker
-from src.line.config import line_settings
 from src.line.messages import NOT_LINKED
-from src.tasks.config import tasks_settings
 from tests.integration.helpers import (
     build_form_response,
     build_postback_event,
@@ -34,13 +32,13 @@ from tests.integration.helpers import (
     sign_signature,
 )
 
-_LAST_ANSWER = f"{tasks_settings.GO_BACKEND_URL}/service/tasks/last-answer"
-_SANITIZE = f"{tasks_settings.GO_BACKEND_URL}/service/autofill/sanitize"
+_LAST_ANSWER = f"{settings.GO_BACKEND_URL}/service/tasks/last-answer"
+_SANITIZE = f"{settings.GO_BACKEND_URL}/service/autofill/sanitize"
 
 
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
     body = build_postback_event(line_user_id=line_user_id, data=data)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
         "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
@@ -93,7 +91,7 @@ async def _seed_one_question_task(
 
 
 def _mock_form(task_form_id: uuid.UUID, form: dict) -> None:
-    respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+    respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
         return_value=Response(200, json=form)
     )
 
@@ -369,7 +367,7 @@ class TestDiaryCardWhenAPartFails:
             )
 
         push_flex.assert_awaited_once()
-        assert f"{line_settings.WEB_APP_URL}/history" in str(push_flex.await_args.args[2])
+        assert f"{settings.WEB_APP_URL}/history" in str(push_flex.await_args.args[2])
         assert "sso#token" not in str(push_flex.await_args.args[2])
 
 

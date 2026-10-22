@@ -9,10 +9,10 @@ from linebot.v3 import WebhookParser
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.webhooks import Event
 
-from src.line.config import line_settings
-from src.line.exceptions import InvalidLineSignature
+from src.config import settings
+from src.exceptions import InvalidLineSignature
 
-_parser = WebhookParser(line_settings.LINE_CHANNEL_SECRET)
+_parser = WebhookParser(settings.LINE_CHANNEL_SECRET)
 
 
 async def parse_line_events(

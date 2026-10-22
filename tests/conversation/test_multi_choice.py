@@ -16,8 +16,8 @@ import pytest
 
 from src.conversation import service
 from src.conversation.models import ConversationAnswer
+from src.exceptions import HandlerNotSupported
 from src.forms.schemas import FormDetail
-from src.tasks.exceptions import HandlerNotSupported
 
 
 @pytest.fixture(autouse=True)
