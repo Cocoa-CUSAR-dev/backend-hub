@@ -20,8 +20,8 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.database import async_session_maker
-from src.forms.config import forms_settings
 from tests.integration.helpers import (
     build_form_response,
     question_json,
@@ -43,7 +43,7 @@ from tests.integration.test_non_text_messages import _send as _send_message
 
 
 def _mock_form(task_form_id: uuid.UUID, form: dict) -> None:
-    respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+    respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
         return_value=Response(200, json=form)
     )
 

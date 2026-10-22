@@ -10,11 +10,11 @@ import pytest
 import respx
 from httpx import Response
 
+from src.config import settings
 from src.exceptions import UpstreamServiceError
 from src.tasks.client import fetch_last_answer, fetch_pending_tasks, fetch_sanitized_autofill
-from src.tasks.config import tasks_settings
 
-_GO = tasks_settings.GO_BACKEND_URL
+_GO = settings.GO_BACKEND_URL
 
 
 @respx.mock
@@ -40,7 +40,7 @@ async def test_pending_tasks_parses_every_row_and_asks_for_one_big_page() -> Non
     assert (task.task_id, task.task_form_id, task.status) == (task_id, task_form_id, "NOT_STARTED")
     request = route.calls.last.request
     assert (request.url.params["user_id"], request.url.params["page_size"]) == ("u-1", "100")
-    assert request.headers["X-Service-Key"] == tasks_settings.GO_SERVICE_KEY
+    assert request.headers["X-Service-Key"] == settings.GO_SERVICE_KEY
 
 
 @respx.mock

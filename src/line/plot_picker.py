@@ -28,7 +28,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.line.config import line_settings
+from src.config import settings
 
 # Fields whose choices are scoped to the farmer's own rows (US2-13). Kotlin
 # sends both as global lists (ref.farm_constant / ref.plot_constant).
@@ -74,7 +74,7 @@ async def list_plots(
     # US2-13: PLOT_SCOPE_MODE=all drops the farmer scoping (dev/test accounts
     # aren't linked to any farm). The farm narrowing still applies -- a plot
     # of another farm would contradict the farm the farmer just picked.
-    scope_to_farmer = line_settings.PLOT_SCOPE_MODE == "farmer"
+    scope_to_farmer = settings.PLOT_SCOPE_MODE == "farmer"
     rows = (
         await session.execute(
             text(
@@ -119,7 +119,7 @@ async def farmer_owned_ids(
     multi-choice plot picker above was scoped, and every ordinary farm/plot
     question showed every farm and plot in the system).
     """
-    if line_settings.PLOT_SCOPE_MODE != "farmer" or field_name not in FARMER_SCOPED_FIELDS:
+    if settings.PLOT_SCOPE_MODE != "farmer" or field_name not in FARMER_SCOPED_FIELDS:
         return None
     if field_name == "farm_id":
         query = """

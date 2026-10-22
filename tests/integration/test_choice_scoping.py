@@ -18,8 +18,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_postback_event,
@@ -35,7 +34,7 @@ from tests.integration.helpers import (
 
 
 async def _post(client: AsyncClient, body: bytes) -> AsyncMock:
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
         "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
@@ -151,8 +150,8 @@ class TestFarmAndPlotChoicesAreScoped:
     ) -> None:
         s = await _seed(db_session)
 
-        with patch.object(line_settings, "PLOT_SCOPE_MODE", "farmer"), respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{s.task_form_id}").mock(
+        with patch.object(settings, "PLOT_SCOPE_MODE", "farmer"), respx.mock:
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{s.task_form_id}").mock(
                 return_value=Response(200, json=s.form_response)
             )
             farm_question = await _post(
@@ -196,8 +195,8 @@ class TestFarmAndPlotChoicesAreScoped:
         farm still see something to pick."""
         s = await _seed(db_session)
 
-        with patch.object(line_settings, "PLOT_SCOPE_MODE", "all"), respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{s.task_form_id}").mock(
+        with patch.object(settings, "PLOT_SCOPE_MODE", "all"), respx.mock:
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{s.task_form_id}").mock(
                 return_value=Response(200, json=s.form_response)
             )
             farm_question = await _post(

@@ -21,8 +21,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_postback_event,
@@ -42,13 +41,13 @@ def _farmer_scoped_plots() -> Iterator[None]:
     """These tests are about farmer scoping, which is production's default
     (PLOT_SCOPE_MODE=farmer) -- the test suite as a whole runs with "all"
     (tests/conftest.py), so switch it back on here."""
-    with patch.object(line_settings, "PLOT_SCOPE_MODE", "farmer"):
+    with patch.object(settings, "PLOT_SCOPE_MODE", "farmer"):
         yield
 
 
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
     body = build_postback_event(line_user_id=line_user_id, data=data)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
             "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
@@ -66,7 +65,7 @@ async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -
 
 async def _send_text(client: AsyncClient, *, line_user_id: str, text_content: str) -> AsyncMock:
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
         "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
@@ -239,9 +238,9 @@ class TestThePickerIsShown:
         )
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             reply_message = await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -267,9 +266,9 @@ class TestThePickerIsShown:
         await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="อะไรก็ได้"
             )
@@ -284,9 +283,9 @@ class TestThePickerIsShown:
         await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="อะไรก็ได้"
             )
@@ -306,9 +305,9 @@ class TestSelecting:
         plot_a, plot_b, plot_c = fixture.plot_ids
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
 
             await _send_postback(
                 client,
@@ -368,9 +367,9 @@ class TestSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             reply_message = await _send_postback(
                 client, line_user_id=fixture.line_user_id, data=f"multi_done:{conversation_id}"
             )
@@ -385,9 +384,9 @@ class TestSelecting:
         plot_a = fixture.plot_ids[0]
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -414,9 +413,9 @@ class TestSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -446,9 +445,9 @@ class TestStaleBubble:
         plot_a, plot_b, _ = fixture.plot_ids
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -484,9 +483,9 @@ class TestStaleBubble:
         )
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             reply_message = await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -505,9 +504,9 @@ class TestTypedTextWhileSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="แปลง B"
             )
@@ -523,9 +522,9 @@ class TestTypedTextWhileSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -544,9 +543,9 @@ class TestTypedTextWhileSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="asdfgh"
             )
@@ -564,9 +563,9 @@ class TestPauseAndResume:
         plot_a = fixture.plot_ids[0]
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -600,9 +599,9 @@ class TestPartialFailureRetry:
         plot_a, plot_b, _ = fixture.plot_ids
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             for plot_id in (plot_a, plot_b):
                 await _send_postback(
                     client,
@@ -727,14 +726,14 @@ class TestAnyOptionQuestion:
         under farmer scoping (US2-13) that is correctly refused. This test is
         about the fan-out, not scoping -- test_choice_scoping covers that.
         """
-        line_settings.PLOT_SCOPE_MODE = "all"  # restored by the autouse fixture
+        settings.PLOT_SCOPE_MODE = "all"  # restored by the autouse fixture
         fixture, conversation_id, form_response = await _seed_activity_type_form(db_session)
         plot_a = fixture.plot_ids[0]
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=form_response)
+            )
 
             for choice_id in ("spray", "fertilise"):
                 await _send_postback(
@@ -775,9 +774,9 @@ class TestAnyOptionQuestion:
         fixture, conversation_id, form_response = await _seed_activity_type_form(db_session)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=form_response)
+            )
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="อะไรนะ"
             )
@@ -808,9 +807,9 @@ class TestNoAddAnotherAfterAMultiChoiceConfirm:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+                return_value=Response(200, json=fixture.form_response)
+            )
             for plot_id in fixture.plot_ids[:ticks]:
                 await _send_postback(
                     client,
@@ -824,7 +823,7 @@ class TestNoAddAnotherAfterAMultiChoiceConfirm:
             body = build_postback_event(
                 line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
             )
-            signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+            signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
             diary = AsyncMock(return_value="ไดอารี่")
             with (
                 patch(

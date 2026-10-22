@@ -4,10 +4,10 @@ directly-testable async functions with no APScheduler-specific plumbing.
 
 import logging
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.clock import bangkok_now
 from src.database import async_session_maker
 from src.line.identity import lookup_line_user_ids
 from src.line.service import multicast_text_batched
@@ -21,8 +21,6 @@ from src.reminders.queries import (
 
 logger = logging.getLogger(__name__)
 
-_BANGKOK = ZoneInfo("Asia/Bangkok")
-
 
 def _reminder_text(task_title: str | None) -> str:
     task = task_title or "งานที่ค้างอยู่"
@@ -35,7 +33,7 @@ async def check_and_send_reminders() -> None:
     late, or twice: a user already logged for a task today is skipped.
     """
     async with async_session_maker() as session:
-        await _run_reminder_check(session, datetime.now(_BANGKOK))
+        await _run_reminder_check(session, bangkok_now())
 
 
 async def _run_reminder_check(session: AsyncSession, now: datetime) -> None:

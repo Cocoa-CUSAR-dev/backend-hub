@@ -13,8 +13,8 @@ from typing import cast
 import litellm
 from pydantic import BaseModel
 
-from src.llm.config import llm_settings
-from src.llm.exceptions import LLMUnavailable
+from src.config import settings
+from src.exceptions import LLMUnavailable
 
 
 async def extract_slots[SchemaT: BaseModel](
@@ -34,11 +34,11 @@ async def extract_slots[SchemaT: BaseModel](
         messages.insert(0, {"role": "system", "content": instructions})
     try:
         response = await litellm.acompletion(
-            model=llm_settings.LLM_MODEL,
-            api_key=llm_settings.LLM_API_KEY,
+            model=settings.LLM_MODEL,
+            api_key=settings.LLM_API_KEY,
             messages=messages,
             response_format=schema,
-            timeout=llm_settings.LLM_TIMEOUT_SECONDS,
+            timeout=settings.LLM_TIMEOUT_SECONDS,
         )
     except Exception as exc:  # noqa: BLE001 -- provider errors are intentionally broad here
         raise LLMUnavailable from exc
@@ -62,8 +62,8 @@ async def generate_follow_up(missing_field: str, context: str) -> str:
     )
     try:
         response = await litellm.acompletion(
-            model=llm_settings.LLM_MODEL,
-            api_key=llm_settings.LLM_API_KEY,
+            model=settings.LLM_MODEL,
+            api_key=settings.LLM_API_KEY,
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as exc:  # noqa: BLE001

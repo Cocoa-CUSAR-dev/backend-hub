@@ -27,11 +27,12 @@ field's own configured error_message (e.g. "กรุณากรอกจำน
 one message per field, not a different one depending on why parsing failed.
 """
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 import dateparser
 from pythainlp.util import thaiword_to_num
+
+from src.clock import bangkok_today
 
 if TYPE_CHECKING:
     from src.conversation.service import Choice
@@ -138,7 +139,7 @@ def parse_date(raw_text: str, *, is_datetime: bool = False) -> str | None:
     # fires when the year is within a few years of "this Gregorian year +
     # 543" specifically, not merely "far in the future" -- an ordinary,
     # deliberately-far-future Gregorian date is never touched.
-    expected_be_year = datetime.now().year + _BE_OFFSET
+    expected_be_year = bangkok_today().year + _BE_OFFSET
     if abs(parsed.year - expected_be_year) <= _BE_YEAR_SLACK:
         try:
             parsed = parsed.replace(year=parsed.year - _BE_OFFSET)

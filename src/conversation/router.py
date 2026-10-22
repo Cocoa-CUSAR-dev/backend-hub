@@ -15,7 +15,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.conversation import dev_queries, service
-from src.conversation.exceptions import AnswerInFlight
 from src.conversation.schemas import (
     CancelRequest,
     ChoiceResponse,
@@ -26,6 +25,7 @@ from src.conversation.schemas import (
     StartConversationRequest,
 )
 from src.database import get_session
+from src.exceptions import AnswerInFlight
 
 router = APIRouter(prefix="/conversation/test", tags=["conversation-test"])
 

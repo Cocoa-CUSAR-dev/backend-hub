@@ -33,9 +33,9 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
+from src.config import settings
+from src.exceptions import LLMUnavailable
 from src.llm.client import extract_slots
-from src.llm.config import llm_settings
-from src.llm.exceptions import LLMUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +147,7 @@ async def classify(text: str, task_titles: list[str] | None = None) -> IntentRes
     INTENT_ROUTING_ENABLED off, or losing the provider entirely, is a return
     to the previous behaviour rather than an outage.
     """
-    if not llm_settings.INTENT_ROUTING_ENABLED or not llm_settings.LLM_API_KEY:
+    if not settings.INTENT_ROUTING_ENABLED or not settings.LLM_API_KEY:
         return IntentResult()
     if not _is_worth_classifying(text):
         return IntentResult()
@@ -174,7 +174,7 @@ async def classify(text: str, task_titles: list[str] | None = None) -> IntentRes
         elapsed_ms,
     )
 
-    if result.confidence < llm_settings.INTENT_MIN_CONFIDENCE:
+    if result.confidence < settings.INTENT_MIN_CONFIDENCE:
         # A confident-sounding wrong route is worse than the hint: the hint
         # costs the farmer one extra tap, a wrong route costs them trust.
         return IntentResult()

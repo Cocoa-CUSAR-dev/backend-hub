@@ -13,7 +13,7 @@ import respx
 from httpx import AsyncClient, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_text_message_event,
     seed_conversation,
@@ -48,7 +48,7 @@ class TestTypedTextAtAGeodataQuestion:
             db_session, conversation_id=conversation_id, question_id=notes_q, text_value="x"
         )
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             reply_message = await _post(

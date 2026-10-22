@@ -9,11 +9,11 @@ import pytest
 import respx
 from httpx import Response
 
+from src.config import settings
 from src.exceptions import UpstreamServiceError
 from src.sso.client import mint_sso_token
-from src.sso.config import sso_settings
 
-_URL = f"{sso_settings.KOTLIN_BACKEND_URL}/service/sso/tokens"
+_URL = f"{settings.KOTLIN_BACKEND_URL}/service/sso/tokens"
 
 
 @respx.mock
@@ -23,7 +23,7 @@ async def test_returns_the_token_and_sends_the_service_key() -> None:
     assert await mint_sso_token("u-1") == "tok"
     request = route.calls.last.request
     assert json.loads(request.content) == {"userId": "u-1"}
-    assert request.headers["X-Service-Key"] == sso_settings.KOTLIN_SERVICE_KEY
+    assert request.headers["X-Service-Key"] == settings.KOTLIN_SERVICE_KEY
 
 
 @respx.mock

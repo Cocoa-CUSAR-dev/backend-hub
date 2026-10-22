@@ -15,17 +15,16 @@ from linebot.v3.webhooks import (
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.conversation import intent, reuse, service, text_parsing
 from src.conversation.constants import PAUSE_LABEL, ActiveSubstate, ConversationStatus
-from src.conversation.exceptions import ConversationNotFound
 from src.conversation.intent import Intent
 from src.conversation.models import Conversation
 from src.database import async_session_maker
 from src.diary.client import generate_diary
-from src.exceptions import UpstreamServiceError
+from src.exceptions import ConversationNotFound, UpstreamServiceError
 from src.forms.client import get_form
 from src.line import identity, messages, parent_picker, temp_task_picker
-from src.line.config import line_settings
 from src.line.dependencies import parse_line_events
 from src.line.flex_builders import build_diary_flex, build_quick_ack_flex
 from src.line.schemas import QuickReplyOption
@@ -85,10 +84,10 @@ async def _generate_and_push_diary(user_id: str, line_user_id: str) -> None:
         # F2 (docs-and-plan#125): token rides in the URL *fragment*, not a query
         # param -- the fragment never reaches the server, so it can't land in
         # access logs / Referer. web-app's /sso page reads it client-side.
-        history_url = f"{line_settings.WEB_APP_URL}/sso#token={token}"
+        history_url = f"{settings.WEB_APP_URL}/sso#token={token}"
     except Exception:
         logger.exception("SSO token mint failed for user_id=%s", user_id)
-        history_url = f"{line_settings.WEB_APP_URL}/history"
+        history_url = f"{settings.WEB_APP_URL}/history"
 
     await push_flex(line_user_id, "ไดอารี่วันนี้", build_diary_flex(diary_text, history_url))
 

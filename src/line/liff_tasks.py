@@ -18,15 +18,13 @@ from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.conversation import reuse, service
 from src.conversation.constants import ActiveSubstate
 from src.database import get_session
-from src.exceptions import UpstreamServiceError
+from src.exceptions import InvalidLiffToken, LineAccountNotLinked, UpstreamServiceError
 from src.forms.client import get_form
 from src.line import identity, liff, parent_picker
-from src.line.config import line_settings
-from src.line.exceptions import LineAccountNotLinked
-from src.line.liff import InvalidLiffToken
 from src.line.schemas import QuickReplyOption
 from src.line.service import push_autofill_offer, push_confirm_prompt, push_text
 from src.tasks.client import fetch_last_answer, fetch_pending_tasks
@@ -49,7 +47,7 @@ def _channel_id_from_liff_id(liff_id: str) -> str:
     """LINE documents a LIFF ID as "{channelId}-{randomId}" -- the same
     channel ID the OAuth2 verify endpoint's client_id parameter expects.
     Deriving it avoids a second, easy-to-desync env var just for this one
-    value -- see LIFF_ID in src/line/config.py.
+    value -- see LIFF_ID in src/config.py.
     """
     return liff_id.split("-", 1)[0]
 
@@ -66,13 +64,13 @@ async def resolve_liff_user(
         raise InvalidLiffToken("Missing bearer LIFF ID token")
     id_token = authorization.removeprefix("Bearer ")
 
-    if not line_settings.LIFF_ID:
+    if not settings.LIFF_ID:
         # Fail closed, same reasoning as ServiceAuthMiddleware's unset-key
         # case on the mobile-backend side: an unconfigured LIFF_ID must
         # never silently accept every token as if it were a real channel.
         raise InvalidLiffToken("LIFF_ID is not configured")
 
-    channel_id = _channel_id_from_liff_id(line_settings.LIFF_ID)
+    channel_id = _channel_id_from_liff_id(settings.LIFF_ID)
     claims = await liff.verify_id_token(id_token, channel_id)
     line_user_id = claims.get("sub")
     if not line_user_id:

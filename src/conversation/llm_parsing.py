@@ -13,18 +13,16 @@ as if this module didn't exist.
 """
 
 import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
+from src.clock import bangkok_today
+from src.config import settings
+from src.exceptions import LLMUnavailable
 from src.llm.client import extract_slots
-from src.llm.config import llm_settings
-from src.llm.exceptions import LLMUnavailable
 
 logger = logging.getLogger(__name__)
 
-_BANGKOK = ZoneInfo("Asia/Bangkok")
 
 _TYPE_INSTRUCTIONS = {
     "INT": "a whole number written with ASCII digits only, e.g. 900",
@@ -39,10 +37,10 @@ class _ExtractedValue(BaseModel):
 
 
 async def try_llm_parse(rule_type: str, raw_text: str) -> str | None:
-    if not llm_settings.LLM_API_KEY or rule_type not in _TYPE_INSTRUCTIONS:
+    if not settings.LLM_API_KEY or rule_type not in _TYPE_INSTRUCTIONS:
         return None
 
-    today = datetime.now(_BANGKOK).date().isoformat()
+    today = bangkok_today().isoformat()
     instructions = (
         "A Thai farmer typed a free-text answer to a form question. "
         f"Extract it as {_TYPE_INSTRUCTIONS[rule_type]}. "

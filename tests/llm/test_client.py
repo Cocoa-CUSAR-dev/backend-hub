@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import BaseModel
 
+from src.exceptions import LLMUnavailable
 from src.llm.client import extract_slots, generate_follow_up
-from src.llm.exceptions import LLMUnavailable
 
 
 class _FarmSlots(BaseModel):

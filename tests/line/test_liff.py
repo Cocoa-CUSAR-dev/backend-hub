@@ -2,8 +2,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.exceptions import UpstreamServiceError
-from src.line.liff import InvalidLiffToken, verify_id_token
+from src.exceptions import InvalidLiffToken, UpstreamServiceError
+from src.line.liff import verify_id_token
 
 
 def _mock_response(status_code: int, body: dict) -> MagicMock:

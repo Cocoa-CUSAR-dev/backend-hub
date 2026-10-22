@@ -11,11 +11,11 @@ tests/integration/test_choice_scoping.py).
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from src.config import settings
 from src.conversation import service
 from src.conversation.models import ConversationAnswer
 from src.forms.schemas import FormDetail
 from src.line import plot_picker
-from src.line.config import line_settings
 
 FARM_A, FARM_B = "farm-a", "farm-b"
 
@@ -162,13 +162,13 @@ class TestScopedQuestionStillRendersCorrectly:
 class TestFarmerOwnedIdsSwitch:
     async def test_mode_all_never_queries(self) -> None:
         session = MagicMock(execute=AsyncMock())
-        with patch.object(line_settings, "PLOT_SCOPE_MODE", "all"):
+        with patch.object(settings, "PLOT_SCOPE_MODE", "all"):
             assert await plot_picker.farmer_owned_ids(session, uuid.uuid4(), "farm_id") is None
         session.execute.assert_not_awaited()
 
     async def test_other_fields_are_never_scoped(self) -> None:
         session = MagicMock(execute=AsyncMock())
-        with patch.object(line_settings, "PLOT_SCOPE_MODE", "farmer"):
+        with patch.object(settings, "PLOT_SCOPE_MODE", "farmer"):
             assert (
                 await plot_picker.farmer_owned_ids(session, uuid.uuid4(), "fertilizer_id") is None
             )

@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, patch
 
+from src.config import settings
 from src.line import router
-from src.line.config import line_settings
 
 
 # US3-2 / #125 (F2): the diary card's "view full history" deep link must carry
@@ -25,5 +25,5 @@ async def test_diary_card_link_puts_token_in_fragment_not_query() -> None:
         await router._generate_and_push_diary("user-1", "Uabc")
 
     url = captured["history_url"]
-    assert url == f"{line_settings.WEB_APP_URL}/sso#token=TOK123"
+    assert url == f"{settings.WEB_APP_URL}/sso#token=TOK123"
     assert "?token=" not in url

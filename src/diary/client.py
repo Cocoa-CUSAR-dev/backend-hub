@@ -6,9 +6,8 @@ as src/forms/client.py's get_form and src/tasks/client.py's submit_task.
 
 import httpx
 
-from src.diary.config import diary_settings
-from src.diary.exceptions import DiaryNotAvailable
-from src.exceptions import UpstreamServiceError
+from src.config import settings
+from src.exceptions import DiaryNotAvailable, UpstreamServiceError
 from src.request_id import REQUEST_ID_HEADER, get_request_id
 
 
@@ -20,14 +19,12 @@ async def generate_diary(user_id: str) -> str:
     # not just one or the other. Confirmed live 2026-09-18: a real diary
     # with several answered forms took 33.8s end to end -- past the old 30s
     # ceiling despite succeeding.
-    async with httpx.AsyncClient(
-        base_url=diary_settings.KOTLIN_BACKEND_URL, timeout=60.0
-    ) as client:
+    async with httpx.AsyncClient(base_url=settings.KOTLIN_BACKEND_URL, timeout=60.0) as client:
         response = await client.post(
             "/service/diaries/generate",
             json={"userId": user_id},
             headers={
-                "X-Service-Key": diary_settings.KOTLIN_SERVICE_KEY,
+                "X-Service-Key": settings.KOTLIN_SERVICE_KEY,
                 REQUEST_ID_HEADER: get_request_id(),
             },
         )

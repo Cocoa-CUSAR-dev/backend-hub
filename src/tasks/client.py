@@ -13,10 +13,9 @@ from typing import Any
 
 import httpx
 
-from src.exceptions import UpstreamServiceError
+from src.config import settings
+from src.exceptions import HandlerNotSupported, UpstreamServiceError
 from src.request_id import REQUEST_ID_HEADER, get_request_id
-from src.tasks.config import tasks_settings
-from src.tasks.exceptions import HandlerNotSupported
 from src.tasks.schemas import TaskListItem, TaskSubmission
 
 
@@ -31,12 +30,12 @@ async def submit_task(submission: TaskSubmission) -> None:
     # told the farmer it failed and to retry, when retrying would have
     # inserted a second, duplicate row (dissectAnswer has no idempotency
     # guard). Same fix, same reasoning as src/forms/client.py's get_form().
-    async with httpx.AsyncClient(base_url=tasks_settings.GO_BACKEND_URL, timeout=30.0) as client:
+    async with httpx.AsyncClient(base_url=settings.GO_BACKEND_URL, timeout=30.0) as client:
         response = await client.post(
             "/service/tasks",
             json=submission.model_dump(),
             headers={
-                "X-Service-Key": tasks_settings.GO_SERVICE_KEY,
+                "X-Service-Key": settings.GO_SERVICE_KEY,
                 REQUEST_ID_HEADER: get_request_id(),
             },
         )
@@ -80,12 +79,12 @@ async def fetch_pending_tasks(*, user_id: str) -> list[TaskListItem]:
     list is expected to comfortably fit in one page for the to-do screen;
     revisit with real pagination if that stops being true.
     """
-    async with httpx.AsyncClient(base_url=tasks_settings.GO_BACKEND_URL, timeout=30.0) as client:
+    async with httpx.AsyncClient(base_url=settings.GO_BACKEND_URL, timeout=30.0) as client:
         response = await client.get(
             "/service/tasks",
             params={"user_id": user_id, "page_size": 100},
             headers={
-                "X-Service-Key": tasks_settings.GO_SERVICE_KEY,
+                "X-Service-Key": settings.GO_SERVICE_KEY,
                 REQUEST_ID_HEADER: get_request_id(),
             },
         )
@@ -108,12 +107,12 @@ async def fetch_last_answer(*, user_id: str, handler: str) -> dict[str, Any] | N
     src.conversation.reuse.sanitize_for_autofill is what strips those
     before anything gets offered to a farmer, not this function.
     """
-    async with httpx.AsyncClient(base_url=tasks_settings.GO_BACKEND_URL, timeout=30.0) as client:
+    async with httpx.AsyncClient(base_url=settings.GO_BACKEND_URL, timeout=30.0) as client:
         response = await client.get(
             "/service/tasks/last-answer",
             params={"user_id": user_id, "handler": handler},
             headers={
-                "X-Service-Key": tasks_settings.GO_SERVICE_KEY,
+                "X-Service-Key": settings.GO_SERVICE_KEY,
                 REQUEST_ID_HEADER: get_request_id(),
             },
         )
@@ -147,12 +146,12 @@ async def fetch_sanitized_autofill(
     src.conversation.reuse.sanitize_for_autofill builds that from this
     chatbot's own Question dataclasses; this function is just the HTTP call.
     """
-    async with httpx.AsyncClient(base_url=tasks_settings.GO_BACKEND_URL, timeout=30.0) as client:
+    async with httpx.AsyncClient(base_url=settings.GO_BACKEND_URL, timeout=30.0) as client:
         response = await client.post(
             "/service/autofill/sanitize",
             json={"answer": answer, "questions": questions},
             headers={
-                "X-Service-Key": tasks_settings.GO_SERVICE_KEY,
+                "X-Service-Key": settings.GO_SERVICE_KEY,
                 REQUEST_ID_HEADER: get_request_id(),
             },
         )

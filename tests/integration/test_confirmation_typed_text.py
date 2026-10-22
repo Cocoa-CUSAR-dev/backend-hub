@@ -21,8 +21,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_text_message_event,
@@ -44,7 +43,7 @@ async def _send_message(client: AsyncClient, *, line_user_id: str, text_content:
     real one would try to reach Kotlin.
     """
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
             "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
@@ -136,7 +135,7 @@ class TestTypedYesWordConfirms:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             with patch("src.conversation.service.submit_task", new=AsyncMock()):
@@ -158,7 +157,7 @@ class TestTypedYesWordConfirms:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             with patch("src.conversation.service.submit_task", new=AsyncMock()):
@@ -178,7 +177,7 @@ class TestTypedYesWordConfirms:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             with patch("src.conversation.service.submit_task", new=AsyncMock()):
@@ -202,7 +201,7 @@ class TestTypedCancelAndEdit:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             await _send_message(client, line_user_id=line_user_id, text_content="ยกเลิก")
@@ -218,7 +217,7 @@ class TestTypedCancelAndEdit:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             reply_message = await _send_message(
@@ -241,7 +240,7 @@ class TestUnrecognisedTextIsNeverADeadEnd:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             reply_message = await _send_message(
@@ -271,7 +270,7 @@ class TestUnrecognisedTextIsNeverADeadEnd:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
+            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
             await _send_message(client, line_user_id=line_user_id, text_content="⏸️ พักไว้ก่อน")

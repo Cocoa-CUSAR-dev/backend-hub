@@ -1,11 +1,11 @@
 from unittest.mock import AsyncMock, patch
 
 from src.conversation import llm_parsing
-from src.llm.exceptions import LLMUnavailable
+from src.exceptions import LLMUnavailable
 
 
 def _with_key(key: str = "test-key"):  # noqa: ANN202
-    return patch.object(llm_parsing.llm_settings, "LLM_API_KEY", key)
+    return patch.object(llm_parsing.settings, "LLM_API_KEY", key)
 
 
 def _extract(value: str | None) -> AsyncMock:

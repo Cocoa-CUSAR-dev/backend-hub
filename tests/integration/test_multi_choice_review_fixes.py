@@ -25,8 +25,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import build_postback_event, sign_signature
 from tests.integration.test_multi_choice_flow import (
     _Fixture,
@@ -71,7 +70,7 @@ async def _park_at_confirmation(
 
 
 def _mock_form(fixture: _Fixture) -> None:
-    respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
+    respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
         return_value=Response(200, json=fixture.form_response)
     )
 
@@ -126,9 +125,7 @@ class TestDoubleConfirmNeverDuplicates:
                         "/line/webhook",
                         content=body,
                         headers={
-                            "X-Line-Signature": sign_signature(
-                                body, line_settings.LINE_CHANNEL_SECRET
-                            )
+                            "X-Line-Signature": sign_signature(body, settings.LINE_CHANNEL_SECRET)
                         },
                     )
                     for body in (body_a, body_b)

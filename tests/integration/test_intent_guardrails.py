@@ -18,9 +18,9 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.conversation import intent
 from src.line import messages
-from src.line.config import line_settings
 from tests.integration.helpers import (
     build_text_message_event,
     seed_task_form,
@@ -57,14 +57,14 @@ async def _send(
     client: AsyncClient, *, line_user_id: str, words: str, model: AsyncMock
 ) -> tuple[Any, AsyncMock]:
     body = build_text_message_event(line_user_id=line_user_id, text_content=words)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     submit_task = AsyncMock()
     with (
         patch(
             "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
-        patch.object(intent.llm_settings, "LLM_API_KEY", "test-key"),
-        patch.object(intent.llm_settings, "INTENT_ROUTING_ENABLED", True),
+        patch.object(intent.settings, "LLM_API_KEY", "test-key"),
+        patch.object(intent.settings, "INTENT_ROUTING_ENABLED", True),
         patch("src.conversation.intent.extract_slots", new=model),
         patch("src.conversation.service.submit_task", new=submit_task),
     ):

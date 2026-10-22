@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.reminders.exceptions import InvalidReminderReference, ReminderNotFound
+from src.exceptions import InvalidReminderReference, ReminderNotFound
 from src.reminders.jobs import _run_reminder_check, check_and_send_reminders
 from src.reminders.queries import (
     create_reminder_schedule,
@@ -264,10 +264,10 @@ async def test_check_and_send_reminders_wrapper_reads_real_clock_and_own_session
 
     fixed_now = datetime(2026, 9, 7, 17, 0, tzinfo=_BANGKOK)
     with (
-        patch("src.reminders.jobs.datetime") as mock_datetime,
+        patch("src.reminders.jobs.bangkok_now") as mock_now,
         patch("src.reminders.jobs.multicast_text_batched", new=_all_succeed()) as multicast,
     ):
-        mock_datetime.now.return_value = fixed_now
+        mock_now.return_value = fixed_now
         await check_and_send_reminders()
 
     multicast.assert_awaited_once()
@@ -292,18 +292,18 @@ async def test_check_and_send_reminders_does_not_double_send_across_the_bangkok_
     second_tick = datetime(2026, 9, 7, 1, 15, tzinfo=_BANGKOK)
 
     with (
-        patch("src.reminders.jobs.datetime") as mock_datetime,
+        patch("src.reminders.jobs.bangkok_now") as mock_now,
         patch("src.reminders.jobs.multicast_text_batched", new=_all_succeed()) as first,
     ):
-        mock_datetime.now.return_value = first_tick
+        mock_now.return_value = first_tick
         await check_and_send_reminders()
     first.assert_awaited_once()
 
     with (
-        patch("src.reminders.jobs.datetime") as mock_datetime,
+        patch("src.reminders.jobs.bangkok_now") as mock_now,
         patch("src.reminders.jobs.multicast_text_batched", new=_all_succeed()) as second,
     ):
-        mock_datetime.now.return_value = second_tick
+        mock_now.return_value = second_tick
         await check_and_send_reminders()
     second.assert_not_awaited()
 
