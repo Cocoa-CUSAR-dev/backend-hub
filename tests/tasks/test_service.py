@@ -22,7 +22,7 @@ SESSION: Any = object()  # never touched: every db call is faked
 
 def _actor(perms: frozenset[str] = FARMER_PERMS, user_id: UUID | None = None) -> Actor:
     return Actor(
-        user_id=user_id or uuid4(), roles=frozenset({"farmer"}), perms=perms, channel="mobile"
+        user_id=user_id or uuid4(), roles=frozenset({"farmer"}), perms=perms, channel="api"
     )
 
 

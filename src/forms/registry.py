@@ -20,6 +20,7 @@ import re
 import time
 
 from src import db
+from src.database import Session
 from src.db.forms import FieldDependencyRow
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ def _is_safe(dependency: FieldDependencyRow) -> bool:
     return len(link) == 2 and all(_IDENTIFIER.match(name) for name in names)
 
 
-async def _load(session: db.Session) -> dict[str, FieldDependencyRow]:
+async def _load(session: Session) -> dict[str, FieldDependencyRow]:
     tables = await db.forms.existing_tables(session)
     by_child: dict[str, FieldDependencyRow] = {}
     for dependency in await db.forms.field_dependencies(session):
@@ -64,7 +65,7 @@ async def _load(session: db.Session) -> dict[str, FieldDependencyRow]:
     return by_child
 
 
-async def dependencies(session: db.Session) -> dict[str, FieldDependencyRow]:
+async def dependencies(session: Session) -> dict[str, FieldDependencyRow]:
     """Valid dependencies keyed by child field."""
     global _cache
     if _cache is not None and time.monotonic() - _cache[0] < TTL_SECONDS:

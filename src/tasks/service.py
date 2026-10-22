@@ -19,6 +19,7 @@ from uuid import UUID
 
 from src import clock, db
 from src.actor import Actor, require
+from src.database import Session
 from src.db.forms import TaskForm
 from src.db.tasks import TaskRow
 from src.exceptions import Forbidden, NotFound
@@ -61,7 +62,7 @@ def status_of(task: TaskRow, form: TaskForm | None, bangkok_now: datetime) -> st
 
 
 async def list_for(
-    session: db.Session,
+    session: Session,
     actor: Actor,
     *,
     open_on: date | None = None,
@@ -104,7 +105,7 @@ async def list_for(
     return out
 
 
-async def get(session: db.Session, actor: Actor, task_id: UUID) -> dict[str, Any]:
+async def get(session: Session, actor: Actor, task_id: UUID) -> dict[str, Any]:
     """The caller's most recent answer to this task, as a bare answer object
     (the shape the mobile app parses)."""
     require(actor, "read:response:own")
@@ -114,7 +115,7 @@ async def get(session: db.Session, actor: Actor, task_id: UUID) -> dict[str, Any
     return answer
 
 
-async def get_form(session: db.Session, actor: Actor, task_id: UUID) -> TaskFormOut:
+async def get_form(session: Session, actor: Actor, task_id: UUID) -> TaskFormOut:
     """The form to fill for this task, plus its version for the app's cache."""
     _require_form_reader(actor)
     task_form = await db.forms.form_of_task(session, task_id)
@@ -126,7 +127,7 @@ async def get_form(session: db.Session, actor: Actor, task_id: UUID) -> TaskForm
     return TaskFormOut(form=form, version=task_form.version)
 
 
-async def my_responses(session: db.Session, actor: Actor, task_id: UUID) -> list[ResponseOut]:
+async def my_responses(session: Session, actor: Actor, task_id: UUID) -> list[ResponseOut]:
     """Every answer the caller filed against this task, newest first. Empty,
     not an error, when there are none."""
     require(actor, "read:response:own")

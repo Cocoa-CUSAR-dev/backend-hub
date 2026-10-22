@@ -23,6 +23,7 @@ from collections.abc import Iterable
 from uuid import UUID
 
 from src import db
+from src.database import Session
 from src.db.forms import FieldDependencyRow, FormRow
 from src.db.ref import Choice
 from src.forms import registry
@@ -46,7 +47,7 @@ def reset_cache() -> None:
     _choice_columns.clear()
 
 
-async def _choice_source(session: db.Session, field_name: str) -> tuple[str, str, str]:
+async def _choice_source(session: Session, field_name: str) -> tuple[str, str, str]:
     cached = _choice_columns.get(field_name)
     if cached:
         return cached
@@ -65,7 +66,7 @@ async def _choice_source(session: db.Session, field_name: str) -> tuple[str, str
 
 
 async def _choices_for(
-    session: db.Session, field_name: str, dependency: FieldDependencyRow | None
+    session: Session, field_name: str, dependency: FieldDependencyRow | None
 ) -> list[Choice]:
     if field_name == "grade_code":
         return await db.ref.grade_codes(session)
@@ -84,7 +85,7 @@ async def _choices_for(
 
 
 async def _all_choices(
-    session: db.Session, rows: Iterable[FormRow], dependencies: dict[str, FieldDependencyRow]
+    session: Session, rows: Iterable[FormRow], dependencies: dict[str, FieldDependencyRow]
 ) -> dict[str, list[ChoiceOut]]:
     option_fields = dict.fromkeys(
         row.field_name for row in rows if row.input_type == OPTION and row.field_name
@@ -131,7 +132,7 @@ def _question(
     )
 
 
-async def load_form(session: db.Session, form_id: UUID) -> FormOut | None:
+async def load_form(session: Session, form_id: UUID) -> FormOut | None:
     """The whole form, or None if it does not exist. Sections and questions
     keep their sort order; inactive ones are included with is_active false."""
     rows = await db.forms.form_rows(session, form_id)
