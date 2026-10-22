@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from src import db
 from src.actor import Actor
@@ -128,7 +129,7 @@ async def test_create_farm_writes_farm_owner_and_point(fake: dict[str, AsyncMock
 
 
 async def test_create_farm_with_an_outline_and_without_gis(fake: dict[str, AsyncMock]) -> None:
-    outline = [{"lat": 1, "lng": 2}, {"lat": 3, "lng": 4}]
+    outline = [{"lat": 1, "lng": 2}, {"lat": 3, "lng": 4}, {"lat": 5, "lng": 6}]
     await service.create_farm(SESSION, _actor(), _farm_in(gis=outline))
     assert fake["insert_geo"].await_args.kwargs["wkt"].startswith("POLYGON((")
 
@@ -170,7 +171,9 @@ async def test_create_farm_needs_a_person(fake: dict[str, AsyncMock]) -> None:
 
 async def test_create_plot_writes_area_in_rai_and_outline(fake: dict[str, AsyncMock]) -> None:
     me = _actor()
-    plot = _plot_in(gis=[{"lat": 1, "lng": 2}, {"lat": 3, "lng": 4}], gis_area_m2=3200)
+    plot = _plot_in(
+        gis=[{"lat": 1, "lng": 2}, {"lat": 3, "lng": 4}, {"lat": 5, "lng": 6}], gis_area_m2=3200
+    )
 
     out = await service.create_plot(SESSION, me, plot)
 
@@ -188,6 +191,40 @@ async def test_create_plot_writes_area_in_rai_and_outline(fake: dict[str, AsyncM
 async def test_create_plot_stores_no_shape_for_a_single_point(fake: dict[str, AsyncMock]) -> None:
     await service.create_plot(SESSION, _actor(), _plot_in(gis=[{"lat": 1, "lng": 2}]))
     fake["insert_geo"].assert_not_awaited()
+
+
+TWO_POINTS = [{"lat": 1, "lng": 2}, {"lat": 3, "lng": 4}]
+
+
+async def test_two_points_are_no_outline_and_nothing_is_written(
+    fake: dict[str, AsyncMock],
+) -> None:
+    # PostGIS needs a ring of 4 (3 distinct + closing); 2 points used to
+    # reach ST_GeomFromText and roll the whole registration back as a 500.
+    with pytest.raises(Invalid) as farm_error:
+        await service.create_farm(SESSION, _actor(), _farm_in(gis=TWO_POINTS))
+    with pytest.raises(Invalid) as plot_error:
+        await service.create_plot(SESSION, _actor(), _plot_in(gis=TWO_POINTS))
+
+    expected = {"gis": "An outline needs at least 3 points"}
+    assert farm_error.value.fields == plot_error.value.fields == expected
+    fake["insert_farm"].assert_not_awaited()
+    fake["insert_plot"].assert_not_awaited()
+    fake["insert_geo"].assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "point",
+    [
+        {"lat": 90.1, "lng": 0},
+        {"lat": -91, "lng": 0},
+        {"lat": 0, "lng": 180.5},
+        {"lat": 0, "lng": -181},
+    ],
+)
+def test_coordinates_outside_the_globe_are_refused(point: dict[str, float]) -> None:
+    with pytest.raises(ValidationError):
+        _farm_in(gis=[point])
 
 
 async def test_create_plot_on_an_unknown_farm_is_not_found(fake: dict[str, AsyncMock]) -> None:

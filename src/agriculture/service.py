@@ -79,7 +79,11 @@ def _wkt_point(point: GisPoint) -> str:
 
 def _wkt_polygon(points: list[GisPoint]) -> str:
     """A closed outline: the first point is repeated at the end. Coordinates
-    are lon lat with six decimals, as Go's %f wrote them."""
+    are lon lat with six decimals, as Go's %f wrote them. Needs 3+ points:
+    PostGIS rejects a ring with fewer than 4 (3 distinct + closing), which
+    used to roll the whole registration back as a 500."""
+    if len(points) < 3:
+        raise Invalid(fields={"gis": "An outline needs at least 3 points"})
     ring = [*points, points[0]]
     return "POLYGON((" + ",".join(f"{p.lng:f} {p.lat:f}" for p in ring) + "))"
 
@@ -89,6 +93,11 @@ async def create_farm(session: Session, actor: Actor, farm: FarmIn) -> FarmCreat
     require(actor, "create:farm:own")
     user_id = _caller(actor)
     found_date = _found_date(farm.found_date)
+    # One point is the farm's location, three or more its outline; checked
+    # before anything is written.
+    wkt = None
+    if farm.gis:
+        wkt = _wkt_point(farm.gis[0]) if len(farm.gis) == 1 else _wkt_polygon(farm.gis)
     farm_id = uuid4()
     now = clock.utc_now()
     async with transaction(session):
@@ -111,8 +120,7 @@ async def create_farm(session: Session, actor: Actor, farm: FarmIn) -> FarmCreat
             updated_at=now.replace(tzinfo=None),
         )
         await db.agriculture.link_farmer(session, user_id, farm_id)
-        if farm.gis:
-            wkt = _wkt_point(farm.gis[0]) if len(farm.gis) == 1 else _wkt_polygon(farm.gis)
+        if wkt is not None:
             await db.storage.insert_geo(
                 session,
                 uploaded_by=user_id,
@@ -133,6 +141,9 @@ async def create_plot(session: Session, actor: Actor, plot: PlotIn) -> PlotCreat
     require(actor, "create:farm:own")
     user_id = _caller(actor)
     found_date = _found_date(plot.found_date)
+    # A single point is not an outline, so Go stored nothing for it; two
+    # points can't make one either.
+    wkt = _wkt_polygon(plot.gis) if len(plot.gis) >= 2 else None
     if not await db.agriculture.farm_exists(session, plot.farm_id):
         raise NotFound("Farm not found")
     if not await db.agriculture.farmer_owns_farm(session, user_id, plot.farm_id):
@@ -157,12 +168,11 @@ async def create_plot(session: Session, actor: Actor, plot: PlotIn) -> PlotCreat
             created_at=now.replace(tzinfo=None),
             updated_at=now.replace(tzinfo=None),
         )
-        # A single point is not an outline, so Go stored nothing for it.
-        if len(plot.gis) >= 2:
+        if wkt is not None:
             await db.storage.insert_geo(
                 session,
                 uploaded_by=user_id,
-                wkt=_wkt_polygon(plot.gis),
+                wkt=wkt,
                 code=str(plot_id),
                 source_type="plot",
                 area_sq_m=plot.gis_area_m2,
@@ -266,6 +276,10 @@ async def upload_farm_image(
 
     object_name = f"{uuid4()}.{extension}"
     key = f"farms/{farm_id}/{object_name}"
+    # Uploaded before the record is written. If the insert then fails, the
+    # object stays in R2 with nothing pointing at it: accepted, since it is
+    # private and small, and the other order could leave a record pointing
+    # at a photo that never arrived.
     await r2.put(key, data, mime_type)
     async with transaction(session):
         await db.storage.insert_file(
