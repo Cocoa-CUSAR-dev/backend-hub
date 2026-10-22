@@ -59,10 +59,10 @@ uvicorn src.main:app --reload
 
 Every setting is in `src/config.py` and listed in `.env.sample`. SQLAlchemy needs a `postgresql+asyncpg://` URL, not the plain `postgresql://` that Go/Kotlin use.
 
-**Windows with Smart App Control:** if importing SQLAlchemy fails with "An Application Control policy has blocked this file", reinstall it without its compiled speed-ups:
+**Windows with Smart App Control:** if importing SQLAlchemy fails with "An Application Control policy has blocked this file", reinstall it without its compiled speed-ups (`--no-cache-dir` matters: otherwise pip reuses the compiled build). In PowerShell, set the variable first with `$env:DISABLE_SQLALCHEMY_CEXT="1"`.
 
 ```bash
-DISABLE_SQLALCHEMY_CEXT=1 pip install --force-reinstall --no-deps --no-binary sqlalchemy sqlalchemy
+DISABLE_SQLALCHEMY_CEXT=1 pip install --no-cache-dir --force-reinstall --no-deps --no-binary sqlalchemy sqlalchemy
 ```
 
 ## Running tests and checks
