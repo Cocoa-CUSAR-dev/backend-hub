@@ -50,7 +50,7 @@ async def _send_message(client: AsyncClient, *, line_user_id: str, text_content:
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -63,7 +63,7 @@ async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -
     body = build_postback_event(line_user_id=line_user_id, data=data)
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}

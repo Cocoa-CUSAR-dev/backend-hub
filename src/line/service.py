@@ -2,26 +2,19 @@ import logging
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from linebot.v3.messaging import (
-    AsyncApiClient,
-    AsyncMessagingApi,
-    Configuration,
+from src.chat.ui.flex_builders import build_multi_choice_flex
+from src.chat.ui.schemas import QuickReplyOption
+from src.line import client as line_client
+from src.line.client import (
     FlexContainer,
     FlexMessage,
     LocationAction,
     MessageAction,
-    MulticastRequest,
     PostbackAction,
-    PushMessageRequest,
     QuickReply,
     QuickReplyItem,
-    ReplyMessageRequest,
     TextMessage,
 )
-
-from src.chat.ui.flex_builders import build_multi_choice_flex
-from src.chat.ui.schemas import QuickReplyOption
-from src.config import settings
 
 if TYPE_CHECKING:
     from src.chat.service import Question
@@ -31,8 +24,6 @@ logger = logging.getLogger(__name__)
 
 # LINE's multicast endpoint accepts at most 500 recipients per call.
 _MULTICAST_LIMIT = 500
-
-_configuration = Configuration(access_token=settings.LINE_CHANNEL_ACCESS_TOKEN)
 
 _QUICK_REPLY_LABEL_MAX = 20  # LINE's own platform limit on a button's label
 
@@ -57,10 +48,7 @@ async def reply_text(
         text=text,
         quickReply=_build_quick_reply(quick_reply) if quick_reply else None,
     )
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).reply_message(
-            ReplyMessageRequest(replyToken=reply_token, messages=[message])
-        )
+    await line_client.reply(reply_token, [message])
 
 
 async def reply_task_choices(reply_token: str, text: str, tasks: list["PendingTask"]) -> None:
@@ -92,10 +80,7 @@ async def reply_task_choices(reply_token: str, text: str, tasks: list["PendingTa
         ]
     )
     message = TextMessage(text=text, quickReply=quick_reply)
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).reply_message(
-            ReplyMessageRequest(replyToken=reply_token, messages=[message])
-        )
+    await line_client.reply(reply_token, [message])
 
 
 def _build_confirm_prompt_message(text: str, conversation_id: UUID) -> TextMessage:
@@ -149,10 +134,7 @@ async def reply_confirm_prompt(reply_token: str, text: str, conversation_id: UUI
     honest failure, no escape).
     """
     message = _build_confirm_prompt_message(text, conversation_id)
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).reply_message(
-            ReplyMessageRequest(replyToken=reply_token, messages=[message])
-        )
+    await line_client.reply(reply_token, [message])
 
 
 async def push_confirm_prompt(to: str, text: str, conversation_id: UUID) -> None:
@@ -162,8 +144,7 @@ async def push_confirm_prompt(to: str, text: str, conversation_id: UUID) -> None
     call, not a LINE event). COSTED send, same as push_text.
     """
     message = _build_confirm_prompt_message(text, conversation_id)
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).push_message(PushMessageRequest(to=to, messages=[message]))
+    await line_client.push(to, [message])
 
 
 async def reply_add_another_prompt(reply_token: str, text: str, conversation_id: UUID) -> None:
@@ -195,10 +176,7 @@ async def reply_add_another_prompt(reply_token: str, text: str, conversation_id:
         ]
     )
     message = TextMessage(text=text, quickReply=quick_reply)
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).reply_message(
-            ReplyMessageRequest(replyToken=reply_token, messages=[message])
-        )
+    await line_client.reply(reply_token, [message])
 
 
 def _build_autofill_offer_message(
@@ -255,10 +233,7 @@ async def reply_autofill_offer(
     message = _build_autofill_offer_message(
         task_id=task_id, task_form_id=task_form_id, handler=handler, preview=preview
     )
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).reply_message(
-            ReplyMessageRequest(replyToken=reply_token, messages=[message])
-        )
+    await line_client.reply(reply_token, [message])
 
 
 async def push_autofill_offer(
@@ -273,8 +248,7 @@ async def push_autofill_offer(
     message = _build_autofill_offer_message(
         task_id=task_id, task_form_id=task_form_id, handler=handler, preview=preview
     )
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).push_message(PushMessageRequest(to=to, messages=[message]))
+    await line_client.push(to, [message])
 
 
 async def reply_edit_picker(
@@ -300,10 +274,7 @@ async def reply_edit_picker(
         ]
     )
     message = TextMessage(text="เลือกข้อที่ต้องการแก้ไข:", quickReply=quick_reply)
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).reply_message(
-            ReplyMessageRequest(replyToken=reply_token, messages=[message])
-        )
+    await line_client.reply(reply_token, [message])
 
 
 async def reply_multi_choice_picker(
@@ -356,10 +327,7 @@ async def reply_selection_ack(reply_token: str, text: str, conversation_id: UUID
         ]
     )
     message = TextMessage(text=text, quickReply=quick_reply)
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).reply_message(
-            ReplyMessageRequest(replyToken=reply_token, messages=[message])
-        )
+    await line_client.reply(reply_token, [message])
 
 
 async def reply_flex(reply_token: str, alt_text: str, contents: dict[str, Any]) -> None:
@@ -369,15 +337,10 @@ async def reply_flex(reply_token: str, alt_text: str, contents: dict[str, Any]) 
     Message docs / simulator for building one; FlexContainer.from_dict parses
     it into the SDK's own model.
     """
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).reply_message(
-            ReplyMessageRequest(
-                replyToken=reply_token,
-                messages=[
-                    FlexMessage(altText=alt_text, contents=FlexContainer.from_dict(contents))
-                ],
-            )
-        )
+    await line_client.reply(
+        reply_token,
+        [FlexMessage(altText=alt_text, contents=FlexContainer.from_dict(contents))],
+    )
 
 
 async def push_text(to: str, text: str, quick_reply: list[QuickReplyOption] | None = None) -> None:
@@ -395,16 +358,12 @@ async def push_text(to: str, text: str, quick_reply: list[QuickReplyOption] | No
         text=text,
         quickReply=_build_quick_reply(quick_reply) if quick_reply else None,
     )
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).push_message(PushMessageRequest(to=to, messages=[message]))
+    await line_client.push(to, [message])
 
 
 async def push_flex(to: str, alt_text: str, contents: dict[str, Any]) -> None:
     flex_message = FlexMessage(altText=alt_text, contents=FlexContainer.from_dict(contents))
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).push_message(
-            PushMessageRequest(to=to, messages=[flex_message])
-        )
+    await line_client.push(to, [flex_message])
 
 
 async def multicast_text(to: list[str], text: str) -> None:
@@ -413,10 +372,7 @@ async def multicast_text(to: list[str], text: str) -> None:
     differently by LINE. Callers with more than LINE's 500-recipient cap
     should use multicast_text_batched instead of chunking themselves.
     """
-    async with AsyncApiClient(_configuration) as client:
-        await AsyncMessagingApi(client).multicast(
-            MulticastRequest(to=to, messages=[TextMessage(text=text)])
-        )
+    await line_client.multicast(to, [TextMessage(text=text)])
 
 
 async def multicast_text_batched(to: list[str], text: str) -> tuple[list[str], list[str]]:

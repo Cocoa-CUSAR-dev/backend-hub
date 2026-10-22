@@ -61,7 +61,7 @@ async def _send(
     submit_task = AsyncMock()
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
         patch.object(intent.settings, "LLM_API_KEY", "test-key"),
         patch.object(intent.settings, "INTENT_ROUTING_ENABLED", True),

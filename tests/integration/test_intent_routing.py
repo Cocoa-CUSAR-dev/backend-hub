@@ -48,7 +48,7 @@ async def _send(
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
         patch("src.chat.router.intent.classify", new=classify),
     ):

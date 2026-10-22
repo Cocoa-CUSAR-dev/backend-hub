@@ -112,7 +112,7 @@ class TestDoubleConfirmNeverDuplicates:
             respx.mock,
             patch("src.chat.service.submit_task", new=submit_task),
             patch(
-                "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+                "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
             ) as reply_message,
             patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
             patch("src.chat.router.push_flex", new=AsyncMock()),

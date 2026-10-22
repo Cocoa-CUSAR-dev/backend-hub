@@ -46,7 +46,7 @@ async def _send_message(client: AsyncClient, *, line_user_id: str, text_content:
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
         patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
         patch("src.chat.router.push_flex", new=AsyncMock()),

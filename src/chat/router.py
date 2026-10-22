@@ -3,15 +3,6 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends
-from linebot.v3.webhooks import (
-    Event,
-    FollowEvent,
-    ImageMessageContent,
-    LocationMessageContent,
-    MessageEvent,
-    PostbackEvent,
-    TextMessageContent,
-)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +20,15 @@ from src.diary.client import generate_diary
 from src.exceptions import ConversationNotFound, UpstreamServiceError
 from src.forms.client import get_form
 from src.line import parent_picker, temp_task_picker
+from src.line.client import (
+    Event,
+    FollowEvent,
+    ImageMessageContent,
+    LocationMessageContent,
+    MessageEvent,
+    PostbackEvent,
+    TextMessageContent,
+)
 from src.line.dependencies import parse_line_events
 from src.line.service import (
     push_flex,

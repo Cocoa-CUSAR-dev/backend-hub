@@ -50,7 +50,7 @@ async def _post(client: AsyncClient, body: bytes) -> Any:
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
         # The greeting is classified before any flow runs; no LLM here.
         patch(

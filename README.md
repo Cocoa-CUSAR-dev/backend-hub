@@ -40,7 +40,7 @@ src/
 ├── db/                  # ALL SQL, one file per schema (owners listed in each file)
 ├── llm/                 # the only LiteLLM caller
 ├── chat/                # LINE door + chatbot brain (webhook, LIFF, ui/, state machine, intent, parsing)
-├── line/                # LINE helpers still to be folded into line/client.py (the one linebot importer)
+├── line/                # client.py (the one linebot importer) + service.py (outgoing messages); the rest is moving out
 ├── forms/  tasks/  diary/  sso/   # temporary clients to Kotlin/Go
 ├── reminders/  notifications/
 ├── jobs/                # cron door (/internal/cron/*) and the scheduler

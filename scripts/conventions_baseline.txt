@@ -2,13 +2,8 @@
 # Fix an item -> run `python scripts/check_conventions.py --prune`.
 # Never add lines by hand: new code must follow the conventions.
 http-exception|src/exceptions.py|uses HTTPException
-lib-outside-client|src/chat/router.py|imports linebot
 lib-outside-client|src/diary/client.py|imports httpx
 lib-outside-client|src/forms/client.py|imports httpx
-lib-outside-client|src/line/dependencies.py|imports linebot
-lib-outside-client|src/line/liff.py|imports httpx
-lib-outside-client|src/line/rich_menu.py|imports linebot
-lib-outside-client|src/line/service.py|imports linebot
 lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
 sql-outside-db|src/chat/dev_queries.py|imports sqlalchemy

@@ -15,8 +15,8 @@ def _patched_messaging_api():
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=False)
     return (
-        patch("src.line.service.AsyncApiClient", return_value=client),
-        patch("src.line.service.AsyncMessagingApi", return_value=messaging_api),
+        patch("src.line.client.AsyncApiClient", return_value=client),
+        patch("src.line.client.AsyncMessagingApi", return_value=messaging_api),
         messaging_api,
     )
 

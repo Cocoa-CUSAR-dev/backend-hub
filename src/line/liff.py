@@ -1,19 +1,20 @@
-"""LIFF ID-token verification.
-
-Not part of `line-bot-sdk` -- `linebot.v3.liff` is for managing LIFF apps
-(add/update/list), not for verifying a logged-in LIFF session's ID token.
-That's a plain REST call to LINE's own OAuth2 verify endpoint, so this uses
-httpx directly, same as src/forms and src/tasks.
+"""Which LINE Login channels' ID tokens this service accepts, and the loop that
+tries them. The REST call that verifies one token is `verify_id_token` in
+src/line/client.py.
 """
 
-from typing import Any, cast
-
-import httpx
+from typing import Any
 
 from src.config import settings
-from src.exceptions import InvalidLiffToken, UpstreamServiceError
+from src.exceptions import InvalidLiffToken
+from src.line.client import verify_id_token
 
-_VERIFY_URL = "https://api.line.me/oauth2/v2.1/verify"
+__all__ = [
+    "channel_id_from_liff_id",
+    "login_channel_ids",
+    "verify_for_any_channel",
+    "verify_id_token",
+]
 
 
 def channel_id_from_liff_id(liff_id: str) -> str:
@@ -44,23 +45,3 @@ async def verify_for_any_channel(id_token: str) -> dict[str, Any]:
         except InvalidLiffToken:
             continue
     raise InvalidLiffToken
-
-
-async def verify_id_token(id_token: str, channel_id: str) -> dict[str, Any]:
-    """Returns the decoded claims (includes `sub` -- the LINE user ID) if
-    valid. Raises InvalidLiffToken on anything else.
-    """
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            _VERIFY_URL,
-            data={"id_token": id_token, "client_id": channel_id},
-        )
-
-    if response.status_code == 400:
-        raise InvalidLiffToken
-    if response.status_code >= 400:
-        raise UpstreamServiceError(f"LINE verify endpoint returned {response.status_code}")
-
-    # httpx's .json() is typed Any (JSON content can be anything) -- LINE's
-    # verify endpoint contract guarantees an object on 200, per its own docs.
-    return cast(dict[str, Any], response.json())
