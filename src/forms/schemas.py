@@ -1,6 +1,8 @@
 from typing import Any
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, model_serializer
+from pydantic.alias_generators import to_camel
 
 
 class FormDetail(BaseModel):
@@ -23,3 +25,75 @@ class FormDetail(BaseModel):
     # one submission per task, exactly as before.
     is_multiple_submit: bool = False
     sections: list[dict[str, Any]] = []
+
+
+# --- Form definition as the app reads it (docs-and-plan#261) ---------------
+#
+# camelCase on the wire: the mobile app was built on Kotlin's Form.Detail
+# JSON (formId, sections[].questions[].fieldName, ...) and parses those keys
+# directly, so the merged backend keeps them byte-for-byte.
+
+
+class _CamelOut(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class ChoiceOut(_CamelOut):
+    id: str
+    name: str
+    # Only on a dependent question's choices; omitted otherwise (Kotlin's
+    # JsonInclude.NON_NULL), so other payloads stay unchanged.
+    parent_id: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_missing_parent(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data: dict[str, Any] = handler(self)
+        if self.parent_id is None:
+            data.pop("parentId", None)
+            data.pop("parent_id", None)
+        return data
+
+
+class QuestionOut(_CamelOut):
+    question_id: UUID
+    section_id: UUID
+    label: str | None
+    input_type: str | None
+    description: str | None
+    field_name: str | None
+    default_value: Any
+    is_mandatory: bool
+    is_active: bool
+    carry_forward: bool
+    sort_order: int | None
+    # A list only for OPTION questions; null for every other input type.
+    choices: list[ChoiceOut] | None
+    validation_rule: dict[str, Any] | None
+    # The parent field this question's choices are filtered by (plot_id ->
+    # "farm_id"); omitted when there is none.
+    depends_on: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_missing_dependency(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data: dict[str, Any] = handler(self)
+        if self.depends_on is None:
+            data.pop("dependsOn", None)
+            data.pop("depends_on", None)
+        return data
+
+
+class SectionOut(_CamelOut):
+    section_id: UUID
+    title: str | None
+    description: str | None
+    sort_order: int | None
+    is_active: bool
+    questions: list[QuestionOut]
+
+
+class FormOut(_CamelOut):
+    form_id: UUID
+    title: str | None
+    description: str | None
+    is_multiple_submit: bool
+    sections: list[SectionOut]

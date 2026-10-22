@@ -38,6 +38,11 @@ TAGS: list[dict[str, Any]] = [
     },
     {"name": "admin", "description": "Admin only: grant or remove researcher / admin roles."},
     {
+        "name": "tasks",
+        "description": "My tasks, the form to fill for each, and my answers. Task times "
+        "(open_at, close_at) are Bangkok wall-clock written with a Z, as the mobile app expects.",
+    },
+    {
         "name": "agriculture",
         "description": "Farms, plots and farm photos: register them and list mine. Photos are "
         "private; lists carry a link to each farm's newest photo, valid for an hour.",
