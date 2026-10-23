@@ -10,14 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src import db
 from tests.db.conftest import insert
 
-PROBE = "agriculture.probe_activity"
+PROBE = "agriculture.probe_rows"
 
 
 @pytest.fixture
 async def probe(db_session: AsyncSession) -> AsyncSession:
     await db_session.execute(
         text(
-            "CREATE TABLE agriculture.probe_activity ("
+            "CREATE TABLE agriculture.probe_rows ("
             " probe_id uuid DEFAULT gen_random_uuid() PRIMARY KEY,"
             " farm_id uuid NOT NULL, amount numeric, done_on date, is_organic boolean,"
             " visits integer, extra jsonb, note varchar(20))"
@@ -54,7 +54,14 @@ async def test_insert_row_casts_json_answers_to_the_column_types(probe: AsyncSes
         types,
     )
 
-    row = (await probe.execute(text("SELECT * FROM agriculture.probe_activity"))).one()
+    row = (
+        await probe.execute(
+            text(
+                "SELECT farm_id, amount, done_on, is_organic, visits, extra, note"
+                " FROM agriculture.probe_rows"
+            )
+        )
+    ).one()
     assert row.farm_id == farm_id
     assert (float(row.amount), str(row.done_on), row.is_organic, row.visits) == (
         12.5,
@@ -68,7 +75,7 @@ async def test_insert_row_casts_json_answers_to_the_column_types(probe: AsyncSes
 
 async def test_names_are_checked_before_they_reach_sql(probe: AsyncSession) -> None:
     with pytest.raises(ValueError, match="identifier"):
-        await db.handler_rows.column_types(probe, "agriculture.probe_activity; DROP")
+        await db.handler_rows.column_types(probe, "agriculture.probe_rows; DROP")
     with pytest.raises(ValueError, match="identifier"):
         await db.handler_rows.insert_row(
             probe, PROBE, {"farm_id; --": "x"}, {"farm_id; --": "uuid"}
