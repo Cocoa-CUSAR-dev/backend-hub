@@ -33,6 +33,7 @@ from src.admin.router import router as admin_router
 from src.agriculture.router import router as agriculture_router
 from src.auth.router import router as auth_router
 from src.exceptions import register_exception_handlers
+from src.forms.router import router as forms_router
 from src.internal.router import router as internal_router
 from src.line.liff_tasks import router as liff_tasks_router
 from src.line.router import router as line_router
@@ -112,6 +113,7 @@ app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(admin_router)
 app.include_router(tasks_router)
+app.include_router(forms_router)
 app.include_router(agriculture_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
