@@ -1,0 +1,167 @@
+{
+  "kid": "K-31",
+  "after": "ANL-02",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/analytics/harvest/summary/total"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/analytics/harvest/summary/total"
+  },
+  "seeds": [
+    "base",
+    "places"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "all farms",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/total",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Harvest Weight",
+        "metadata": {
+          "provinceId": null,
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "data": {
+          "label": "All Grades",
+          "value": 532.75,
+          "unit": "kg"
+        }
+      }
+    },
+    {
+      "name": "one province",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/total",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "provinceId": "30000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Harvest Weight",
+        "metadata": {
+          "provinceId": "30000000-0000-4000-8000-000000000001",
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "data": {
+          "label": "All Grades",
+          "value": 397.5,
+          "unit": "kg"
+        }
+      }
+    },
+    {
+      "name": "grade A",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/total",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "gradeCode": "A"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Harvest Weight",
+        "metadata": {
+          "provinceId": null,
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "data": {
+          "label": "Grade A",
+          "value": 355.5,
+          "unit": "kg"
+        }
+      }
+    },
+    {
+      "name": "district not in province",
+      "actor": "researcher",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/total",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "provinceId": "30000000-0000-4000-8000-000000000001",
+        "districtId": "31000000-0000-4000-8000-000000000002"
+      },
+      "body": null,
+      "response": {
+        "error": "The geographic hierarchy provided (Province/District/Subdistrict/Farm) is inconsistent or invalid."
+      }
+    },
+    {
+      "name": "missing range",
+      "actor": "researcher",
+      "status": 500,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/total",
+      "body": null,
+      "response": {
+        "error": "Internal server error"
+      },
+      "hub": {
+        "status": 422
+      }
+    },
+    {
+      "name": "forbidden",
+      "actor": "farmer_1",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/total",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/total",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T11:14:14.824+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/analytics/harvest/summary/total"
+      }
+    }
+  ]
+}

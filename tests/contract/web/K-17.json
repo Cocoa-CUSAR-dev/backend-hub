@@ -1,0 +1,89 @@
+{
+  "kid": "K-17",
+  "after": "FORM-08",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/forms/{formId}/reminder"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/{id}/reminder",
+    "params": {
+      "id": "formId"
+    }
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "form with a reminder",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001/reminder",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "scheduleId": "59000000-0000-4000-8000-000000000001",
+        "enabled": true,
+        "timeOfDay": "08:00:00",
+        "recipients": [
+          {
+            "type": "ROLE",
+            "id": "10000000-0000-4000-8000-000000000003",
+            "label": "farmer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "form without",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003/reminder",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000003"
+      },
+      "body": null,
+      "response": {
+        "scheduleId": null,
+        "enabled": false,
+        "timeOfDay": null,
+        "recipients": []
+      }
+    },
+    {
+      "name": "unknown form",
+      "actor": "researcher",
+      "status": 404,
+      "method": "GET",
+      "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999/reminder",
+      "params": {
+        "formId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": null,
+      "response": {
+        "error": "Form not found"
+      }
+    },
+    {
+      "name": "forbidden",
+      "actor": "farmer_1",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001/reminder",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

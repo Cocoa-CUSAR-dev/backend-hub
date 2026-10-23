@@ -1,0 +1,60 @@
+{
+  "kid": "K-51",
+  "after": "TASK-06",
+  "note": "Becomes diary.service.generate_for, called by tasks.service.submit; no hub route.",
+  "kotlin": {
+    "method": "POST",
+    "path": "/api/v1/service/diaries/generate"
+  },
+  "hub": null,
+  "seeds": [
+    "base",
+    "forms",
+    "answers"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "farmer with a conversation, nothing sent today",
+      "status": 404,
+      "method": "POST",
+      "path": "/api/v1/service/diaries/generate",
+      "body": {
+        "userId": "20000000-0000-4000-8000-000000000003"
+      },
+      "response": {
+        "error": "No submissions on 2026-10-23 to generate a diary from"
+      },
+      "service_key": true
+    },
+    {
+      "name": "farmer without a conversation",
+      "status": 403,
+      "method": "POST",
+      "path": "/api/v1/service/diaries/generate",
+      "body": {
+        "userId": "20000000-0000-4000-8000-000000000004"
+      },
+      "response": {
+        "error": "No chatbot conversation found for this user"
+      },
+      "service_key": true
+    },
+    {
+      "name": "wrong service key",
+      "status": 401,
+      "method": "POST",
+      "path": "/api/v1/service/diaries/generate",
+      "body": {
+        "userId": "20000000-0000-4000-8000-000000000003"
+      },
+      "response": {
+        "timestamp": "2026-10-23T11:14:25.849+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/service/diaries/generate"
+      },
+      "service_key": true
+    }
+  ]
+}

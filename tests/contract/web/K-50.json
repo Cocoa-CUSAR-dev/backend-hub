@@ -1,0 +1,158 @@
+{
+  "kid": "K-50",
+  "after": "FORM-02",
+  "note": "Becomes an in-process call (forms.service.get); no hub route to replay against.",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/service/forms/{formId}"
+  },
+  "hub": null,
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "chatbot reads a form",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/service/forms/51000000-0000-4000-8000-000000000001",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "formId": "51000000-0000-4000-8000-000000000001",
+        "title": "บันทึกยอดส่งโกโก้",
+        "description": "ส่งผลผลิตที่จุดรวบรวม",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "sectionId": "52000000-0000-4000-8000-000000000001",
+            "title": "การส่งผลผลิต",
+            "description": null,
+            "sortOrder": 1,
+            "isActive": true,
+            "questions": [
+              {
+                "questionId": "53000000-0000-4000-8000-000000000001",
+                "sectionId": "52000000-0000-4000-8000-000000000001",
+                "label": "เลือกฟาร์มที่จัดส่ง",
+                "inputType": "OPTION",
+                "description": null,
+                "fieldName": "farm_id",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": true,
+                "sortOrder": 0,
+                "choices": [
+                  {
+                    "id": "40000000-0000-4000-8000-000000000001",
+                    "name": "สวนโกโก้ชุมพร"
+                  },
+                  {
+                    "id": "40000000-0000-4000-8000-000000000002",
+                    "name": "สวนโกโก้แม่ริม"
+                  }
+                ],
+                "validationRule": null
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000002",
+                "sectionId": "52000000-0000-4000-8000-000000000001",
+                "label": "หน่วยรวบรวมที่จัดส่ง",
+                "inputType": "OPTION",
+                "description": null,
+                "fieldName": "hub_id",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 1,
+                "choices": [
+                  {
+                    "id": "42000000-0000-4000-8000-000000000001",
+                    "name": "จุดรวบรวมท่าตะเภา"
+                  }
+                ],
+                "validationRule": null
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000003",
+                "sectionId": "52000000-0000-4000-8000-000000000001",
+                "label": "วันที่ส่งมา",
+                "inputType": "DATE",
+                "description": null,
+                "fieldName": "harvest_date",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 2,
+                "choices": null,
+                "validationRule": {
+                  "errorMessage": "ห้ามระบุวันที่ในอนาคต",
+                  "maxDate": "today",
+                  "type": "DATE"
+                }
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000004",
+                "sectionId": "52000000-0000-4000-8000-000000000001",
+                "label": "อธิบายการขนส่ง",
+                "inputType": "VARCHAR",
+                "description": "ไม่บังคับ",
+                "fieldName": "logistic_result",
+                "defaultValue": null,
+                "isMandatory": false,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 3,
+                "choices": null,
+                "validationRule": {
+                  "errorMessage": "กรุณากรอกไม่เกิน 500 ตัวอักษร",
+                  "type": "VARCHAR",
+                  "maxLength": 500
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "service_key": true
+    },
+    {
+      "name": "wrong service key",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/service/forms/51000000-0000-4000-8000-000000000001",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T11:14:03.472+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/service/forms/51000000-0000-4000-8000-000000000001"
+      },
+      "service_key": true
+    },
+    {
+      "name": "unknown form",
+      "status": 404,
+      "method": "GET",
+      "path": "/api/v1/service/forms/5f000000-0000-4000-8000-000000000999",
+      "params": {
+        "formId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": null,
+      "response": {
+        "error": "Form not found"
+      },
+      "service_key": true
+    }
+  ]
+}

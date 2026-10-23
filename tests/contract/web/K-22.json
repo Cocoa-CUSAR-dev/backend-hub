@@ -1,0 +1,106 @@
+{
+  "kid": "K-22",
+  "after": "FORM-02",
+  "note": "Kotlin takes a task id; FORM-02 takes a form id (docs-and-plan#271), so the replay sends the task's form id (hub.params form_of:taskId).",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/tasks/{taskId}"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/{id}",
+    "query": {
+      "include": "stats"
+    },
+    "params": {
+      "id": "form_of:taskId"
+    }
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "task 1",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "title": "บันทึกยอดส่งโกโก้",
+        "description": "ส่งผลผลิตที่จุดรวบรวม",
+        "taskType": "FORM",
+        "openAt": "2026-09-01T00:00:00",
+        "closeAt": "2026-12-31T16:59:59"
+      }
+    },
+    {
+      "name": "task without form",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000005",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000005"
+      },
+      "body": null,
+      "response": {
+        "taskId": "50000000-0000-4000-8000-000000000005",
+        "title": "งานไม่มีแบบฟอร์ม",
+        "description": "no form",
+        "taskType": "TASK",
+        "openAt": "2026-10-10T00:00:00",
+        "closeAt": null
+      }
+    },
+    {
+      "name": "unknown task",
+      "actor": "researcher",
+      "status": 404,
+      "method": "GET",
+      "path": "/api/v1/tasks/5f000000-0000-4000-8000-000000000999",
+      "params": {
+        "taskId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": null,
+      "response": {
+        "error": "Task Not Found"
+      }
+    },
+    {
+      "name": "forbidden",
+      "actor": "farmer_1",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T11:14:03.243+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001"
+      }
+    }
+  ]
+}

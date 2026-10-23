@@ -1,0 +1,198 @@
+{
+  "kid": "K-25",
+  "after": "FORM-12",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/tasks/{taskId}/review"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/{id}/responses",
+    "query": {
+      "view": "review"
+    },
+    "params": {
+      "id": "form_of:taskId"
+    }
+  },
+  "seeds": [
+    "base",
+    "forms",
+    "answers"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "task 1",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": [
+        {
+          "responseId": "54000000-0000-4000-8000-000000000004",
+          "submitter": "สมหญิง รักสวน",
+          "submittedAt": "2026-10-06T04:00:00",
+          "fields": [
+            {
+              "fieldName": "farm_id",
+              "label": "เลือกฟาร์มที่จัดส่ง",
+              "inputType": "OPTION",
+              "value": "40000000-0000-4000-8000-000000000002",
+              "source": null,
+              "editable": false
+            },
+            {
+              "fieldName": "hub_id",
+              "label": "หน่วยรวบรวมที่จัดส่ง",
+              "inputType": "OPTION",
+              "value": "42000000-0000-4000-8000-000000000001",
+              "source": null,
+              "editable": false
+            },
+            {
+              "fieldName": "harvest_date",
+              "label": "วันที่ส่งมา",
+              "inputType": "DATE",
+              "value": "2026-10-06",
+              "source": null,
+              "editable": true
+            },
+            {
+              "fieldName": "logistic_result",
+              "label": "อธิบายการขนส่ง",
+              "inputType": "VARCHAR",
+              "value": null,
+              "source": null,
+              "editable": true
+            }
+          ]
+        },
+        {
+          "responseId": "54000000-0000-4000-8000-000000000001",
+          "submitter": "สมชาย ใจดี",
+          "submittedAt": "2026-10-05T02:30:00",
+          "fields": [
+            {
+              "fieldName": "farm_id",
+              "label": "เลือกฟาร์มที่จัดส่ง",
+              "inputType": "OPTION",
+              "value": "40000000-0000-4000-8000-000000000001",
+              "source": null,
+              "editable": false
+            },
+            {
+              "fieldName": "hub_id",
+              "label": "หน่วยรวบรวมที่จัดส่ง",
+              "inputType": "OPTION",
+              "value": "42000000-0000-4000-8000-000000000001",
+              "source": null,
+              "editable": false
+            },
+            {
+              "fieldName": "harvest_date",
+              "label": "วันที่ส่งมา",
+              "inputType": "DATE",
+              "value": "2026-10-05",
+              "source": null,
+              "editable": true
+            },
+            {
+              "fieldName": "logistic_result",
+              "label": "อธิบายการขนส่ง",
+              "inputType": "VARCHAR",
+              "value": "รถกระบะ",
+              "source": null,
+              "editable": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "page of one",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001"
+      },
+      "query": {
+        "page": "0",
+        "size": "1"
+      },
+      "body": null,
+      "response": [
+        {
+          "responseId": "54000000-0000-4000-8000-000000000004",
+          "submitter": "สมหญิง รักสวน",
+          "submittedAt": "2026-10-06T04:00:00",
+          "fields": [
+            {
+              "fieldName": "farm_id",
+              "label": "เลือกฟาร์มที่จัดส่ง",
+              "inputType": "OPTION",
+              "value": "40000000-0000-4000-8000-000000000002",
+              "source": null,
+              "editable": false
+            },
+            {
+              "fieldName": "hub_id",
+              "label": "หน่วยรวบรวมที่จัดส่ง",
+              "inputType": "OPTION",
+              "value": "42000000-0000-4000-8000-000000000001",
+              "source": null,
+              "editable": false
+            },
+            {
+              "fieldName": "harvest_date",
+              "label": "วันที่ส่งมา",
+              "inputType": "DATE",
+              "value": "2026-10-06",
+              "source": null,
+              "editable": true
+            },
+            {
+              "fieldName": "logistic_result",
+              "label": "อธิบายการขนส่ง",
+              "inputType": "VARCHAR",
+              "value": null,
+              "source": null,
+              "editable": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unknown task",
+      "actor": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/tasks/5f000000-0000-4000-8000-000000000999/review",
+      "params": {
+        "taskId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": null,
+      "response": []
+    },
+    {
+      "name": "forbidden",
+      "actor": "farmer_1",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

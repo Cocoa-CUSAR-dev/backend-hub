@@ -1,0 +1,188 @@
+{
+  "kid": "K-36",
+  "after": "ANL-05",
+  "note": "",
+  "kotlin": {
+    "method": "POST",
+    "path": "/api/v1/analytics/harvest/spatial/time-series/delta"
+  },
+  "hub": {
+    "method": "POST",
+    "path": "/api/v1/analytics/harvest/spatial/time-series/delta"
+  },
+  "seeds": [
+    "base",
+    "places"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "drawn area around Chumphon",
+      "actor": "researcher",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/delta",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Harvest Weight per Month",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              95.0,
+              140.0
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade B",
+            "values": [
+              30.0,
+              0.0,
+              0.0
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade C",
+            "values": [
+              0.0,
+              0.0,
+              12.0
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no area",
+      "actor": "researcher",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/delta",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {},
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Harvest Weight per Month",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              95.0,
+              140.0
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade B",
+            "values": [
+              30.0,
+              60.0,
+              75.25
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade C",
+            "values": [
+              0.0,
+              0.0,
+              12.0
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "grade A in the area",
+      "actor": "researcher",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/delta",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "gradeCode": "A"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Harvest Weight per Month",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              95.0,
+              140.0
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "forbidden",
+      "actor": "farmer_1",
+      "status": 403,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/delta",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/delta",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "timestamp": "2026-10-23T11:14:17.139+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/analytics/harvest/spatial/time-series/delta"
+      }
+    }
+  ]
+}

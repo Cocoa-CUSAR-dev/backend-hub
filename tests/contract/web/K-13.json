@@ -1,0 +1,352 @@
+{
+  "kid": "K-13",
+  "after": "FORM-04",
+  "note": "",
+  "kotlin": {
+    "method": "PUT",
+    "path": "/api/v1/forms/{formId}"
+  },
+  "hub": {
+    "method": "PUT",
+    "path": "/api/v1/forms/{id}",
+    "params": {
+      "id": "formId"
+    }
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "rename a question and add one",
+      "actor": "researcher",
+      "status": 200,
+      "method": "PUT",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "description": "แก้คำอธิบาย",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "sectionId": "52000000-0000-4000-8000-000000000001",
+            "title": "การส่งผลผลิต",
+            "description": null,
+            "isActive": true,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "questionId": "53000000-0000-4000-8000-000000000001",
+                "label": "ฟาร์มที่ส่ง",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "farm_id",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 0
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000002",
+                "label": "หน่วยรวบรวมที่จัดส่ง",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "hub_id",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 1
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000003",
+                "label": "วันที่ส่งมา",
+                "description": null,
+                "inputType": "DATE",
+                "fieldName": "harvest_date",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 2
+              },
+              {
+                "questionId": null,
+                "label": "แปลงที่เก็บ",
+                "description": "ใหม่",
+                "inputType": "OPTION",
+                "fieldName": "plot_id",
+                "isMandatory": false,
+                "isActive": true,
+                "sortOrder": 3
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "formId": "51000000-0000-4000-8000-000000000001",
+        "title": "บันทึกยอดส่งโกโก้",
+        "description": "แก้คำอธิบาย",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "sectionId": "52000000-0000-4000-8000-000000000001",
+            "title": "การส่งผลผลิต",
+            "description": null,
+            "sortOrder": 1,
+            "isActive": true,
+            "questions": [
+              {
+                "questionId": "53000000-0000-4000-8000-000000000001",
+                "sectionId": "52000000-0000-4000-8000-000000000001",
+                "label": "ฟาร์มที่ส่ง",
+                "inputType": "OPTION",
+                "description": null,
+                "fieldName": "farm_id",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": true,
+                "sortOrder": 0,
+                "choices": [
+                  {
+                    "id": "40000000-0000-4000-8000-000000000001",
+                    "name": "สวนโกโก้ชุมพร"
+                  },
+                  {
+                    "id": "40000000-0000-4000-8000-000000000002",
+                    "name": "สวนโกโก้แม่ริม"
+                  }
+                ],
+                "validationRule": null
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000002",
+                "sectionId": "52000000-0000-4000-8000-000000000001",
+                "label": "หน่วยรวบรวมที่จัดส่ง",
+                "inputType": "OPTION",
+                "description": null,
+                "fieldName": "hub_id",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 1,
+                "choices": [
+                  {
+                    "id": "42000000-0000-4000-8000-000000000001",
+                    "name": "จุดรวบรวมท่าตะเภา"
+                  }
+                ],
+                "validationRule": null
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000003",
+                "sectionId": "52000000-0000-4000-8000-000000000001",
+                "label": "วันที่ส่งมา",
+                "inputType": "DATE",
+                "description": null,
+                "fieldName": "harvest_date",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 2,
+                "choices": null,
+                "validationRule": {
+                  "errorMessage": "ห้ามระบุวันที่ในอนาคต",
+                  "maxDate": "today",
+                  "type": "DATE"
+                }
+              },
+              {
+                "questionId": "61c31f48-e7e4-42a9-9052-d25c9f14966c",
+                "sectionId": "52000000-0000-4000-8000-000000000001",
+                "label": "แปลงที่เก็บ",
+                "inputType": "OPTION",
+                "description": "ใหม่",
+                "fieldName": "plot_id",
+                "defaultValue": null,
+                "isMandatory": false,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 3,
+                "choices": [
+                  {
+                    "id": "41000000-0000-4000-8000-000000000001",
+                    "name": "แปลง A",
+                    "parentId": "40000000-0000-4000-8000-000000000001"
+                  },
+                  {
+                    "id": "41000000-0000-4000-8000-000000000002",
+                    "name": "แปลง B",
+                    "parentId": "40000000-0000-4000-8000-000000000001"
+                  },
+                  {
+                    "id": "41000000-0000-4000-8000-000000000003",
+                    "name": "แปลงเดียว",
+                    "parentId": "40000000-0000-4000-8000-000000000002"
+                  }
+                ],
+                "validationRule": null,
+                "dependsOn": "farm_id"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "no sections",
+      "actor": "researcher",
+      "status": 400,
+      "method": "PUT",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "description": "แก้คำอธิบาย",
+        "isMultipleSubmit": false,
+        "sections": []
+      },
+      "response": {
+        "error": "A form must have at least one section"
+      }
+    },
+    {
+      "name": "unknown form",
+      "actor": "researcher",
+      "status": 404,
+      "method": "PUT",
+      "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999",
+      "params": {
+        "formId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": {
+        "description": "แก้คำอธิบาย",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "sectionId": "52000000-0000-4000-8000-000000000001",
+            "title": "การส่งผลผลิต",
+            "description": null,
+            "isActive": true,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "questionId": "53000000-0000-4000-8000-000000000001",
+                "label": "ฟาร์มที่ส่ง",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "farm_id",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 0
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000002",
+                "label": "หน่วยรวบรวมที่จัดส่ง",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "hub_id",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 1
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000003",
+                "label": "วันที่ส่งมา",
+                "description": null,
+                "inputType": "DATE",
+                "fieldName": "harvest_date",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 2
+              },
+              {
+                "questionId": null,
+                "label": "แปลงที่เก็บ",
+                "description": "ใหม่",
+                "inputType": "OPTION",
+                "fieldName": "plot_id",
+                "isMandatory": false,
+                "isActive": true,
+                "sortOrder": 3
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "error": "Form not found"
+      }
+    },
+    {
+      "name": "forbidden",
+      "actor": "farmer_1",
+      "status": 403,
+      "method": "PUT",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "description": "แก้คำอธิบาย",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "sectionId": "52000000-0000-4000-8000-000000000001",
+            "title": "การส่งผลผลิต",
+            "description": null,
+            "isActive": true,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "questionId": "53000000-0000-4000-8000-000000000001",
+                "label": "ฟาร์มที่ส่ง",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "farm_id",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 0
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000002",
+                "label": "หน่วยรวบรวมที่จัดส่ง",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "hub_id",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 1
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000003",
+                "label": "วันที่ส่งมา",
+                "description": null,
+                "inputType": "DATE",
+                "fieldName": "harvest_date",
+                "isMandatory": true,
+                "isActive": true,
+                "sortOrder": 2
+              },
+              {
+                "questionId": null,
+                "label": "แปลงที่เก็บ",
+                "description": "ใหม่",
+                "inputType": "OPTION",
+                "fieldName": "plot_id",
+                "isMandatory": false,
+                "isActive": true,
+                "sortOrder": 3
+              }
+            ]
+          }
+        ]
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

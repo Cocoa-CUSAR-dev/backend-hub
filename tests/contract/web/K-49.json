@@ -1,0 +1,60 @@
+{
+  "kid": "K-49",
+  "after": "ADMIN-04",
+  "note": "",
+  "kotlin": {
+    "method": "DELETE",
+    "path": "/api/v1/researchers/{userId}"
+  },
+  "hub": {
+    "method": "DELETE",
+    "path": "/api/v1/admin/researchers/{id}",
+    "params": {
+      "id": "userId"
+    }
+  },
+  "seeds": [
+    "base"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "remove one",
+      "actor": "admin",
+      "status": 200,
+      "method": "DELETE",
+      "path": "/api/v1/researchers/20000000-0000-4000-8000-000000000008",
+      "params": {
+        "userId": "20000000-0000-4000-8000-000000000008"
+      },
+      "body": null,
+      "response": "Successfully deleted researcher"
+    },
+    {
+      "name": "unknown user",
+      "actor": "admin",
+      "status": 404,
+      "method": "DELETE",
+      "path": "/api/v1/researchers/5f000000-0000-4000-8000-000000000999",
+      "params": {
+        "userId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": null,
+      "response": {
+        "error": "Researcher not found or do not have access"
+      }
+    },
+    {
+      "name": "forbidden",
+      "actor": "researcher",
+      "status": 403,
+      "method": "DELETE",
+      "path": "/api/v1/researchers/20000000-0000-4000-8000-000000000008",
+      "params": {
+        "userId": "20000000-0000-4000-8000-000000000008"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}
