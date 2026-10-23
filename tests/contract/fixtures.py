@@ -28,7 +28,8 @@ HERE = Path(__file__).parent
 WEB = HERE / "web"
 SEED_DIR = WEB / "seed"
 # Load order; a fixture names the files it needs and they load in this order.
-SEED_ORDER = ("base", "places", "forms", "answers")
+# "reference" (rows the migrations insert) is always loaded, first.
+SEED_ORDER = ("reference", "base", "places", "forms", "answers")
 
 # Kotlin status -> the status backend-hub answers for the same case.
 STATUS_MAP = {400: 422}
@@ -123,7 +124,7 @@ def dump(fx: Fixture) -> str:
 
 
 def seed_sql(names: Iterable[str]) -> list[str]:
-    wanted = set(names)
+    wanted = {"reference", *names}
     return [(SEED_DIR / f"{n}.sql").read_text(encoding="utf-8") for n in SEED_ORDER if n in wanted]
 
 
@@ -208,7 +209,8 @@ def compare(case: Case, status: int, body: Any, recorded_on: date, today: date) 
     want = expected_status(case)
     if status != want:
         return Diff(False, f"status {status}, expected {want} (Kotlin answered {case.status})")
-    if case.status >= 400 or case.hub.get("compare") == "status":
+    # Error answers are compared by status only, on either side.
+    if case.status >= 400 or want >= 400 or case.hub.get("compare") == "status":
         return Diff(True)
     known = known_ids(case)
     ignore = case.hub.get("ignore", [])

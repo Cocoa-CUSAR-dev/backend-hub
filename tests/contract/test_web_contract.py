@@ -15,7 +15,6 @@ from typing import Any
 from uuid import UUID
 
 import pytest
-from fastapi.routing import APIRoute
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,9 +40,9 @@ FIXTURES = all_fixtures()
 
 
 def _served(method: str, path: str) -> bool:
-    return any(
-        isinstance(r, APIRoute) and r.path == path and method in r.methods for r in app.routes
-    )
+    """Whether the app has this route. Read from the OpenAPI paths: FastAPI
+    nests included routers, so app.routes doesn't list them flat."""
+    return method.lower() in app.openapi().get("paths", {}).get(path, {})
 
 
 def _skip_reason(fx: Fixture) -> str | None:

@@ -77,6 +77,13 @@ def test_status_override_wins() -> None:
     assert compare(overridden(500, 422), 422, {"detail": "y"}, TODAY, TODAY).ok
 
 
+def test_an_override_to_an_error_compares_the_status_only() -> None:
+    kotlin = Case(
+        name="c", status=200, method="GET", path="/x", response={"a": 1}, hub={"status": 404}
+    )
+    assert compare(kotlin, 404, {"detail": "Form not found"}, TODAY, TODAY).ok
+
+
 def test_body_must_match_after_masking() -> None:
     kotlin = case(200, {"formId": NEW, "title": "a"})
     assert compare(
@@ -129,7 +136,8 @@ def test_seed_tables_are_found_in_load_order() -> None:
     from tests.contract.fixtures import seed_tables
 
     tables = seed_tables(["answers", "base"])
-    assert tables[0] == "ref.province_constant"
+    assert tables[0].startswith("form.field_")  # reference.sql always loads first
+    assert "ref.province_constant" in tables
     assert "form.response" in tables
     assert "collection.harvest" not in tables
 
