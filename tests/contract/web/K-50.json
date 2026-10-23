@@ -47,16 +47,7 @@
                 "isActive": true,
                 "carryForward": true,
                 "sortOrder": 0,
-                "choices": [
-                  {
-                    "id": "40000000-0000-4000-8000-000000000001",
-                    "name": "สวนโกโก้ชุมพร"
-                  },
-                  {
-                    "id": "40000000-0000-4000-8000-000000000002",
-                    "name": "สวนโกโก้แม่ริม"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -71,12 +62,7 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 1,
-                "choices": [
-                  {
-                    "id": "42000000-0000-4000-8000-000000000001",
-                    "name": "จุดรวบรวมท่าตะเภา"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -133,7 +119,7 @@
       },
       "body": null,
       "response": {
-        "timestamp": "2026-10-23T11:14:03.472+00:00",
+        "timestamp": "2026-10-23T12:37:22.264+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/service/forms/51000000-0000-4000-8000-000000000001"

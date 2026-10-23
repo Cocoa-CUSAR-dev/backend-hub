@@ -8,11 +8,11 @@
   },
   "hub": {
     "method": "PATCH",
-    "path": "/api/v1/forms/{id}/responses/{rid}/fields/{field}",
+    "path": "/api/v1/forms/{form_id}/responses/{response_id}/fields/{field_name}",
     "params": {
-      "id": "form_of:taskId",
-      "rid": "responseId",
-      "field": "fieldName"
+      "form_id": "form_of:taskId",
+      "response_id": "responseId",
+      "field_name": "fieldName"
     }
   },
   "seeds": [
@@ -24,10 +24,10 @@
   "cases": [
     {
       "name": "fix a text field",
-      "actor": "researcher",
       "status": 200,
       "method": "PATCH",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000001/fields/logistic_result",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000001",
@@ -48,10 +48,10 @@
     },
     {
       "name": "fix a date",
-      "actor": "researcher",
       "status": 200,
       "method": "PATCH",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000004/fields/harvest_date",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000004",
@@ -71,10 +71,10 @@
     },
     {
       "name": "not a date",
-      "actor": "researcher",
       "status": 400,
       "method": "PATCH",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000004/fields/harvest_date",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000004",
@@ -89,10 +89,10 @@
     },
     {
       "name": "choice fields can't be edited",
-      "actor": "researcher",
       "status": 400,
       "method": "PATCH",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000001/fields/farm_id",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000001",
@@ -107,10 +107,10 @@
     },
     {
       "name": "unknown field",
-      "actor": "researcher",
       "status": 400,
       "method": "PATCH",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000001/fields/nope",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000001",
@@ -125,10 +125,10 @@
     },
     {
       "name": "unknown answer",
-      "actor": "researcher",
       "status": 404,
       "method": "PATCH",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/5f000000-0000-4000-8000-000000000999/fields/logistic_result",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "5f000000-0000-4000-8000-000000000999",
@@ -143,10 +143,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "PATCH",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000001/fields/logistic_result",
+      "actor": "farmer_1",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000001",

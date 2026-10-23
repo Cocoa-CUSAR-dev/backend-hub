@@ -17,10 +17,10 @@
   "cases": [
     {
       "name": "admin",
-      "actor": "admin",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/researchers",
+      "actor": "admin",
       "body": null,
       "response": [
         {
@@ -39,10 +39,10 @@
     },
     {
       "name": "by organization",
-      "actor": "admin",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/researchers",
+      "actor": "admin",
       "query": {
         "organization": "CUSAR"
       },
@@ -58,10 +58,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "researcher",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/researchers",
+      "actor": "researcher",
       "body": null,
       "response": "Access Denied: You do not have the required permissions."
     },
@@ -72,7 +72,7 @@
       "path": "/api/v1/researchers",
       "body": null,
       "response": {
-        "timestamp": "2026-10-23T11:14:23.999+00:00",
+        "timestamp": "2026-10-23T12:37:44.528+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/researchers"

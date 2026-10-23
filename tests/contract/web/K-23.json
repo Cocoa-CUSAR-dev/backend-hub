@@ -8,9 +8,9 @@
   },
   "hub": {
     "method": "GET",
-    "path": "/api/v1/forms/{id}/responses",
+    "path": "/api/v1/forms/{form_id}/responses",
     "params": {
-      "id": "form_of:taskId"
+      "form_id": "form_of:taskId"
     }
   },
   "seeds": [
@@ -22,10 +22,10 @@
   "cases": [
     {
       "name": "task 1",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001"
       },
@@ -83,10 +83,10 @@
     },
     {
       "name": "multi-submit task",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000002/responses",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000002"
       },
@@ -135,10 +135,10 @@
     },
     {
       "name": "page of one",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001"
       },
@@ -188,10 +188,10 @@
     },
     {
       "name": "unknown task",
-      "actor": "researcher",
       "status": 404,
       "method": "GET",
       "path": "/api/v1/tasks/5f000000-0000-4000-8000-000000000999/responses",
+      "actor": "researcher",
       "params": {
         "taskId": "5f000000-0000-4000-8000-000000000999"
       },
@@ -202,10 +202,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses",
+      "actor": "farmer_1",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001"
       },

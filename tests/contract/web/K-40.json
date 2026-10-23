@@ -18,10 +18,10 @@
   "cases": [
     {
       "name": "drawn area around Chumphon",
-      "actor": "researcher",
       "status": 200,
       "method": "POST",
       "path": "/api/v1/analytics/harvest/spatial/summary/total",
+      "actor": "researcher",
       "query": {
         "from": "2026-08",
         "to": "2026-10"
@@ -45,10 +45,10 @@
     },
     {
       "name": "no area",
-      "actor": "researcher",
       "status": 200,
       "method": "POST",
       "path": "/api/v1/analytics/harvest/spatial/summary/total",
+      "actor": "researcher",
       "query": {
         "from": "2026-08",
         "to": "2026-10"
@@ -70,10 +70,10 @@
     },
     {
       "name": "grade A in the area",
-      "actor": "researcher",
       "status": 200,
       "method": "POST",
       "path": "/api/v1/analytics/harvest/spatial/summary/total",
+      "actor": "researcher",
       "query": {
         "from": "2026-08",
         "to": "2026-10",
@@ -98,10 +98,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "POST",
       "path": "/api/v1/analytics/harvest/spatial/summary/total",
+      "actor": "farmer_1",
       "query": {
         "from": "2026-08",
         "to": "2026-10"
@@ -124,7 +124,7 @@
         "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
       },
       "response": {
-        "timestamp": "2026-10-23T11:14:22.107+00:00",
+        "timestamp": "2026-10-23T12:37:42.403+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/analytics/harvest/spatial/summary/total"

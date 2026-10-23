@@ -18,10 +18,10 @@
   "cases": [
     {
       "name": "harvest",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/handlers/harvest/fields",
+      "actor": "researcher",
       "params": {
         "handler": "harvest"
       },
@@ -114,10 +114,10 @@
     },
     {
       "name": "child handler",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/handlers/harvest_grade_detail/fields",
+      "actor": "researcher",
       "params": {
         "handler": "harvest_grade_detail"
       },
@@ -262,10 +262,10 @@
     },
     {
       "name": "unknown handler",
-      "actor": "researcher",
       "status": 400,
       "method": "GET",
       "path": "/api/v1/forms/handlers/no_such_handler/fields",
+      "actor": "researcher",
       "params": {
         "handler": "no_such_handler"
       },
@@ -276,10 +276,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/forms/handlers/harvest/fields",
+      "actor": "farmer_1",
       "params": {
         "handler": "harvest"
       },

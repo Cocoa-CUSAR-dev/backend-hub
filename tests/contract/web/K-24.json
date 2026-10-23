@@ -8,10 +8,10 @@
   },
   "hub": {
     "method": "GET",
-    "path": "/api/v1/forms/{id}/responses/{rid}",
+    "path": "/api/v1/forms/{form_id}/responses/{response_id}",
     "params": {
-      "id": "form_of:taskId",
-      "rid": "responseId"
+      "form_id": "form_of:taskId",
+      "response_id": "responseId"
     }
   },
   "seeds": [
@@ -23,10 +23,10 @@
   "cases": [
     {
       "name": "one answer",
-      "actor": "researcher",
       "status": 404,
       "method": "GET",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses/54000000-0000-4000-8000-000000000001",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000001"
@@ -42,10 +42,10 @@
     },
     {
       "name": "answer of another task",
-      "actor": "researcher",
       "status": 404,
       "method": "GET",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses/54000000-0000-4000-8000-000000000002",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000002"
@@ -57,10 +57,10 @@
     },
     {
       "name": "unknown answer",
-      "actor": "researcher",
       "status": 404,
       "method": "GET",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses/5f000000-0000-4000-8000-000000000999",
+      "actor": "researcher",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "5f000000-0000-4000-8000-000000000999"
@@ -72,10 +72,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses/54000000-0000-4000-8000-000000000001",
+      "actor": "farmer_1",
       "params": {
         "taskId": "50000000-0000-4000-8000-000000000001",
         "responseId": "54000000-0000-4000-8000-000000000001"

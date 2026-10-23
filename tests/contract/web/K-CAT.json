@@ -19,10 +19,10 @@
   "cases": [
     {
       "name": "researcher",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/handlers/catalog",
+      "actor": "researcher",
       "body": null,
       "response": {
         "handlers": [
@@ -1656,10 +1656,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/forms/handlers/catalog",
+      "actor": "farmer_1",
       "body": null,
       "response": "Access Denied: You do not have the required permissions."
     },
@@ -1670,7 +1670,7 @@
       "path": "/api/v1/forms/handlers/catalog",
       "body": null,
       "response": {
-        "timestamp": "2026-10-23T11:14:08.150+00:00",
+        "timestamp": "2026-10-23T12:37:28.020+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/forms/handlers/catalog"

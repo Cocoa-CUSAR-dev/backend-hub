@@ -1,0 +1,51 @@
+-- Contract seed 0/5: reference rows the database repo's migrations insert
+-- (V16 validation rules, V30 field dependencies), which a database built from
+-- tests/resources/schema.sql doesn't have. Load it first. On a database built
+-- from the migrations every row already exists, so it changes nothing there.
+INSERT INTO form.field_dependency (child_field, parent_field, link_table, link_column, label_th) VALUES ('plot_id', 'farm_id', 'agriculture.plot', 'farm_id', 'แปลงต้องอยู่ในฟาร์มที่เลือก') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_dependency (child_field, parent_field, link_table, link_column, label_th) VALUES ('district_id', 'province_id', 'ref.district_constant', 'province_id', 'อำเภอต้องอยู่ในจังหวัดที่เลือก') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_dependency (child_field, parent_field, link_table, link_column, label_th) VALUES ('subdistrict_id', 'district_id', 'ref.subdistrict_constant', 'district_id', 'ตำบลต้องอยู่ในอำเภอที่เลือก') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('amount', '{"max": 1000, "min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกปริมาณ 0-1,000"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('bean_color_inside', '{"type": "VARCHAR", "maxLength": 200, "errorMessage": "กรุณากรอกไม่เกิน 200 ตัวอักษร"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('bean_color_outside', '{"type": "VARCHAR", "maxLength": 200, "errorMessage": "กรุณากรอกไม่เกิน 200 ตัวอักษร"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('cut_test_result', '{"type": "VARCHAR", "maxLength": 500, "errorMessage": "กรุณากรอกไม่เกิน 500 ตัวอักษร"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('description', '{"type": "VARCHAR", "maxLength": 500, "errorMessage": "กรุณากรอกไม่เกิน 500 ตัวอักษร"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('ends_at', '{"type": "DATETIME", "maxDate": "today", "errorMessage": "ห้ามระบุเวลาที่ยังไม่ถึง"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('fan_count', '{"max": 50, "min": 0, "type": "INT", "integerOnly": true, "errorMessage": "กรุณากรอกจำนวนพัดลมเป็นจำนวนเต็ม 0-50"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('fan_power', '{"max": 5000, "min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกกำลังไฟฟ้า 0-5,000 (วัตต์)"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('gis', '{"type": "GEODATA", "validLatLng": true, "errorMessage": "พิกัดไม่ถูกต้อง"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('harvest_date', '{"type": "DATE", "maxDate": "today", "errorMessage": "ห้ามระบุวันที่ในอนาคต"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('humi', '{"max": 100, "min": 0, "type": "FLOAT", "errorMessage": "ความชื้นต้องอยู่ระหว่าง 0-100%"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('logistic_result', '{"type": "VARCHAR", "maxLength": 500, "errorMessage": "กรุณากรอกไม่เกิน 500 ตัวอักษร"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('management_method', '{"type": "VARCHAR", "maxLength": 500, "errorMessage": "กรุณากรอกไม่เกิน 500 ตัวอักษร"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('notes', '{"type": "VARCHAR", "maxLength": 500, "errorMessage": "กรุณากรอกไม่เกิน 500 ตัวอักษร"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('quantity_kg', '{"max": 5000, "min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกปริมาณ 0-5,000 (กก.)"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('smell', '{"type": "VARCHAR", "maxLength": 200, "errorMessage": "กรุณากรอกไม่เกิน 200 ตัวอักษร"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('started_at', '{"type": "DATETIME", "maxDate": "today", "errorMessage": "ห้ามระบุเวลาที่ยังไม่ถึง"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('tank_volume_liter', '{"max": 10000, "min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกขนาดถัง 0-10,000 (ลิตร)"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('temp_inside', '{"max": 100, "min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกอุณหภูมิ 0-100 (องศาเซลเซียส)"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('temp_outside', '{"max": 60, "min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกอุณหภูมิ 0-60 (องศาเซลเซียส)"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('weight_gram_per_pod', '{"max": 500, "min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกน้ำหนัก 0-500 (กรัม)"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('plant_cost_per_tree', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('hole_filler_amount_g', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('hole_filler_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('prep_area_labor_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('dig_hole_labor_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('planting_labor_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('watering_system_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('fertilizer_use_times_per_year', '{"min": 0, "type": "INT", "integerOnly": true, "errorMessage": "กรุณากรอกจำนวนเต็มตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('fertilizer_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('chem_bio_use_times_per_year', '{"min": 0, "type": "INT", "integerOnly": true, "errorMessage": "กรุณากรอกจำนวนเต็มตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('chem_bio_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('weeding_times_per_year', '{"min": 0, "type": "INT", "integerOnly": true, "errorMessage": "กรุณากรอกจำนวนเต็มตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('weeding_labor_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('pruning_times_per_year', '{"min": 0, "type": "INT", "integerOnly": true, "errorMessage": "กรุณากรอกจำนวนเต็มตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('pruning_labor_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('harvest_times_per_month', '{"min": 0, "type": "INT", "integerOnly": true, "errorMessage": "กรุณากรอกจำนวนเต็มตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('harvest_labor_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('harvest_volume_kg_per_time', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('cocoa_price', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('electricity_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('fuel_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('other_expenses_cost', '{"min": 0, "type": "FLOAT", "errorMessage": "กรุณากรอกตัวเลขตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;
+INSERT INTO form.field_validation_rule (field_name, validation_rule) VALUES ('tree_count', '{"min": 0, "type": "INT", "integerOnly": true, "errorMessage": "กรุณากรอกจำนวนต้นเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป"}') ON CONFLICT DO NOTHING;

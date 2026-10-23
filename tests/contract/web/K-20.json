@@ -17,10 +17,10 @@
   "cases": [
     {
       "name": "search contract",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/reminders/recipient-options/users",
+      "actor": "researcher",
       "query": {
         "q": "contract"
       },
@@ -84,10 +84,10 @@
     },
     {
       "name": "search farmer",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/reminders/recipient-options/users",
+      "actor": "researcher",
       "query": {
         "q": "farmer"
       },
@@ -111,10 +111,10 @@
     },
     {
       "name": "empty search",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/reminders/recipient-options/users",
+      "actor": "researcher",
       "body": null,
       "response": [
         {
@@ -175,10 +175,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/reminders/recipient-options/users",
+      "actor": "farmer_1",
       "query": {
         "q": "contract"
       },

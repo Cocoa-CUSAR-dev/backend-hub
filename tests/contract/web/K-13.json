@@ -8,9 +8,9 @@
   },
   "hub": {
     "method": "PUT",
-    "path": "/api/v1/forms/{id}",
+    "path": "/api/v1/forms/{form_id}",
     "params": {
-      "id": "formId"
+      "form_id": "formId"
     }
   },
   "seeds": [
@@ -21,10 +21,10 @@
   "cases": [
     {
       "name": "rename a question and add one",
-      "actor": "researcher",
       "status": 200,
       "method": "PUT",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },
@@ -108,16 +108,7 @@
                 "isActive": true,
                 "carryForward": true,
                 "sortOrder": 0,
-                "choices": [
-                  {
-                    "id": "40000000-0000-4000-8000-000000000001",
-                    "name": "สวนโกโก้ชุมพร"
-                  },
-                  {
-                    "id": "40000000-0000-4000-8000-000000000002",
-                    "name": "สวนโกโก้แม่ริม"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -132,12 +123,7 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 1,
-                "choices": [
-                  {
-                    "id": "42000000-0000-4000-8000-000000000001",
-                    "name": "จุดรวบรวมท่าตะเภา"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -160,7 +146,7 @@
                 }
               },
               {
-                "questionId": "61c31f48-e7e4-42a9-9052-d25c9f14966c",
+                "questionId": "3af58e56-43ca-445f-9aaa-2438f28740aa",
                 "sectionId": "52000000-0000-4000-8000-000000000001",
                 "label": "แปลงที่เก็บ",
                 "inputType": "OPTION",
@@ -171,23 +157,7 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 3,
-                "choices": [
-                  {
-                    "id": "41000000-0000-4000-8000-000000000001",
-                    "name": "แปลง A",
-                    "parentId": "40000000-0000-4000-8000-000000000001"
-                  },
-                  {
-                    "id": "41000000-0000-4000-8000-000000000002",
-                    "name": "แปลง B",
-                    "parentId": "40000000-0000-4000-8000-000000000001"
-                  },
-                  {
-                    "id": "41000000-0000-4000-8000-000000000003",
-                    "name": "แปลงเดียว",
-                    "parentId": "40000000-0000-4000-8000-000000000002"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null,
                 "dependsOn": "farm_id"
               }
@@ -198,10 +168,10 @@
     },
     {
       "name": "no sections",
-      "actor": "researcher",
       "status": 400,
       "method": "PUT",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },
@@ -216,10 +186,10 @@
     },
     {
       "name": "unknown form",
-      "actor": "researcher",
       "status": 404,
       "method": "PUT",
       "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999",
+      "actor": "researcher",
       "params": {
         "formId": "5f000000-0000-4000-8000-000000000999"
       },
@@ -284,10 +254,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "PUT",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001",
+      "actor": "farmer_1",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },

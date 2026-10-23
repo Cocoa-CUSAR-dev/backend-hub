@@ -8,9 +8,9 @@
   },
   "hub": {
     "method": "PUT",
-    "path": "/api/v1/forms/{id}/edit",
+    "path": "/api/v1/forms/{form_id}/edit",
     "params": {
-      "id": "formId"
+      "form_id": "formId"
     }
   },
   "seeds": [
@@ -21,10 +21,10 @@
   "cases": [
     {
       "name": "switch a question off",
-      "actor": "researcher",
       "status": 200,
       "method": "PUT",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003/edit",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000003"
       },
@@ -56,10 +56,10 @@
     },
     {
       "name": "unknown form",
-      "actor": "researcher",
       "status": 404,
       "method": "PUT",
       "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999/edit",
+      "actor": "researcher",
       "params": {
         "formId": "5f000000-0000-4000-8000-000000000999"
       },
@@ -93,10 +93,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "PUT",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003/edit",
+      "actor": "farmer_1",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000003"
       },

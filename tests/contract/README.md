@@ -12,7 +12,7 @@ tests/contract/
 ├── test_fixtures.py       # tests of the helper and of the fixture files themselves
 └── web/
     ├── K-07.json ... K-51.json, K-CAT.json, K-RUN.json   # one file per Kotlin route
-    └── seed/              # base.sql, places.sql, forms.sql, answers.sql
+    └── seed/              # reference.sql, base.sql, places.sql, forms.sql, answers.sql
 ```
 
 `K-xx` is the row ID on the Before sheet of api-migration-map.xlsx, and `after` is the
@@ -32,12 +32,17 @@ A case runs inside one transaction that is rolled back at the end. It loads the 
 files the fixture names, signs in as the case's actor with a real hub token, sends the
 request and compares the answer.
 
-**The first PR that ports a route** may see `add ... to tests/resources/schema.sql`. The
-seed uses tables the CI schema doesn't have yet: `ref.district_constant`,
-`ref.subdistrict_constant`, `processing.hub`, `collection.harvest`,
-`collection.harvest_grade_detail`, `form.task_recipient`, `form.task_recurrence`,
-`form.diary_entry` and `form.response_correction_log`. Copy those tables from the
-`database` repo's migrations into `schema.sql` in the same PR.
+**A PR that ports a route** may see `add ... to tests/resources/schema.sql`: the seed
+writes tables the CI schema doesn't have yet. docs-and-plan#271 added what `base` and
+`forms` need. Still missing for the other seeds: `processing.hub`, `collection.harvest`,
+`collection.harvest_grade_detail` (places), `form.diary_entry` and
+`form.response_correction_log` (answers). Copy them from the `database` repo's migrations
+into `schema.sql` in the PR that first needs them.
+
+The seed loads only the files a fixture names, plus `reference.sql` first: the validation
+rules and field dependencies the migrations insert, which a database built from
+`schema.sql` doesn't have. The recorder resets Kotlin's database to the same files, so a
+recorded answer never depends on rows the replay won't load.
 
 ## What counts as "the same"
 

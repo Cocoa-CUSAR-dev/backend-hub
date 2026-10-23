@@ -18,10 +18,10 @@
   "cases": [
     {
       "name": "every sheet",
-      "actor": "researcher",
       "status": 400,
       "method": "GET",
       "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
       "body": null,
       "response": {
         "error": "size must be between 1 and 500"
@@ -33,10 +33,10 @@
     },
     {
       "name": "farms only",
-      "actor": "researcher",
       "status": 400,
       "method": "GET",
       "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
       "query": {
         "sheets": "FARM"
       },
@@ -51,10 +51,10 @@
     },
     {
       "name": "harvests only",
-      "actor": "researcher",
       "status": 400,
       "method": "GET",
       "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
       "query": {
         "sheets": "HARVEST"
       },
@@ -69,10 +69,10 @@
     },
     {
       "name": "unknown sheet",
-      "actor": "researcher",
       "status": 400,
       "method": "GET",
       "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
       "query": {
         "sheets": "NOPE"
       },
@@ -83,10 +83,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/reports/raw-data/download",
+      "actor": "farmer_1",
       "body": null,
       "response": "Access Denied: You do not have the required permissions."
     },
@@ -97,7 +97,7 @@
       "path": "/api/v1/reports/raw-data/download",
       "body": null,
       "response": {
-        "timestamp": "2026-10-23T11:14:23.753+00:00",
+        "timestamp": "2026-10-23T12:37:44.290+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/reports/raw-data/download"

@@ -21,10 +21,10 @@
   "cases": [
     {
       "name": "researcher",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/tasks",
+      "actor": "researcher",
       "body": null,
       "response": [
         {
@@ -67,14 +67,19 @@
           "openAt": "2026-06-01T00:00:00",
           "closeAt": "2026-06-30T16:59:59"
         }
-      ]
+      ],
+      "hub": {
+        "ignore": [
+          "*.formId"
+        ]
+      }
     },
     {
       "name": "page of two",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/tasks",
+      "actor": "researcher",
       "query": {
         "page": "0",
         "size": "2"
@@ -97,14 +102,19 @@
           "openAt": "2026-10-01T00:00:00",
           "closeAt": "2026-10-07T16:59:59"
         }
-      ]
+      ],
+      "hub": {
+        "ignore": [
+          "*.formId"
+        ]
+      }
     },
     {
       "name": "size 0",
-      "actor": "researcher",
       "status": 400,
       "method": "GET",
       "path": "/api/v1/tasks",
+      "actor": "researcher",
       "query": {
         "size": "0"
       },
@@ -115,21 +125,25 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/tasks",
+      "actor": "farmer_1",
       "body": null,
       "response": "Access Denied: You do not have the required permissions."
     },
     {
       "name": "forbidden",
-      "actor": "admin",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/tasks",
+      "actor": "admin",
       "body": null,
-      "response": "Access Denied: You do not have the required permissions."
+      "response": "Access Denied: You do not have the required permissions.",
+      "hub": {
+        "status": 200,
+        "compare": "status"
+      }
     },
     {
       "name": "no token",
@@ -138,7 +152,7 @@
       "path": "/api/v1/tasks",
       "body": null,
       "response": {
-        "timestamp": "2026-10-23T11:14:02.962+00:00",
+        "timestamp": "2026-10-23T12:37:21.599+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/tasks"

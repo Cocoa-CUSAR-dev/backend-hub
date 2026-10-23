@@ -8,9 +8,9 @@
   },
   "hub": {
     "method": "PUT",
-    "path": "/api/v1/forms/{id}/reminder",
+    "path": "/api/v1/forms/{form_id}/reminder",
     "params": {
-      "id": "formId"
+      "form_id": "formId"
     }
   },
   "seeds": [
@@ -21,10 +21,10 @@
   "cases": [
     {
       "name": "turn one on",
-      "actor": "researcher",
       "status": 200,
       "method": "PUT",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003/reminder",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000003"
       },
@@ -39,7 +39,7 @@
         ]
       },
       "response": {
-        "scheduleId": "bd24b8df-061b-4d2e-a7d3-2e030a3498ed",
+        "scheduleId": "1e4afc14-1d46-4a55-a4e6-c62340a9b435",
         "enabled": true,
         "timeOfDay": "07:30:00",
         "recipients": [
@@ -53,10 +53,10 @@
     },
     {
       "name": "turn one off",
-      "actor": "researcher",
       "status": 200,
       "method": "PUT",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001/reminder",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },
@@ -79,10 +79,10 @@
     },
     {
       "name": "unknown form",
-      "actor": "researcher",
       "status": 404,
       "method": "PUT",
       "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999/reminder",
+      "actor": "researcher",
       "params": {
         "formId": "5f000000-0000-4000-8000-000000000999"
       },
@@ -96,10 +96,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "PUT",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001/reminder",
+      "actor": "farmer_1",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },

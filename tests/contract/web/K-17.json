@@ -8,9 +8,9 @@
   },
   "hub": {
     "method": "GET",
-    "path": "/api/v1/forms/{id}/reminder",
+    "path": "/api/v1/forms/{form_id}/reminder",
     "params": {
-      "id": "formId"
+      "form_id": "formId"
     }
   },
   "seeds": [
@@ -21,10 +21,10 @@
   "cases": [
     {
       "name": "form with a reminder",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001/reminder",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },
@@ -44,10 +44,10 @@
     },
     {
       "name": "form without",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003/reminder",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000003"
       },
@@ -61,10 +61,10 @@
     },
     {
       "name": "unknown form",
-      "actor": "researcher",
       "status": 404,
       "method": "GET",
       "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999/reminder",
+      "actor": "researcher",
       "params": {
         "formId": "5f000000-0000-4000-8000-000000000999"
       },
@@ -75,10 +75,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001/reminder",
+      "actor": "farmer_1",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },

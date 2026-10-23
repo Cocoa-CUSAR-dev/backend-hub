@@ -19,10 +19,10 @@
   "cases": [
     {
       "name": "one day",
-      "actor": "farmer_1",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/me/history/2026-10-05",
+      "actor": "farmer_1",
       "params": {
         "date": "2026-10-05"
       },
@@ -74,10 +74,10 @@
     },
     {
       "name": "an empty day",
-      "actor": "farmer_1",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/me/history/2026-10-20",
+      "actor": "farmer_1",
       "params": {
         "date": "2026-10-20"
       },
@@ -86,10 +86,10 @@
     },
     {
       "name": "only my own answers",
-      "actor": "farmer_2",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/me/history/2026-10-05",
+      "actor": "farmer_2",
       "params": {
         "date": "2026-10-05"
       },
@@ -98,10 +98,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "researcher",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/me/history/2026-10-05",
+      "actor": "researcher",
       "params": {
         "date": "2026-10-05"
       },
@@ -118,7 +118,7 @@
       },
       "body": null,
       "response": {
-        "timestamp": "2026-10-23T11:14:02.131+00:00",
+        "timestamp": "2026-10-23T12:37:20.269+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/me/history/2026-10-05"

@@ -18,10 +18,10 @@
   "cases": [
     {
       "name": "minimal harvest form",
-      "actor": "researcher",
       "status": 201,
       "method": "POST",
       "path": "/api/v1/forms",
+      "actor": "researcher",
       "body": {
         "title": "ฟอร์มทดสอบ contract",
         "description": "สร้างจาก contract test",
@@ -65,21 +65,21 @@
         ]
       },
       "response": {
-        "formId": "708db6f6-2d4a-41a8-bf51-def75a32fcd6",
+        "formId": "988e948c-b806-4967-b993-6c3b0d35fe25",
         "title": "ฟอร์มทดสอบ contract",
         "description": "สร้างจาก contract test",
         "isMultipleSubmit": false,
         "sections": [
           {
-            "sectionId": "7ab3992b-85d5-470e-97f4-2dd5bf0911f2",
+            "sectionId": "13b88c97-6ba5-4170-9c10-182f3c98b546",
             "title": "การส่ง",
             "description": null,
             "sortOrder": 1,
             "isActive": true,
             "questions": [
               {
-                "questionId": "25b061c7-8690-4ce6-8266-ce7724cfa2a7",
-                "sectionId": "7ab3992b-85d5-470e-97f4-2dd5bf0911f2",
+                "questionId": "6c3b056c-7aa9-4d05-b56d-814efa8cd633",
+                "sectionId": "13b88c97-6ba5-4170-9c10-182f3c98b546",
                 "label": "ฟาร์ม",
                 "inputType": "OPTION",
                 "description": null,
@@ -89,21 +89,12 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 0,
-                "choices": [
-                  {
-                    "id": "40000000-0000-4000-8000-000000000001",
-                    "name": "สวนโกโก้ชุมพร"
-                  },
-                  {
-                    "id": "40000000-0000-4000-8000-000000000002",
-                    "name": "สวนโกโก้แม่ริม"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
-                "questionId": "9d922b1b-4bc1-4afe-95da-b0e3b1b52392",
-                "sectionId": "7ab3992b-85d5-470e-97f4-2dd5bf0911f2",
+                "questionId": "28a36792-1db5-4294-9215-f1fdadd74395",
+                "sectionId": "13b88c97-6ba5-4170-9c10-182f3c98b546",
                 "label": "จุดรวบรวม",
                 "inputType": "OPTION",
                 "description": null,
@@ -113,17 +104,12 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 1,
-                "choices": [
-                  {
-                    "id": "42000000-0000-4000-8000-000000000001",
-                    "name": "จุดรวบรวมท่าตะเภา"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
-                "questionId": "33cb42fd-c40e-49b2-ae93-511d70ddc6bb",
-                "sectionId": "7ab3992b-85d5-470e-97f4-2dd5bf0911f2",
+                "questionId": "51ad2311-3f81-4e97-9564-1c6e35b885dd",
+                "sectionId": "13b88c97-6ba5-4170-9c10-182f3c98b546",
                 "label": "วันที่ส่ง",
                 "inputType": "DATE",
                 "description": null,
@@ -147,10 +133,10 @@
     },
     {
       "name": "with reminder, weekly repeat and recipients",
-      "actor": "researcher",
       "status": 201,
       "method": "POST",
       "path": "/api/v1/forms",
+      "actor": "researcher",
       "body": {
         "title": "ฟอร์มทดสอบ contract ทำซ้ำ",
         "description": "สร้างจาก contract test",
@@ -218,21 +204,21 @@
         ]
       },
       "response": {
-        "formId": "43048344-06cd-4527-8256-c0468ab93d88",
+        "formId": "9f3cd03c-ab93-4f66-81d0-1dc334ec5c65",
         "title": "ฟอร์มทดสอบ contract ทำซ้ำ",
         "description": "สร้างจาก contract test",
         "isMultipleSubmit": false,
         "sections": [
           {
-            "sectionId": "87b39eff-7c27-4de1-803b-53748bc34da7",
+            "sectionId": "b9483460-a1c4-473d-8525-3ca2bde1ea02",
             "title": "การส่ง",
             "description": null,
             "sortOrder": 1,
             "isActive": true,
             "questions": [
               {
-                "questionId": "65d65a23-831d-4e50-b919-de7d089a36da",
-                "sectionId": "87b39eff-7c27-4de1-803b-53748bc34da7",
+                "questionId": "2cbedcd4-082d-4ec4-bfe4-9c8c97c6e732",
+                "sectionId": "b9483460-a1c4-473d-8525-3ca2bde1ea02",
                 "label": "ฟาร์ม",
                 "inputType": "OPTION",
                 "description": null,
@@ -242,21 +228,12 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 0,
-                "choices": [
-                  {
-                    "id": "40000000-0000-4000-8000-000000000001",
-                    "name": "สวนโกโก้ชุมพร"
-                  },
-                  {
-                    "id": "40000000-0000-4000-8000-000000000002",
-                    "name": "สวนโกโก้แม่ริม"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
-                "questionId": "efc537bc-b6aa-4e4a-91db-75fbb9328f6b",
-                "sectionId": "87b39eff-7c27-4de1-803b-53748bc34da7",
+                "questionId": "7adce52a-8c52-4cc2-9757-88985bbd6c5b",
+                "sectionId": "b9483460-a1c4-473d-8525-3ca2bde1ea02",
                 "label": "จุดรวบรวม",
                 "inputType": "OPTION",
                 "description": null,
@@ -266,17 +243,12 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 1,
-                "choices": [
-                  {
-                    "id": "42000000-0000-4000-8000-000000000001",
-                    "name": "จุดรวบรวมท่าตะเภา"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
-                "questionId": "b74e5a30-58e8-4f1b-aba0-6fec88945089",
-                "sectionId": "87b39eff-7c27-4de1-803b-53748bc34da7",
+                "questionId": "7f6cb311-5855-4a83-819d-22296f47daf1",
+                "sectionId": "b9483460-a1c4-473d-8525-3ca2bde1ea02",
                 "label": "วันที่ส่ง",
                 "inputType": "DATE",
                 "description": null,
@@ -300,10 +272,10 @@
     },
     {
       "name": "no sections",
-      "actor": "researcher",
       "status": 400,
       "method": "POST",
       "path": "/api/v1/forms",
+      "actor": "researcher",
       "body": {
         "title": "ฟอร์มทดสอบ contract",
         "description": "สร้างจาก contract test",
@@ -320,10 +292,10 @@
     },
     {
       "name": "a field the handler doesn't have",
-      "actor": "researcher",
       "status": 400,
       "method": "POST",
       "path": "/api/v1/forms",
+      "actor": "researcher",
       "body": {
         "title": "ฟอร์มทดสอบ contract",
         "description": "สร้างจาก contract test",
@@ -356,10 +328,10 @@
     },
     {
       "name": "unknown handler",
-      "actor": "researcher",
       "status": 400,
       "method": "POST",
       "path": "/api/v1/forms",
+      "actor": "researcher",
       "body": {
         "title": "ฟอร์มทดสอบ contract",
         "description": "สร้างจาก contract test",
@@ -408,10 +380,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "POST",
       "path": "/api/v1/forms",
+      "actor": "farmer_1",
       "body": {
         "title": "ฟอร์มทดสอบ contract",
         "description": "สร้างจาก contract test",
@@ -458,10 +430,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "admin",
       "status": 403,
       "method": "POST",
       "path": "/api/v1/forms",
+      "actor": "admin",
       "body": {
         "title": "ฟอร์มทดสอบ contract",
         "description": "สร้างจาก contract test",

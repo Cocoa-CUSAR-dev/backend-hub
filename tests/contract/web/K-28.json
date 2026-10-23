@@ -18,10 +18,10 @@
   "cases": [
     {
       "name": "all farms",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/analytics/harvest/time-series/delta",
+      "actor": "researcher",
       "query": {
         "from": "2026-08",
         "to": "2026-10"
@@ -70,10 +70,10 @@
     },
     {
       "name": "one province",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/analytics/harvest/time-series/delta",
+      "actor": "researcher",
       "query": {
         "from": "2026-08",
         "to": "2026-10",
@@ -123,10 +123,10 @@
     },
     {
       "name": "grade A",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/analytics/harvest/time-series/delta",
+      "actor": "researcher",
       "query": {
         "from": "2026-08",
         "to": "2026-10",
@@ -158,10 +158,10 @@
     },
     {
       "name": "district not in province",
-      "actor": "researcher",
       "status": 400,
       "method": "GET",
       "path": "/api/v1/analytics/harvest/time-series/delta",
+      "actor": "researcher",
       "query": {
         "from": "2026-08",
         "to": "2026-10",
@@ -175,10 +175,10 @@
     },
     {
       "name": "missing range",
-      "actor": "researcher",
       "status": 500,
       "method": "GET",
       "path": "/api/v1/analytics/harvest/time-series/delta",
+      "actor": "researcher",
       "body": null,
       "response": {
         "error": "Internal server error"
@@ -189,10 +189,10 @@
     },
     {
       "name": "forbidden",
-      "actor": "farmer_1",
       "status": 403,
       "method": "GET",
       "path": "/api/v1/analytics/harvest/time-series/delta",
+      "actor": "farmer_1",
       "query": {
         "from": "2026-08",
         "to": "2026-10"
@@ -211,7 +211,7 @@
       },
       "body": null,
       "response": {
-        "timestamp": "2026-10-23T11:14:13.704+00:00",
+        "timestamp": "2026-10-23T12:37:34.161+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/analytics/harvest/time-series/delta"

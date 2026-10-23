@@ -293,7 +293,7 @@ def user_analytics(kid: str, after: str, kotlin: str, hub: str) -> Route:
 F = "/api/v1/forms"
 T = "/api/v1/tasks"
 A = "/api/v1/analytics"
-HUB_FORM = f"{F}/{{id}}"
+HUB_FORM = f"{F}/{{form_id}}"
 
 ROUTES: list[Route] = [
     # ---- me: history and diary (ME-03..05, K-51) ------------------------------
@@ -363,13 +363,19 @@ ROUTES: list[Route] = [
         "FORM-02",
         "GET",
         f"{F}/{{formId}}",
-        {"method": "GET", "path": HUB_FORM, "params": {"id": "formId"}},
+        {"method": "GET", "path": HUB_FORM, "params": {"form_id": "formId"}},
         FORM_SEEDS,
         [
             C("harvest form", "researcher", {"formId": FORM[1]}),
             C("form with inactive parts", "researcher", {"formId": FORM[3]}),
             C("farmer, open form", "farmer_1", {"formId": FORM[1]}),
-            C("farmer, form assigned to someone else", "farmer_2", {"formId": FORM[2]}),
+            # The hub applies the task list's assignment rule (#261); Kotlin served the form.
+            C(
+                "farmer, form assigned to someone else",
+                "farmer_2",
+                {"formId": FORM[2]},
+                hub={"status": 404},
+            ),
             C("unknown form", "researcher", {"formId": UNKNOWN}),
             anon(params={"formId": FORM[1]}),
         ],
@@ -382,11 +388,18 @@ ROUTES: list[Route] = [
         {"method": "GET", "path": F, "query": {"include": "stats"}},
         FORM_SEEDS,
         [
-            C("researcher", "researcher"),
-            C("page of two", "researcher", query={"page": "0", "size": "2"}),
+            # The hub adds formId to each row (docs-and-plan#271).
+            C("researcher", "researcher", hub={"ignore": ["*.formId"]}),
+            C(
+                "page of two",
+                "researcher",
+                query={"page": "0", "size": "2"},
+                hub={"ignore": ["*.formId"]},
+            ),
             C("size 0", "researcher", query={"size": "0"}),
             forbidden(),
-            forbidden("admin"),
+            # FORM-01 needs read:form:all, which admins hold (K-21 asked for read:task:all).
+            forbidden("admin", hub={"status": 200, "compare": "status"}),
             anon(),
         ],
         note="Shows every task, including task 4 (form without section) and task 5 (no form).",
@@ -400,12 +413,13 @@ ROUTES: list[Route] = [
             "method": "GET",
             "path": HUB_FORM,
             "query": {"include": "stats"},
-            "params": {"id": "form_of:taskId"},
+            "params": {"form_id": "form_of:taskId"},
         },
         FORM_SEEDS,
         [
-            C("task 1", "researcher", {"taskId": TASK[1]}),
-            C("task without form", "researcher", {"taskId": TASK[5]}),
+            C("task 1", "researcher", {"taskId": TASK[1]}, hub={"ignore": ["formId"]}),
+            # /forms/{form_id} needs a form; this task has none.
+            C("task without form", "researcher", {"taskId": TASK[5]}, hub={"status": 404}),
             C("unknown task", "researcher", {"taskId": UNKNOWN}),
             forbidden(params={"taskId": TASK[1]}),
             anon(params={"taskId": TASK[1]}),
@@ -460,7 +474,7 @@ ROUTES: list[Route] = [
         "FORM-04",
         "PUT",
         f"{F}/{{formId}}",
-        {"method": "PUT", "path": HUB_FORM, "params": {"id": "formId"}},
+        {"method": "PUT", "path": HUB_FORM, "params": {"form_id": "formId"}},
         FORM_SEEDS,
         [
             C(
@@ -484,7 +498,7 @@ ROUTES: list[Route] = [
         "FORM-05",
         "PUT",
         f"{F}/{{formId}}/edit",
-        {"method": "PUT", "path": f"{HUB_FORM}/edit", "params": {"id": "formId"}},
+        {"method": "PUT", "path": f"{HUB_FORM}/edit", "params": {"form_id": "formId"}},
         FORM_SEEDS,
         [
             C("switch a question off", "researcher", {"formId": FORM[3]}, body=EDIT_FORM3),
@@ -537,7 +551,7 @@ ROUTES: list[Route] = [
         "FORM-08",
         "GET",
         f"{F}/{{formId}}/reminder",
-        {"method": "GET", "path": f"{HUB_FORM}/reminder", "params": {"id": "formId"}},
+        {"method": "GET", "path": f"{HUB_FORM}/reminder", "params": {"form_id": "formId"}},
         FORM_SEEDS,
         [
             C("form with a reminder", "researcher", {"formId": FORM[1]}),
@@ -551,7 +565,7 @@ ROUTES: list[Route] = [
         "FORM-09",
         "PUT",
         f"{F}/{{formId}}/reminder",
-        {"method": "PUT", "path": f"{HUB_FORM}/reminder", "params": {"id": "formId"}},
+        {"method": "PUT", "path": f"{HUB_FORM}/reminder", "params": {"form_id": "formId"}},
         FORM_SEEDS,
         [
             C(
@@ -612,7 +626,7 @@ ROUTES: list[Route] = [
         "FORM-12",
         "GET",
         f"{T}/{{taskId}}/responses",
-        {"method": "GET", "path": f"{HUB_FORM}/responses", "params": {"id": "form_of:taskId"}},
+        {"method": "GET", "path": f"{HUB_FORM}/responses", "params": {"form_id": "form_of:taskId"}},
         ANSWER_SEEDS,
         [
             C("task 1", "researcher", {"taskId": TASK[1]}),
@@ -630,8 +644,8 @@ ROUTES: list[Route] = [
         f"{T}/{{taskId}}/responses/{{responseId}}",
         {
             "method": "GET",
-            "path": f"{HUB_FORM}/responses/{{rid}}",
-            "params": {"id": "form_of:taskId", "rid": "responseId"},
+            "path": f"{HUB_FORM}/responses/{{response_id}}",
+            "params": {"form_id": "form_of:taskId", "response_id": "responseId"},
         },
         ANSWER_SEEDS,
         [
@@ -657,7 +671,7 @@ ROUTES: list[Route] = [
             "method": "GET",
             "path": f"{HUB_FORM}/responses",
             "query": {"view": "review"},
-            "params": {"id": "form_of:taskId"},
+            "params": {"form_id": "form_of:taskId"},
         },
         ANSWER_SEEDS,
         [
@@ -674,8 +688,12 @@ ROUTES: list[Route] = [
         f"{T}/{{taskId}}/review/{{responseId}}/fields/{{fieldName}}",
         {
             "method": "PATCH",
-            "path": f"{HUB_FORM}/responses/{{rid}}/fields/{{field}}",
-            "params": {"id": "form_of:taskId", "rid": "responseId", "field": "fieldName"},
+            "path": f"{HUB_FORM}/responses/{{response_id}}/fields/{{field_name}}",
+            "params": {
+                "form_id": "form_of:taskId",
+                "response_id": "responseId",
+                "field_name": "fieldName",
+            },
         },
         ANSWER_SEEDS,
         [
@@ -804,7 +822,11 @@ ROUTES: list[Route] = [
         "ADMIN-03",
         "GET",
         "/api/v1/researchers/{userId}",
-        {"method": "GET", "path": "/api/v1/admin/researchers/{id}", "params": {"id": "userId"}},
+        {
+            "method": "GET",
+            "path": "/api/v1/admin/researchers/{user_id}",
+            "params": {"user_id": "userId"},
+        },
         ["base"],
         [
             C("one researcher", "admin", {"userId": RESEARCHER_2}),
@@ -817,7 +839,11 @@ ROUTES: list[Route] = [
         "ADMIN-04",
         "DELETE",
         "/api/v1/researchers/{userId}",
-        {"method": "DELETE", "path": "/api/v1/admin/researchers/{id}", "params": {"id": "userId"}},
+        {
+            "method": "DELETE",
+            "path": "/api/v1/admin/researchers/{user_id}",
+            "params": {"user_id": "userId"},
+        },
         ["base"],
         [
             C("remove one", "admin", {"userId": RESEARCHER_2}),
@@ -905,7 +931,9 @@ def token(user_id: str, username: str, roles: list[str], perms: list[str]) -> st
     )
 
 
-async def reset(conn: asyncpg.Connection) -> None:
+async def reset(conn: asyncpg.Connection, seeds: list[str]) -> None:
+    """Back to the migrations' rows plus exactly the seeds a route replays with,
+    so the recorded answer depends on nothing the replay won't load."""
     tables = [
         f"{r['schemaname']}.{r['tablename']}"
         for r in await conn.fetch(
@@ -914,7 +942,7 @@ async def reset(conn: asyncpg.Connection) -> None:
         if f"{r['schemaname']}.{r['tablename']}" not in KEEP
     ]
     await conn.execute(f"TRUNCATE {', '.join(tables)} CASCADE")
-    for sql in seed_sql(["base", "places", "forms", "answers"]):
+    for sql in seed_sql(seeds):
         await conn.execute(sql)
 
 
@@ -926,9 +954,10 @@ def fill(template: str, params: dict[str, str]) -> str:
 
 async def record(route: Route, conn: asyncpg.Connection, client: httpx.Client) -> Fixture:
     cases: list[Case] = []
+    await reset(conn, route.seeds)
     for c in route.cases:
         if route.method != "GET":
-            await reset(conn)
+            await reset(conn, route.seeds)
         headers: dict[str, str] = {}
         if c.actor:
             uid, name = ACTORS[c.actor]
@@ -960,7 +989,6 @@ async def record(route: Route, conn: asyncpg.Connection, client: httpx.Client) -
             )
         )
         print(f"  {route.kid} {r.status_code} {c.name}")
-    await reset(conn)
     return Fixture(
         kid=route.kid,
         after=route.after,
@@ -976,7 +1004,6 @@ async def record(route: Route, conn: asyncpg.Connection, client: httpx.Client) -
 async def main(only: list[str]) -> None:
     conn = await asyncpg.connect(DB)
     try:
-        await reset(conn)
         with httpx.Client(base_url=KOTLIN, timeout=60) as client:
             for route in ROUTES:
                 if only and route.kid not in only:

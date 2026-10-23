@@ -8,9 +8,9 @@
   },
   "hub": {
     "method": "GET",
-    "path": "/api/v1/forms/{id}",
+    "path": "/api/v1/forms/{form_id}",
     "params": {
-      "id": "formId"
+      "form_id": "formId"
     }
   },
   "seeds": [
@@ -21,10 +21,10 @@
   "cases": [
     {
       "name": "harvest form",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },
@@ -54,16 +54,7 @@
                 "isActive": true,
                 "carryForward": true,
                 "sortOrder": 0,
-                "choices": [
-                  {
-                    "id": "40000000-0000-4000-8000-000000000001",
-                    "name": "สวนโกโก้ชุมพร"
-                  },
-                  {
-                    "id": "40000000-0000-4000-8000-000000000002",
-                    "name": "สวนโกโก้แม่ริม"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -78,12 +69,7 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 1,
-                "choices": [
-                  {
-                    "id": "42000000-0000-4000-8000-000000000001",
-                    "name": "จุดรวบรวมท่าตะเภา"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -131,10 +117,10 @@
     },
     {
       "name": "form with inactive parts",
-      "actor": "researcher",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003",
+      "actor": "researcher",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000003"
       },
@@ -164,16 +150,7 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 0,
-                "choices": [
-                  {
-                    "id": "40000000-0000-4000-8000-000000000001",
-                    "name": "สวนโกโก้ชุมพร"
-                  },
-                  {
-                    "id": "40000000-0000-4000-8000-000000000002",
-                    "name": "สวนโกโก้แม่ริม"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -264,10 +241,10 @@
     },
     {
       "name": "farmer, open form",
-      "actor": "farmer_1",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001",
+      "actor": "farmer_1",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000001"
       },
@@ -297,16 +274,7 @@
                 "isActive": true,
                 "carryForward": true,
                 "sortOrder": 0,
-                "choices": [
-                  {
-                    "id": "40000000-0000-4000-8000-000000000001",
-                    "name": "สวนโกโก้ชุมพร"
-                  },
-                  {
-                    "id": "40000000-0000-4000-8000-000000000002",
-                    "name": "สวนโกโก้แม่ริม"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -321,12 +289,7 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 1,
-                "choices": [
-                  {
-                    "id": "42000000-0000-4000-8000-000000000001",
-                    "name": "จุดรวบรวมท่าตะเภา"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -374,10 +337,10 @@
     },
     {
       "name": "farmer, form assigned to someone else",
-      "actor": "farmer_2",
       "status": 200,
       "method": "GET",
       "path": "/api/v1/forms/51000000-0000-4000-8000-000000000002",
+      "actor": "farmer_2",
       "params": {
         "formId": "51000000-0000-4000-8000-000000000002"
       },
@@ -407,16 +370,7 @@
                 "isActive": true,
                 "carryForward": true,
                 "sortOrder": 0,
-                "choices": [
-                  {
-                    "id": "40000000-0000-4000-8000-000000000001",
-                    "name": "สวนโกโก้ชุมพร"
-                  },
-                  {
-                    "id": "40000000-0000-4000-8000-000000000002",
-                    "name": "สวนโกโก้แม่ริม"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null
               },
               {
@@ -431,23 +385,7 @@
                 "isActive": true,
                 "carryForward": false,
                 "sortOrder": 1,
-                "choices": [
-                  {
-                    "id": "41000000-0000-4000-8000-000000000001",
-                    "name": "แปลง A",
-                    "parentId": "40000000-0000-4000-8000-000000000001"
-                  },
-                  {
-                    "id": "41000000-0000-4000-8000-000000000002",
-                    "name": "แปลง B",
-                    "parentId": "40000000-0000-4000-8000-000000000001"
-                  },
-                  {
-                    "id": "41000000-0000-4000-8000-000000000003",
-                    "name": "แปลงเดียว",
-                    "parentId": "40000000-0000-4000-8000-000000000002"
-                  }
-                ],
+                "choices": [],
                 "validationRule": null,
                 "dependsOn": "farm_id"
               },
@@ -492,14 +430,17 @@
             ]
           }
         ]
+      },
+      "hub": {
+        "status": 404
       }
     },
     {
       "name": "unknown form",
-      "actor": "researcher",
       "status": 404,
       "method": "GET",
       "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999",
+      "actor": "researcher",
       "params": {
         "formId": "5f000000-0000-4000-8000-000000000999"
       },
@@ -518,7 +459,7 @@
       },
       "body": null,
       "response": {
-        "timestamp": "2026-10-23T11:14:02.686+00:00",
+        "timestamp": "2026-10-23T12:37:21.206+00:00",
         "status": 401,
         "error": "Unauthorized",
         "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001"
