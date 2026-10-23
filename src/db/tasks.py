@@ -113,6 +113,49 @@ async def task_visible_to(session: AsyncSession, user_id: UUID, task_id: UUID) -
     return bool(found.scalar())
 
 
+@dataclass(frozen=True, slots=True)
+class TaskInfo:
+    """A task as the researcher's task list shows it (FORM-01 ?include=stats)."""
+
+    task_id: UUID
+    title: str | None
+    description: str | None
+    task_type: str | None
+    # Bangkok wall-clock, as the researcher typed it (no zone stored).
+    open_at: datetime | None
+    close_at: datetime | None
+
+
+_TASK_INFO_COLUMNS = "task_id, title, description, task_type, open_at, close_at"
+
+
+async def all_tasks(session: AsyncSession, *, limit: int, offset: int) -> list[TaskInfo]:
+    """Every task, newest opening first. task_id breaks ties, so a page never
+    repeats or skips a row (web-backend BE-9). Tasks with no open_at come first,
+    as Postgres sorts NULLs in a descending order."""
+    result = await session.execute(
+        text(
+            f"""
+            SELECT {_TASK_INFO_COLUMNS} FROM form.task
+            ORDER BY open_at DESC, task_id
+            LIMIT :limit OFFSET :offset
+            """
+        ),
+        {"limit": limit, "offset": offset},
+    )
+    return [TaskInfo(**row._mapping) for row in result]
+
+
+async def task_info(session: AsyncSession, task_id: UUID) -> TaskInfo | None:
+    row = (
+        await session.execute(
+            text(f"SELECT {_TASK_INFO_COLUMNS} FROM form.task WHERE task_id = :task_id"),
+            {"task_id": task_id},
+        )
+    ).first()
+    return TaskInfo(**row._mapping) if row else None
+
+
 async def latest_answer(
     session: AsyncSession, user_id: UUID, task_id: UUID
 ) -> dict[str, Any] | None:

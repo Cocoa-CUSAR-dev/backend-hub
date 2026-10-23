@@ -14,6 +14,7 @@ Other code calls the functions here.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -90,6 +91,51 @@ async def form_of_task(session: AsyncSession, task_id: UUID) -> TaskForm | None:
         )
     ).first()
     return TaskForm(**row._mapping) if row else None
+
+
+async def form_by_id(session: AsyncSession, form_id: UUID) -> TaskForm | None:
+    row = (
+        await session.execute(
+            text(f"SELECT {_TASK_FORM_COLUMNS} FROM form.task_form WHERE form_id = :form_id"),
+            {"form_id": form_id},
+        )
+    ).first()
+    return TaskForm(**row._mapping) if row else None
+
+
+@dataclass(frozen=True, slots=True)
+class FormListRow:
+    """One form in the researcher's form list (FORM-01)."""
+
+    form_id: UUID
+    task_id: UUID
+    title: str | None
+    content: str | None
+    handler: str | None
+    is_multiple_submit: bool
+    description: str | None
+    created_at: datetime | None
+
+
+async def forms_with_sections(session: AsyncSession) -> list[FormListRow]:
+    """Every form that has at least one section, newest first.
+
+    A form with no section can't be filled, so it isn't listed (21 legacy
+    rows, dynamic-form-proposal.md decision #5), as in web-backend.
+    """
+    result = await session.execute(
+        text(
+            """
+            SELECT tf.form_id, tf.task_id, tf.title, tf.content, tf.handler,
+                   COALESCE(tf.is_multiple_submit, FALSE) AS is_multiple_submit,
+                   tf.description, tf.created_at
+            FROM form.task_form tf
+            WHERE EXISTS (SELECT 1 FROM form.section s WHERE s.form_id = tf.form_id)
+            ORDER BY tf.created_at DESC, tf.form_id
+            """
+        )
+    )
+    return [FormListRow(**row._mapping) for row in result]
 
 
 async def forms_of_tasks(session: AsyncSession, task_ids: list[UUID]) -> dict[UUID, TaskForm]:

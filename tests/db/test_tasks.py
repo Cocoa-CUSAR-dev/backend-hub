@@ -152,3 +152,38 @@ async def test_responses_of_user_lists_only_mine_newest_first(db_session: AsyncS
     assert rows[0].answer == {"grade": "B"}
     assert rows[0].submitted_at == datetime(2026, 10, 1, 10)
     assert rows[0].status == "SUBMITTED"
+
+
+# ---- the researcher's task view (FORM-01 / FORM-02 ?include=stats) -------------
+
+
+async def test_all_tasks_newest_opening_first_no_open_at_first(db_session: AsyncSession) -> None:
+    old = await _task(db_session, "old", datetime(2026, 6, 1), task_type="FORM")
+    new = await _task(db_session, "new", datetime(2026, 10, 1), task_type="FORM")
+    undated = await insert(db_session, "form.task", title="undated", task_type="TASK")
+
+    rows = await db.tasks.all_tasks(db_session, limit=500, offset=0)
+
+    ids = [r.task_id for r in rows if r.task_id in {old, new, undated}]
+    assert ids == [undated, new, old]  # Postgres sorts NULL first in DESC, as Kotlin got
+
+
+async def test_all_tasks_pages_through_in_a_stable_order(db_session: AsyncSession) -> None:
+    same_time = datetime(2031, 1, 1)
+    made = {await _task(db_session, f"t{i}", same_time) for i in range(3)}
+
+    first = await db.tasks.all_tasks(db_session, limit=2, offset=0)
+    second = await db.tasks.all_tasks(db_session, limit=2, offset=2)
+
+    seen = [r.task_id for r in first + second if r.task_id in made]
+    assert len(seen) == len(set(seen)) == 3
+
+
+async def test_task_info_has_the_type_and_dates(db_session: AsyncSession) -> None:
+    task_id = await _task(db_session, "Harvest", datetime(2026, 9, 1), task_type="FORM")
+
+    info = await db.tasks.task_info(db_session, task_id)
+
+    assert info is not None
+    assert (info.title, info.task_type, info.open_at) == ("Harvest", "FORM", datetime(2026, 9, 1))
+    assert await db.tasks.task_info(db_session, uuid4()) is None
