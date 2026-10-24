@@ -1,41 +1,17 @@
-"""SSO Client -- mints a short-lived token for the diary card's "view full
-history" deep link (US2-6, docs-and-plan#133). Same service-key trust model
-as src/diary/client.py's generate_diary: the chatbot already knows this is
-the right user_id (it just used it to generate the diary), so minting a
-token for them isn't a new trust decision, just handing the browser proof
-of one already made.
+"""SSO token for the diary card's "view full history" deep link (US2-6,
+docs-and-plan#133).
+
+Minted here, in-process, by src/auth (no HTTP call to web-backend any more).
+The web app redeems it at backend-hub's POST /api/v1/auth/sso/exchange:
+15 minutes, single use, never usable as an API token. The chatbot already
+knows this is the right user_id (it just generated their diary), so minting
+isn't a new trust decision, just proof of one already made.
 """
 
-import httpx
+from uuid import UUID
 
-from src.config import settings
-from src.exceptions import UpstreamServiceError
-from src.request_id import REQUEST_ID_HEADER, get_request_id
+from src.auth import service as auth_service
 
 
-async def mint_sso_token(user_id: str) -> str:
-    async with httpx.AsyncClient(base_url=settings.KOTLIN_BACKEND_URL, timeout=30.0) as client:
-        response = await client.post(
-            "/service/sso/tokens",
-            json={"userId": user_id},
-            headers={
-                "X-Service-Key": settings.KOTLIN_SERVICE_KEY,
-                REQUEST_ID_HEADER: get_request_id(),
-            },
-        )
-
-    if response.status_code == 401:
-        raise UpstreamServiceError(
-            "Kotlin rejected the service key (401) -- confirm KOTLIN_SERVICE_KEY here "
-            "matches CHATBOT_SERVICE_KEY on web-backend"
-        )
-    if response.status_code >= 400:
-        raise UpstreamServiceError(f"Kotlin backend returned {response.status_code}")
-
-    body = response.json()
-    error = body.get("error")
-    if error:
-        raise UpstreamServiceError(f"Kotlin returned an error envelope: {error}")
-
-    token: str = body["value"]
-    return token
+async def mint_sso_token(user_id: str | UUID) -> str:
+    return auth_service.sso_mint(user_id if isinstance(user_id, UUID) else UUID(str(user_id)))

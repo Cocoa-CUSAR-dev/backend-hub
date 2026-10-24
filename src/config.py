@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     # JSON list in .env: LINE_LOGIN_CHANNEL_IDS=["1234567890"]
     LINE_LOGIN_CHANNEL_IDS: list[str] = []
     # US2-6 (docs-and-plan#133): base URL for the diary card's "view full
-    # history" button; src/sso/client.py appends a short-lived ?token=.
+    # history" button; src/sso/client.py mints the one-time #token=.
     WEB_APP_URL: str = ""
     # US2-13 (docs-and-plan#242): "farmer" (production) offers only the farms
     # a farmer is linked to through agriculture.farmer_farm, and only those

@@ -28,15 +28,15 @@ export function ensureLiffReady(): Promise<void> {
   return initPromise;
 }
 
-// Every API call in api.ts needs this -- getIDToken() throws if init/login
-// hasn't completed yet, which ensureLiffReady's caller (App.tsx) is
-// responsible for awaiting first.
-export function getAuthHeader(): { Authorization: string } {
+// The LINE ID token, swapped for our own access token by api.ts
+// (POST /api/v1/auth/line/login). getIDToken() throws if init/login hasn't
+// completed yet, which ensureLiffReady's caller (App.tsx) awaits first.
+export function getLineIdToken(): string {
   const idToken = liff.getIDToken();
   if (!idToken) {
     throw new Error("No LIFF ID token -- ensureLiffReady() must resolve before this is called");
   }
-  return { Authorization: `Bearer ${idToken}` };
+  return idToken;
 }
 
 export function closeLiffWindow(): void {
