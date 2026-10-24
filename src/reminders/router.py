@@ -17,6 +17,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
+from src.actor import Actor
 from src.database import Session, get_session
 from src.db.notify import Recipient, ScheduleRow
 from src.notifications.dependencies import require_service_key
@@ -35,6 +36,16 @@ router = APIRouter(
 )
 
 SessionDep = Annotated[Session, Depends(get_session)]
+
+
+def service_actor() -> Actor:
+    """The caller is web-backend, identified by its service key, not a person:
+    it acts as the system until these routes move into the web API, where the
+    caller is the signed-in researcher."""
+    return Actor.system()
+
+
+ActorDep = Annotated[Actor, Depends(service_actor)]
 
 
 def _to_recipients(rules: list[RecipientRule] | None) -> list[Recipient] | None:
@@ -59,9 +70,11 @@ def _to_response(row: ScheduleRow) -> ReminderScheduleResponse:
 async def create_reminder(
     body: ReminderScheduleCreate,
     session: SessionDep,
+    actor: ActorDep,
 ) -> ReminderScheduleResponse:
     row = await service.create_schedule(
         session,
+        actor,
         task_id=body.task_id,
         time_of_day=body.time_of_day,
         created_by=body.created_by,
@@ -71,8 +84,10 @@ async def create_reminder(
 
 
 @router.get("", response_model=list[ReminderScheduleResponse])
-async def list_reminders(task_id: UUID, session: SessionDep) -> list[ReminderScheduleResponse]:
-    return [_to_response(row) for row in await service.list_schedules(session, task_id)]
+async def list_reminders(
+    task_id: UUID, session: SessionDep, actor: ActorDep
+) -> list[ReminderScheduleResponse]:
+    return [_to_response(row) for row in await service.list_schedules(session, actor, task_id)]
 
 
 @router.patch("/{schedule_id}", response_model=ReminderScheduleResponse)
@@ -80,9 +95,11 @@ async def update_reminder(
     schedule_id: UUID,
     body: ReminderScheduleUpdate,
     session: SessionDep,
+    actor: ActorDep,
 ) -> ReminderScheduleResponse:
     row = await service.update_schedule(
         session,
+        actor,
         schedule_id,
         time_of_day=body.time_of_day,
         is_active=body.is_active,

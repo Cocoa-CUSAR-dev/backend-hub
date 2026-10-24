@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src import db
+from src.actor import Actor
 from src.db.notify import Recipient
 from src.exceptions import InvalidReminderReference, ReminderNotFound
 from src.reminders import service
@@ -43,6 +44,7 @@ async def create_reminder_schedule(
 ) -> uuid.UUID:
     row = await service.create_schedule(
         session,
+        Actor.system(),
         task_id=task_id,
         time_of_day=time_of_day,
         created_by=created_by,
@@ -497,6 +499,7 @@ async def test_update_changes_time_recipients_and_active_flag(db_session: AsyncS
 
     updated = await service.update_schedule(
         db_session,
+        Actor.system(),
         schedule_id,
         time_of_day=time(10, 30),
         is_active=False,
@@ -507,14 +510,14 @@ async def test_update_changes_time_recipients_and_active_flag(db_session: AsyncS
     assert updated.is_active is False
     assert [(r.type, r.id) for r in updated.recipients] == [("ROLE", processor_role)]
 
-    cleared = await service.update_schedule(db_session, schedule_id, recipients=[])
+    cleared = await service.update_schedule(db_session, Actor.system(), schedule_id, recipients=[])
     assert cleared.recipients == ()
     assert cleared.time_of_day == time(10, 30)  # untouched fields stay
 
 
 async def test_update_of_unknown_schedule_raises(db_session: AsyncSession) -> None:
     try:
-        await service.update_schedule(db_session, uuid.uuid4(), is_active=False)
+        await service.update_schedule(db_session, Actor.system(), uuid.uuid4(), is_active=False)
     except ReminderNotFound:
         pass
     else:
