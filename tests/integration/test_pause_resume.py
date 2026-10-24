@@ -1,8 +1,8 @@
 """Tests for pause/resume (US2-3) against a real Postgres session -- most
-classes exercise src.line.router + src.conversation.service together through
+classes exercise src.chat.router + src.chat.service together through
 the real /line/webhook route, with Kotlin's forms endpoint and LINE's reply
 call mocked at the boundary. TestPauseIdleConversations is the exception: it
-calls src.conversation.jobs.pause_idle_conversations directly, since that's a
+calls src.chat.jobs.pause_idle_conversations directly, since that's a
 scheduled job with no webhook involved.
 """
 
@@ -14,8 +14,8 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.chat.jobs import pause_idle_conversations
 from src.config import settings
-from src.conversation.jobs import pause_idle_conversations
 from src.line.parent_picker import ParentOption
 from tests.integration.helpers import (
     build_form_response,
@@ -50,7 +50,7 @@ async def _send_message(client: AsyncClient, *, line_user_id: str, text_content:
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -63,7 +63,7 @@ async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -
     body = build_postback_event(line_user_id=line_user_id, data=data)
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
