@@ -1,0 +1,130 @@
+{
+  "kid": "K-14",
+  "after": "FORM-05",
+  "note": "",
+  "kotlin": {
+    "method": "PUT",
+    "path": "/api/v1/forms/{formId}/edit"
+  },
+  "hub": {
+    "method": "PUT",
+    "path": "/api/v1/forms/{form_id}/edit",
+    "params": {
+      "form_id": "formId"
+    }
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "switch a question off",
+      "status": 200,
+      "method": "PUT",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003/edit",
+      "actor": "researcher",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000003"
+      },
+      "body": {
+        "description": "ปิดคำถามวิธีจัดการ",
+        "sections": [
+          {
+            "sectionId": "52000000-0000-4000-8000-000000000003",
+            "description": null,
+            "isActive": true,
+            "questions": [
+              {
+                "questionId": "53000000-0000-4000-8000-000000000022",
+                "description": null,
+                "isActive": false,
+                "isMandatory": false
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000023",
+                "description": null,
+                "isActive": true,
+                "isMandatory": false
+              }
+            ]
+          }
+        ]
+      },
+      "response": "Successfully audited form"
+    },
+    {
+      "name": "unknown form",
+      "status": 404,
+      "method": "PUT",
+      "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999/edit",
+      "actor": "researcher",
+      "params": {
+        "formId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": {
+        "description": "ปิดคำถามวิธีจัดการ",
+        "sections": [
+          {
+            "sectionId": "52000000-0000-4000-8000-000000000003",
+            "description": null,
+            "isActive": true,
+            "questions": [
+              {
+                "questionId": "53000000-0000-4000-8000-000000000022",
+                "description": null,
+                "isActive": false,
+                "isMandatory": false
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000023",
+                "description": null,
+                "isActive": true,
+                "isMandatory": false
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "error": "Form not found"
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "PUT",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003/edit",
+      "actor": "farmer_1",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000003"
+      },
+      "body": {
+        "description": "ปิดคำถามวิธีจัดการ",
+        "sections": [
+          {
+            "sectionId": "52000000-0000-4000-8000-000000000003",
+            "description": null,
+            "isActive": true,
+            "questions": [
+              {
+                "questionId": "53000000-0000-4000-8000-000000000022",
+                "description": null,
+                "isActive": false,
+                "isMandatory": false
+              },
+              {
+                "questionId": "53000000-0000-4000-8000-000000000023",
+                "description": null,
+                "isActive": true,
+                "isMandatory": false
+              }
+            ]
+          }
+        ]
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "kid": "K-24",
+  "after": "FORM-13",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/tasks/{taskId}/responses/{responseId}"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/{form_id}/responses/{response_id}",
+    "params": {
+      "form_id": "form_of:taskId",
+      "response_id": "responseId"
+    }
+  },
+  "seeds": [
+    "base",
+    "forms",
+    "answers"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "one answer",
+      "status": 404,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses/54000000-0000-4000-8000-000000000001",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "error": "Form Response Not Found"
+      },
+      "hub": {
+        "status": 200,
+        "compare": "status"
+      }
+    },
+    {
+      "name": "answer of another task",
+      "status": 404,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses/54000000-0000-4000-8000-000000000002",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000002"
+      },
+      "body": null,
+      "response": {
+        "error": "Form Response Not Found"
+      }
+    },
+    {
+      "name": "unknown answer",
+      "status": 404,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses/5f000000-0000-4000-8000-000000000999",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": null,
+      "response": {
+        "error": "Form Response Not Found"
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/responses/54000000-0000-4000-8000-000000000001",
+      "actor": "farmer_1",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

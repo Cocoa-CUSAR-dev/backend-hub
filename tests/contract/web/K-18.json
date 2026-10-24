@@ -1,0 +1,113 @@
+{
+  "kid": "K-18",
+  "after": "FORM-09",
+  "note": "",
+  "kotlin": {
+    "method": "PUT",
+    "path": "/api/v1/forms/{formId}/reminder"
+  },
+  "hub": {
+    "method": "PUT",
+    "path": "/api/v1/forms/{form_id}/reminder",
+    "params": {
+      "form_id": "formId"
+    }
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "turn one on",
+      "status": 200,
+      "method": "PUT",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000003/reminder",
+      "actor": "researcher",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000003"
+      },
+      "body": {
+        "enabled": true,
+        "timeOfDay": "07:30:00",
+        "recipients": [
+          {
+            "type": "ROLE",
+            "id": "10000000-0000-4000-8000-000000000003"
+          }
+        ]
+      },
+      "response": {
+        "scheduleId": "1e4afc14-1d46-4a55-a4e6-c62340a9b435",
+        "enabled": true,
+        "timeOfDay": "07:30:00",
+        "recipients": [
+          {
+            "type": "ROLE",
+            "id": "10000000-0000-4000-8000-000000000003",
+            "label": "farmer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "turn one off",
+      "status": 200,
+      "method": "PUT",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001/reminder",
+      "actor": "researcher",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "enabled": false,
+        "timeOfDay": "08:00:00"
+      },
+      "response": {
+        "scheduleId": "59000000-0000-4000-8000-000000000001",
+        "enabled": false,
+        "timeOfDay": "08:00:00",
+        "recipients": [
+          {
+            "type": "ROLE",
+            "id": "10000000-0000-4000-8000-000000000003",
+            "label": "farmer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unknown form",
+      "status": 404,
+      "method": "PUT",
+      "path": "/api/v1/forms/5f000000-0000-4000-8000-000000000999/reminder",
+      "actor": "researcher",
+      "params": {
+        "formId": "5f000000-0000-4000-8000-000000000999"
+      },
+      "body": {
+        "enabled": true,
+        "timeOfDay": "07:30:00"
+      },
+      "response": {
+        "error": "Form not found"
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "PUT",
+      "path": "/api/v1/forms/51000000-0000-4000-8000-000000000001/reminder",
+      "actor": "farmer_1",
+      "params": {
+        "formId": "51000000-0000-4000-8000-000000000001"
+      },
+      "body": {
+        "enabled": false,
+        "timeOfDay": "08:00:00"
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

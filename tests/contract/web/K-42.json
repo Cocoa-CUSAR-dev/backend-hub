@@ -1,0 +1,107 @@
+{
+  "kid": "K-42",
+  "after": "RPT-01",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/reports/raw-data/download"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/reports/raw-data"
+  },
+  "seeds": [
+    "base",
+    "places"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "every sheet",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
+      "body": null,
+      "response": {
+        "error": "size must be between 1 and 500"
+      },
+      "hub": {
+        "status": 200,
+        "compare": "status"
+      }
+    },
+    {
+      "name": "farms only",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
+      "query": {
+        "sheets": "FARM"
+      },
+      "body": null,
+      "response": {
+        "error": "size must be between 1 and 500"
+      },
+      "hub": {
+        "status": 200,
+        "compare": "status"
+      }
+    },
+    {
+      "name": "harvests only",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
+      "query": {
+        "sheets": "HARVEST"
+      },
+      "body": null,
+      "response": {
+        "error": "size must be between 1 and 500"
+      },
+      "hub": {
+        "status": 200,
+        "compare": "status"
+      }
+    },
+    {
+      "name": "unknown sheet",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
+      "query": {
+        "sheets": "NOPE"
+      },
+      "body": null,
+      "response": {
+        "error": "Invalid parameter value: NOPE. Expected one of the supported types."
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "farmer_1",
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:44.290+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/reports/raw-data/download"
+      }
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "kid": "K-10",
+  "after": "FORM-01",
+  "note": "Hides the form with no section (task 4). Kotlin doesn't order this list.",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/forms"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms"
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/forms",
+      "actor": "researcher",
+      "body": null,
+      "response": [
+        {
+          "formId": "51000000-0000-4000-8000-000000000002",
+          "taskId": "50000000-0000-4000-8000-000000000002",
+          "title": "กิจกรรมในสวนประจำสัปดาห์",
+          "content": "activity form",
+          "handler": "farm_activity",
+          "isMultipleSubmit": true,
+          "description": "จดกิจกรรมในสวน",
+          "createdAt": "2026-09-28T03:00:00"
+        },
+        {
+          "formId": "51000000-0000-4000-8000-000000000001",
+          "taskId": "50000000-0000-4000-8000-000000000001",
+          "title": "บันทึกยอดส่งโกโก้",
+          "content": "harvest form",
+          "handler": "harvest",
+          "isMultipleSubmit": false,
+          "description": "ส่งผลผลิตที่จุดรวบรวม",
+          "createdAt": "2026-08-25T03:00:00"
+        },
+        {
+          "formId": "51000000-0000-4000-8000-000000000003",
+          "taskId": "50000000-0000-4000-8000-000000000003",
+          "title": "รายงานโรคและศัตรูพืช",
+          "content": "pest form",
+          "handler": "farm_pest_disease_record",
+          "isMultipleSubmit": false,
+          "description": "พบโรคหรือแมลงให้รายงาน",
+          "createdAt": "2026-07-30T03:00:00"
+        }
+      ],
+      "hub": {
+        "unordered": true
+      }
+    },
+    {
+      "name": "admin",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/forms",
+      "actor": "admin",
+      "body": null,
+      "response": [
+        {
+          "formId": "51000000-0000-4000-8000-000000000002",
+          "taskId": "50000000-0000-4000-8000-000000000002",
+          "title": "กิจกรรมในสวนประจำสัปดาห์",
+          "content": "activity form",
+          "handler": "farm_activity",
+          "isMultipleSubmit": true,
+          "description": "จดกิจกรรมในสวน",
+          "createdAt": "2026-09-28T03:00:00"
+        },
+        {
+          "formId": "51000000-0000-4000-8000-000000000001",
+          "taskId": "50000000-0000-4000-8000-000000000001",
+          "title": "บันทึกยอดส่งโกโก้",
+          "content": "harvest form",
+          "handler": "harvest",
+          "isMultipleSubmit": false,
+          "description": "ส่งผลผลิตที่จุดรวบรวม",
+          "createdAt": "2026-08-25T03:00:00"
+        },
+        {
+          "formId": "51000000-0000-4000-8000-000000000003",
+          "taskId": "50000000-0000-4000-8000-000000000003",
+          "title": "รายงานโรคและศัตรูพืช",
+          "content": "pest form",
+          "handler": "farm_pest_disease_record",
+          "isMultipleSubmit": false,
+          "description": "พบโรคหรือแมลงให้รายงาน",
+          "createdAt": "2026-07-30T03:00:00"
+        }
+      ],
+      "hub": {
+        "unordered": true
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/forms",
+      "actor": "farmer_1",
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/forms",
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:20.715+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/forms"
+      }
+    }
+  ]
+}
