@@ -100,3 +100,34 @@ async def test_link_exists(db_session: AsyncSession) -> None:
     assert await linked(plot, farm) is True
     assert await linked(plot, other_farm) is False
     assert await linked(uuid4(), farm) is False
+
+
+async def test_constraint_errors_become_field_errors(db_session: AsyncSession) -> None:
+    from src.exceptions import AnswerRejectedByDatabase
+
+    await db_session.execute(
+        text(
+            "CREATE TABLE agriculture.probe_strict ("
+            " farm_id uuid NOT NULL REFERENCES agriculture.farm (farm_id), note text)"
+        )
+    )
+    table = "agriculture.probe_strict"
+    types = await db.handler_rows.column_types(db_session, table)
+
+    async def rejected(values: dict[str, object]) -> AnswerRejectedByDatabase:
+        # Each failing INSERT aborts the transaction, so run it in a savepoint.
+        nested = await db_session.begin_nested()
+        with pytest.raises(AnswerRejectedByDatabase) as caught:
+            await db.handler_rows.insert_row(db_session, table, values, types)
+        await nested.rollback()
+        return caught.value
+
+    missing = await rejected({"note": "no farm"})
+    gone = await rejected({"farm_id": str(uuid4())})
+    garbled = await rejected({"farm_id": "not-a-uuid"})
+
+    assert (missing.reason, missing.column) == ("missing", "farm_id")
+    assert missing.fields == {"farm_id": "จำเป็นต้องกรอก แต่ไม่ได้รับคำตอบ"}
+    assert (gone.reason, gone.column) == ("gone", "farm_id")
+    assert (garbled.reason, garbled.column) == ("format", None)
+    assert garbled.fields == {"answer": "มีคำตอบบางข้อที่รูปแบบไม่ถูกต้อง"}
