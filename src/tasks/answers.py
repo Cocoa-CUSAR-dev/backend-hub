@@ -11,6 +11,10 @@ then save the response and write its handler-table row in one transaction.
 Only the form's own checked fields reach the handler table (dissect's
 allow-list), so a hand-made request can't set a column the form never asks.
 
+A farmer may only file an answer about one of their own farms (farmer_farm).
+Hub collectors and processors record work on other people's farms, so their
+farm choice is not limited. Go checked neither.
+
 Permissions (database V35): create:response:own to submit, update:response:own
 to edit one of your own answers. Go accepted any signed-in user.
 """
@@ -32,6 +36,9 @@ SUBMITTED = "ส่งงานเรียบร้อยแล้ว"
 EDITED = "แก้ไขข้อมูลเรียบร้อยแล้ว"
 _NO_FORM = "ไม่พบแบบฟอร์มสำหรับงานที่ระบุ"
 _NO_RESPONSE = "ไม่พบข้อมูลที่ต้องการแก้ไข"
+_NOT_MY_FARM = "ฟาร์มนี้ไม่ได้อยู่ในรายชื่อฟาร์มของคุณ"
+# Roles that record work on other people's farms.
+_ANY_FARM_ROLES = frozenset({"hub_collector", "processor"})
 
 
 def _caller(actor: Actor) -> UUID:
@@ -52,11 +59,39 @@ async def _form_for(session: Session, user_id: UUID, task_id: UUID) -> tuple[UUI
     return task_form.form_id, task_form.handler, form
 
 
-async def _check(session: Session, form: FormOut, answer: dict[str, Any]) -> None:
-    """Every field problem at once: the form's own checks, then whether each
-    dependent choice belongs to its parent (a plot of the chosen farm)."""
+def _farm_owner(actor: Actor, user_id: UUID) -> UUID | None:
+    """Whose farms the answer's farm_id must be one of: the caller's when
+    they are a farmer and not also a hub collector or processor, else None."""
+    if "farmer" in actor.roles and not actor.roles & _ANY_FARM_ROLES:
+        return user_id
+    return None
+
+
+async def _farm_errors(
+    session: Session, farmer_id: UUID | None, answer: dict[str, Any]
+) -> dict[str, str]:
+    value = answer.get("farm_id")
+    if farmer_id is None or not isinstance(value, str) or not value.strip():
+        return {}
+    try:
+        farm_id = UUID(value.strip())
+    except ValueError:
+        return {}  # not a farm id at all: the type checks report it
+    if farm_id in await db.agriculture.farm_ids_of_farmer(session, farmer_id):
+        return {}
+    return {"farm_id": _NOT_MY_FARM}
+
+
+async def _check(
+    session: Session, form: FormOut, answer: dict[str, Any], farmer_id: UUID | None = None
+) -> None:
+    """Every field problem at once: the form's own checks, whether each
+    dependent choice belongs to its parent (a plot of the chosen farm), and,
+    for a farmer (`farmer_id`), whether the chosen farm is one of theirs."""
     errors = answer_errors(form, answer)
     for field, message in (await dissect.dependency_errors(session, answer)).items():
+        errors.setdefault(field, message)
+    for field, message in (await _farm_errors(session, farmer_id, answer)).items():
         errors.setdefault(field, message)
     if errors:
         raise Invalid("ข้อมูลไม่ผ่านการตรวจสอบ", fields=errors)
@@ -90,7 +125,7 @@ async def submit(
     user_id = _caller(actor)
     form_id, handler, form = await _form_for(session, user_id, task_id)
     await dissect.handler_table(session, handler)  # 501 before anything is written
-    await _check(session, form, answer)
+    await _check(session, form, answer, _farm_owner(actor, user_id))
     # Go stored the task id inside the answer too; readers of old rows rely on it.
     stored = {**answer, "task_id": str(task_id)}
     response_id = uuid4()

@@ -28,10 +28,11 @@ def _fresh_caches() -> Iterator[None]:
         module.reset_cache()
 
 
-async def _farmer(session: AsyncSession) -> Actor:
+async def _farmer(session: AsyncSession, *roles: str) -> Actor:
+    """A user with the answer permissions; a farmer unless `roles` says otherwise."""
     user_id = await insert(session, "auth.user_account", username=f"farmer-{uuid4()}")
     assert isinstance(user_id, UUID)
-    return Actor(user_id=user_id, roles=frozenset({"farmer"}), perms=FARMER, channel="api")
+    return Actor(user_id=user_id, roles=frozenset(roles or {"farmer"}), perms=FARMER, channel="api")
 
 
 @pytest.fixture
@@ -87,8 +88,12 @@ async def task(db_session: AsyncSession) -> UUID:
     return task_id
 
 
-async def _farm(session: AsyncSession) -> str:
-    return str(await insert(session, "agriculture.farm", farm_name="F"))
+async def _farm(session: AsyncSession, *owners: Actor) -> str:
+    """A farm, linked in farmer_farm to each of `owners`."""
+    farm_id = await insert(session, "agriculture.farm", farm_name="F")
+    for owner in owners:
+        await insert(session, "agriculture.farmer_farm", farmer_id=owner.user_id, farm_id=farm_id)
+    return str(farm_id)
 
 
 async def _rows(session: AsyncSession, sql: str) -> list[Any]:
@@ -99,7 +104,7 @@ async def test_submit_saves_the_answer_and_its_handler_row(
     db_session: AsyncSession, task: UUID
 ) -> None:
     me = await _farmer(db_session)
-    farm = await _farm(db_session)
+    farm = await _farm(db_session, me)
 
     out = await answers.submit(db_session, me, task, {"farm_id": farm, "weight_kg": "12.5"})
 
@@ -132,7 +137,7 @@ async def test_an_invalid_answer_writes_nothing(db_session: AsyncSession, task: 
 async def test_a_farm_that_does_not_exist_is_named_by_its_label(
     db_session: AsyncSession, task: UUID
 ) -> None:
-    me = await _farmer(db_session)
+    me = await _farmer(db_session, "hub_collector")  # any farm: only the database objects
 
     with pytest.raises(Invalid) as caught:
         await answers.submit(db_session, me, task, {"farm_id": str(uuid4()), "weight_kg": 1})
@@ -149,7 +154,7 @@ async def test_a_form_type_that_cannot_be_saved_yet_writes_nothing(
     await db_session.execute(text("UPDATE form.task_form SET handler = 'not_built_yet'"))
 
     with pytest.raises(HandlerNotSupported):
-        await answers.submit(db_session, me, task, {"farm_id": await _farm(db_session)})
+        await answers.submit(db_session, me, task, {"farm_id": await _farm(db_session, me)})
 
     assert await _rows(db_session, "SELECT 1 FROM form.response") == []
 
@@ -173,7 +178,7 @@ async def test_edit_my_latest_or_a_given_answer_but_never_someone_elses(
 ) -> None:
     me = await _farmer(db_session)
     other = await _farmer(db_session)
-    farm = await _farm(db_session)
+    farm = await _farm(db_session, me, other)
     first = await answers.submit(db_session, me, task, {"farm_id": farm, "weight_kg": 1})
     theirs = await answers.submit(db_session, other, task, {"farm_id": farm, "weight_kg": 2})
 
@@ -228,8 +233,35 @@ async def test_a_column_the_form_does_not_ask_for_is_not_written(
         db_session,
         me,
         task,
-        {"farm_id": await _farm(db_session), "weight_kg": 1, "probe_id": str(sneaky_id)},
+        {"farm_id": await _farm(db_session, me), "weight_kg": 1, "probe_id": str(sneaky_id)},
     )
 
     [row] = await _rows(db_session, "SELECT probe_id FROM agriculture.probe_answers")
     assert row.probe_id != sneaky_id
+
+
+async def test_a_farmer_only_submits_about_their_own_farms(
+    db_session: AsyncSession, task: UUID
+) -> None:
+    me = await _farmer(db_session)
+    neighbour = await _farmer(db_session)
+    theirs = await _farm(db_session, neighbour)
+
+    with pytest.raises(Invalid) as caught:
+        await answers.submit(db_session, me, task, {"farm_id": theirs, "weight_kg": 1})
+
+    assert caught.value.fields == {"farm_id": "ฟาร์มนี้ไม่ได้อยู่ในรายชื่อฟาร์มของคุณ"}
+    assert await _rows(db_session, "SELECT 1 FROM form.response") == []
+
+
+@pytest.mark.parametrize("roles", [("hub_collector",), ("processor",), ("farmer", "hub_collector")])
+async def test_collectors_and_processors_submit_about_any_farm(
+    db_session: AsyncSession, task: UUID, roles: tuple[str, ...]
+) -> None:
+    me = await _farmer(db_session, *roles)
+    someone_elses = await _farm(db_session, await _farmer(db_session))
+
+    await answers.submit(db_session, me, task, {"farm_id": someone_elses, "weight_kg": 1})
+
+    [row] = await _rows(db_session, "SELECT farm_id FROM agriculture.probe_answers")
+    assert str(row.farm_id) == someone_elses
