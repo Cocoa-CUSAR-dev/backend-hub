@@ -1,18 +1,19 @@
 """/api/v1/tasks -- the farmer's tasks, their forms and my answers to them.
 
-Replaces mobile-backend's GET /tasks, /tasks/:taskId, /tasks/:taskId/form and
-/tasks/:taskId/responses (TASK-01, 02, 03, 05 in the API migration map).
+Replaces mobile-backend's GET /tasks, /tasks/:taskId, /tasks/:taskId/form,
+/tasks/:taskId/responses, POST /tasks and PUT /tasks (TASK-01..07 in the API
+migration map).
 """
 
 from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 
 from src.auth.dependencies import CurrentActor, SessionDep
-from src.tasks import service
-from src.tasks.schemas import ResponseOut, TaskFormOut, TaskOut
+from src.tasks import answers, service
+from src.tasks.schemas import AnswerIn, AnswerSavedOut, ResponseOut, TaskFormOut, TaskOut
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
 
@@ -45,3 +46,24 @@ async def my_responses(
     task_id: UUID, actor: CurrentActor, session: SessionDep
 ) -> list[ResponseOut]:
     return await service.my_responses(session, actor, task_id)
+
+
+@router.post(
+    "/{task_id}/responses",
+    status_code=status.HTTP_201_CREATED,
+    summary="Submit my answer to this task",
+)
+async def submit(
+    task_id: UUID, body: AnswerIn, actor: CurrentActor, session: SessionDep
+) -> AnswerSavedOut:
+    return await answers.submit(session, actor, task_id, body.answer)
+
+
+@router.put(
+    "/{task_id}/responses/{response_id}",
+    summary="Edit one of my answers to this task",
+)
+async def edit(
+    task_id: UUID, response_id: UUID, body: AnswerIn, actor: CurrentActor, session: SessionDep
+) -> AnswerSavedOut:
+    return await answers.edit(session, actor, task_id, body.answer, response_id)
