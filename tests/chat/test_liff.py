@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 import pytest
 from httpx import AsyncClient
 
+from src.actor import Actor
 from src.chat import liff as liff_tasks
 from src.chat.constants import ActiveSubstate
 from src.chat.service import Choice, ConversationReply
@@ -21,7 +22,7 @@ from src.config import settings
 from src.database import get_session
 from src.exceptions import InvalidLiffToken, LineAccountNotLinked, UpstreamServiceError
 from src.main import app
-from src.tasks.schemas import TaskListItem
+from src.tasks.schemas import TaskOut
 
 # Shaped like a real LIFF ID ("{channelId}-{randomId}", LINE's own format)
 # so liff.channel_id_from_liff_id has something valid to split on. Scoped to
@@ -101,26 +102,44 @@ async def test_resolve_liff_user_derives_channel_id_from_liff_id() -> None:
 # --- GET /line/liff/tasks -----------------------------------------------
 
 
-def _task_item(task_id: UUID, handler: str, status: str) -> TaskListItem:
-    return TaskListItem(
+def _task_item(task_id: UUID, handler: str | None, status: str, *, form: bool = True) -> TaskOut:
+    return TaskOut(
         task_id=task_id,
-        task_form_id=uuid4(),
         title="test task",
-        handler=handler,
+        description=None,
+        open_at=None,
+        close_at=None,
+        task_form_id=uuid4() if form else None,
+        handler=handler if form else None,
+        is_multiple_submit=False,
         status=status,
+    )
+
+
+def _as_liff_user(user_id: UUID) -> None:
+    app.dependency_overrides[liff_tasks.resolve_liff_user] = lambda: liff_tasks.ResolvedLiffUser(
+        user_id=user_id, line_user_id="Uabc"
+    )
+
+
+def _liff_actor(user_id: UUID) -> Actor:
+    return Actor(
+        user_id=user_id,
+        roles=frozenset({"farmer"}),
+        perms=frozenset({"read:form:assigned", "read:response:own"}),
+        channel="liff",
     )
 
 
 async def test_list_pending_tasks_filters_out_completed(client: AsyncClient) -> None:
     pending = _task_item(uuid4(), "farm_activity", "NOT_STARTED")
     completed = _task_item(uuid4(), "harvest", "COMPLETED")
-    app.dependency_overrides[liff_tasks.resolve_liff_user] = lambda: liff_tasks.ResolvedLiffUser(
-        user_id=uuid4(), line_user_id="Uabc"
-    )
+    user_id = uuid4()
+    _as_liff_user(user_id)
 
-    with patch(
-        "src.chat.liff.fetch_pending_tasks",
-        AsyncMock(return_value=[pending, completed]),
+    with (
+        patch("src.chat.liff.load_actor", AsyncMock(return_value=_liff_actor(user_id))),
+        patch("src.chat.liff.tasks_service.list_for", AsyncMock(return_value=[pending, completed])),
     ):
         resp = await client.get("/line/liff/tasks")
 
@@ -132,20 +151,22 @@ async def test_list_pending_tasks_filters_out_completed(client: AsyncClient) -> 
 
 async def test_list_pending_tasks_keeps_everything_still_outstanding(client: AsyncClient) -> None:
     # docs-and-plan#177: "pending" means anything the farmer can still act
-    # on. A multi-submit form with rows already in comes back from Go as
-    # IN_PROGRESS (form_handler.go's status ladder), and an overdue task is
-    # still owed -- both stay, in Go's order; only COMPLETED goes.
+    # on. A multi-submit form with rows already in comes back from the service
+    # as IN_PROGRESS, and an overdue task is still owed -- both stay, in the
+    # service's order; only COMPLETED goes.
     user_id = uuid4()
     not_started = _task_item(uuid4(), "farm_activity", "NOT_STARTED")
     multi_submit_in_progress = _task_item(uuid4(), "harvest_grade", "IN_PROGRESS")
     done = _task_item(uuid4(), "harvest", "COMPLETED")
     overdue = _task_item(uuid4(), "fertilizer", "OVERDUE")
-    app.dependency_overrides[liff_tasks.resolve_liff_user] = lambda: liff_tasks.ResolvedLiffUser(
-        user_id=user_id, line_user_id="Uabc"
-    )
+    _as_liff_user(user_id)
+    actor = _liff_actor(user_id)
+    list_for = AsyncMock(return_value=[not_started, multi_submit_in_progress, done, overdue])
 
-    fetch = AsyncMock(return_value=[not_started, multi_submit_in_progress, done, overdue])
-    with patch("src.chat.liff.fetch_pending_tasks", fetch):
+    with (
+        patch("src.chat.liff.load_actor", AsyncMock(return_value=actor)) as load,
+        patch("src.chat.liff.tasks_service.list_for", list_for),
+    ):
         resp = await client.get("/line/liff/tasks")
 
     assert resp.status_code == 200
@@ -154,23 +175,76 @@ async def test_list_pending_tasks_keeps_everything_still_outstanding(client: Asy
         (str(multi_submit_in_progress.task_id), "IN_PROGRESS"),
         (str(overdue.task_id), "OVERDUE"),
     ]
-    # Asked for this farmer's tasks, not anyone else's.
-    fetch.assert_awaited_once_with(user_id=str(user_id))
+    # Asked for this farmer's tasks, not anyone else's, as a LIFF caller.
+    assert load.await_args.args[1:] == (user_id, "liff")
+    assert list_for.await_args.args[1] is actor
+
+
+async def test_list_pending_tasks_leaves_out_a_task_with_no_form(client: AsyncClient) -> None:
+    with_form = _task_item(uuid4(), "harvest", "NOT_STARTED")
+    without_form = _task_item(uuid4(), None, "NOT_STARTED", form=False)
+    user_id = uuid4()
+    _as_liff_user(user_id)
+
+    with (
+        patch("src.chat.liff.load_actor", AsyncMock(return_value=_liff_actor(user_id))),
+        patch(
+            "src.chat.liff.tasks_service.list_for",
+            AsyncMock(return_value=[without_form, with_form]),
+        ),
+    ):
+        resp = await client.get("/line/liff/tasks")
+
+    assert [t["task_id"] for t in resp.json()] == [str(with_form.task_id)]
+
+
+async def test_list_pending_tasks_reads_every_page(client: AsyncClient) -> None:
+    first = [
+        _task_item(uuid4(), "harvest", "COMPLETED"),
+        _task_item(uuid4(), "harvest", "NOT_STARTED"),
+    ]
+    last = _task_item(uuid4(), "harvest", "OVERDUE")
+    user_id = uuid4()
+    _as_liff_user(user_id)
+    list_for = AsyncMock(side_effect=[first, [last]])
+
+    with (
+        patch("src.chat.liff.tasks_service.MAX_PAGE_SIZE", 2),
+        patch("src.chat.liff.load_actor", AsyncMock(return_value=_liff_actor(user_id))),
+        patch("src.chat.liff.tasks_service.list_for", list_for),
+    ):
+        resp = await client.get("/line/liff/tasks")
+
+    assert [t["task_id"] for t in resp.json()] == [str(first[1].task_id), str(last.task_id)]
+    assert [call.kwargs["page"] for call in list_for.await_args_list] == [0, 1]
 
 
 async def test_list_pending_tasks_is_empty_when_everything_is_done(client: AsyncClient) -> None:
-    app.dependency_overrides[liff_tasks.resolve_liff_user] = lambda: liff_tasks.ResolvedLiffUser(
-        user_id=uuid4(), line_user_id="Uabc"
-    )
+    user_id = uuid4()
+    _as_liff_user(user_id)
 
-    with patch(
-        "src.chat.liff.fetch_pending_tasks",
-        AsyncMock(return_value=[_task_item(uuid4(), "harvest", "COMPLETED")]),
+    with (
+        patch("src.chat.liff.load_actor", AsyncMock(return_value=_liff_actor(user_id))),
+        patch(
+            "src.chat.liff.tasks_service.list_for",
+            AsyncMock(return_value=[_task_item(uuid4(), "harvest", "COMPLETED")]),
+        ),
     ):
         resp = await client.get("/line/liff/tasks")
 
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+async def test_list_pending_tasks_is_forbidden_without_a_role(client: AsyncClient) -> None:
+    user_id = uuid4()
+    _as_liff_user(user_id)
+    nobody = Actor(user_id=user_id, roles=frozenset(), perms=frozenset(), channel="liff")
+
+    with patch("src.chat.liff.load_actor", AsyncMock(return_value=nobody)):
+        resp = await client.get("/line/liff/tasks")
+
+    assert resp.status_code == 403
 
 
 async def test_list_pending_tasks_requires_auth(client: AsyncClient) -> None:

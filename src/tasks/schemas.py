@@ -88,3 +88,17 @@ class ResponseOut(BaseModel):
     submitted_at: GoTime | None
     status: str | None
     answer: dict[str, Any] | None
+
+
+class AnswerIn(BaseModel):
+    """A farmer's answer to a task's form: field_name -> value, as the form's
+    questions name them (the same object Go's POST/PUT /tasks took as
+    `answer`; the task and response ids are in the URL now)."""
+
+    answer: dict[str, Any]
+
+
+class AnswerSavedOut(BaseModel):
+    message: str
+    # Which response was written, so the caller can edit it later.
+    response_id: UUID

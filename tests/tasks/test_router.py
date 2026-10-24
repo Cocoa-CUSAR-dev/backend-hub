@@ -173,3 +173,88 @@ async def test_responses_list(client: AsyncClient, fake: dict[str, AsyncMock]) -
             "answer": {"grade": "A"},
         }
     ]
+
+
+# --- POST / PUT answers ------------------------------------------------------------
+
+
+@pytest.fixture
+def fake_answers(monkeypatch: pytest.MonkeyPatch) -> dict[str, AsyncMock]:
+    from src.tasks import answers
+
+    fakes = {name: AsyncMock() for name in ("submit", "edit")}
+    for name, mock in fakes.items():
+        monkeypatch.setattr(answers, name, mock)
+    return fakes
+
+
+async def test_submit_answers_201_with_the_response_id(
+    client: AsyncClient, fake_answers: dict[str, AsyncMock]
+) -> None:
+    from src.tasks.schemas import AnswerSavedOut
+
+    task_id, response_id = uuid4(), uuid4()
+    fake_answers["submit"].return_value = AnswerSavedOut(
+        message="ส่งงานเรียบร้อยแล้ว", response_id=response_id
+    )
+
+    response = await client.post(
+        f"/api/v1/tasks/{task_id}/responses",
+        json={"answer": {"weight_kg": 12.5}},
+        headers=_auth(),
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {"message": "ส่งงานเรียบร้อยแล้ว", "response_id": str(response_id)}
+    _, actor, called_task, answer = fake_answers["submit"].await_args.args
+    assert (actor.user_id, called_task, answer) == (USER_ID, task_id, {"weight_kg": 12.5})
+
+
+async def test_edit_passes_both_ids(
+    client: AsyncClient, fake_answers: dict[str, AsyncMock]
+) -> None:
+    from src.tasks.schemas import AnswerSavedOut
+
+    task_id, response_id = uuid4(), uuid4()
+    fake_answers["edit"].return_value = AnswerSavedOut(
+        message="แก้ไขข้อมูลเรียบร้อยแล้ว", response_id=response_id
+    )
+
+    response = await client.put(
+        f"/api/v1/tasks/{task_id}/responses/{response_id}",
+        json={"answer": {"weight_kg": 3}},
+        headers=_auth(),
+    )
+
+    assert response.status_code == 200
+    assert fake_answers["edit"].await_args.args[2:] == (task_id, {"weight_kg": 3}, response_id)
+
+
+async def test_submit_without_an_answer_object_is_422(
+    client: AsyncClient, fake_answers: dict[str, AsyncMock]
+) -> None:
+    response = await client.post(
+        f"/api/v1/tasks/{uuid4()}/responses", json={"weight_kg": 1}, headers=_auth()
+    )
+
+    assert response.status_code == 422
+    fake_answers["submit"].assert_not_awaited()
+
+
+async def test_field_errors_from_the_service_reach_the_client(
+    client: AsyncClient, fake_answers: dict[str, AsyncMock]
+) -> None:
+    from src.exceptions import Invalid
+
+    fake_answers["submit"].side_effect = Invalid(
+        "ข้อมูลไม่ผ่านการตรวจสอบ", fields={"weight_kg": "น้ำหนัก 0-500 กก."}
+    )
+
+    response = await client.post(
+        f"/api/v1/tasks/{uuid4()}/responses", json={"answer": {}}, headers=_auth()
+    )
+
+    assert (response.status_code, response.json()) == (
+        422,
+        {"detail": "ข้อมูลไม่ผ่านการตรวจสอบ", "fields": {"weight_kg": "น้ำหนัก 0-500 กก."}},
+    )

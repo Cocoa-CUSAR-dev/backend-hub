@@ -1,47 +1,26 @@
-"""src/sso/client.py: minting the token behind the diary card's "view
-history" link (docs-and-plan#247). The router falls back to a plain /history
-link on any failure here, so every failure must raise.
-"""
+"""src/sso/client.py: the diary card's deep-link token is minted in-process
+and is exactly what POST /api/v1/auth/sso/exchange redeems."""
 
-import json
+import uuid
 
 import pytest
-import respx
-from httpx import Response
 
-from src.config import settings
-from src.exceptions import UpstreamServiceError
+from src.auth import tokens
+from src.exceptions import Unauthorized
 from src.sso.client import mint_sso_token
 
-_URL = f"{settings.KOTLIN_BACKEND_URL}/service/sso/tokens"
+
+async def test_mints_an_sso_token_for_that_user() -> None:
+    user_id = uuid.uuid4()
+
+    token = await mint_sso_token(str(user_id))
+
+    minted_for, _, _ = tokens.read_sso_token(token)
+    assert minted_for == user_id
 
 
-@respx.mock
-async def test_returns_the_token_and_sends_the_service_key() -> None:
-    route = respx.post(_URL).mock(return_value=Response(200, json={"value": "tok", "error": None}))
+async def test_the_link_token_is_not_an_api_token() -> None:
+    token = await mint_sso_token(uuid.uuid4())
 
-    assert await mint_sso_token("u-1") == "tok"
-    request = route.calls.last.request
-    assert json.loads(request.content) == {"userId": "u-1"}
-    assert request.headers["X-Service-Key"] == settings.KOTLIN_SERVICE_KEY
-
-
-@respx.mock
-async def test_401_names_the_service_key_mismatch() -> None:
-    respx.post(_URL).mock(return_value=Response(401))
-    with pytest.raises(UpstreamServiceError, match="KOTLIN_SERVICE_KEY"):
-        await mint_sso_token("u-1")
-
-
-@respx.mock
-async def test_other_errors_raise() -> None:
-    respx.post(_URL).mock(return_value=Response(500))
-    with pytest.raises(UpstreamServiceError, match="500"):
-        await mint_sso_token("u-1")
-
-
-@respx.mock
-async def test_a_200_carrying_an_error_envelope_raises() -> None:
-    respx.post(_URL).mock(return_value=Response(200, json={"value": None, "error": "no user"}))
-    with pytest.raises(UpstreamServiceError, match="no user"):
-        await mint_sso_token("u-1")
+    with pytest.raises(Unauthorized):
+        tokens.read_access_token(token)

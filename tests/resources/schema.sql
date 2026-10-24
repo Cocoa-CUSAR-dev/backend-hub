@@ -503,10 +503,34 @@ CREATE TABLE storage.geo (
     CONSTRAINT pk_geo PRIMARY KEY (geo_id)
 );
 
+-- docs-and-plan#263: src/forms/registry.py also reads which table each
+-- handler writes to (V30's schema_name / table_name), filled in for the
+-- rows seeded above with the values V30 inserts.
+ALTER TABLE form.handler_registry
+    ADD COLUMN schema_name character varying,
+    ADD COLUMN table_name character varying;
+UPDATE form.handler_registry SET schema_name = v.s, table_name = v.t
+FROM (VALUES
+    ('farm_activity', 'agriculture', 'farm_activity'),
+    ('farm_activity_fertilizer', 'agriculture', 'farm_activity_fertilizer'),
+    ('farm_activity_chemical', 'agriculture', 'farm_activity_chemical'),
+    ('harvest', 'collection', 'harvest'),
+    ('harvest_grade_detail', 'collection', 'harvest_grade_detail'),
+    ('batch', 'processing', 'batch'),
+    ('fermentation_batch', 'processing', 'fermentation_batch'),
+    ('drying_batch', 'processing', 'drying_batch')
+) AS v(h, s, t)
+WHERE handler = v.h;
+ALTER TABLE form.handler_registry
+    ALTER COLUMN schema_name SET NOT NULL,
+    ALTER COLUMN table_name SET NOT NULL;
+
 -- What the chatbot's parent picker lists (src/db/agriculture.py, collection.py,
--- processing.py and ref.py): the farmer's farm activities, the harvests of their
--- farms or hubs, the batches of their stations. Only the columns those
--- queries name; the real tables (database repo, V1 baseline) have many more.
+-- processing.py and ref.py) and the mobile hub / station / batch / harvest
+-- routes (docs-and-plan#266) read and write. Shaped as in the database repo's
+-- V1 baseline, without FKs so tests can insert rows in any order; the
+-- address and owner columns that are NOT NULL there are nullable here so a
+-- test can insert just the columns it cares about.
 CREATE SCHEMA collection;
 
 CREATE TABLE ref.farm_activity_type_constant (
@@ -527,33 +551,58 @@ CREATE TABLE agriculture.farm_activity (
 CREATE TABLE processing.hub (
     hub_id uuid DEFAULT gen_random_uuid() NOT NULL,
     hub_name character varying,
+    geo_id uuid,
+    found_date date,
+    address_detail character varying,
+    subdistrict_id uuid,
+    district_id uuid,
+    province_id uuid,
+    zip_code character varying,
+    contact_name character varying,
+    phone_number character varying,
+    line character varying,
+    facebook character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
     CONSTRAINT pk_hub PRIMARY KEY (hub_id)
-);
-
-CREATE TABLE collection.harvest (
-    harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    farm_id uuid,
-    hub_id uuid,
-    harvest_date date,
-    CONSTRAINT pk_harvest PRIMARY KEY (harvest_id)
 );
 
 CREATE TABLE processing.processing_station (
     processing_station_id uuid DEFAULT gen_random_uuid() NOT NULL,
     processing_station_name character varying,
+    hub_id uuid,
+    geo_id uuid,
+    found_date date,
+    processing_station_area numeric,
+    address_detail character varying,
+    subdistrict_id uuid,
+    district_id uuid,
+    province_id uuid,
+    zip_code character varying,
+    contact_name character varying,
+    phone_number character varying,
+    line character varying,
+    facebook character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
     CONSTRAINT pk_processing_station PRIMARY KEY (processing_station_id)
 );
 
 CREATE TABLE processing.processor_processing_station (
+    processor_processing_station_id uuid DEFAULT gen_random_uuid() NOT NULL,
     processor_id uuid NOT NULL,
     processing_station_id uuid NOT NULL,
-    CONSTRAINT pk_processor_processing_station PRIMARY KEY (processor_id, processing_station_id)
+    CONSTRAINT pk_processor_processing_station PRIMARY KEY (processor_processing_station_id)
 );
 
 CREATE TABLE processing.batch (
     batch_id uuid DEFAULT gen_random_uuid() NOT NULL,
     processing_station_id uuid NOT NULL,
+    origin character varying,
+    notes character varying DEFAULT ''::character varying,
+    quantity_kg numeric,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
     CONSTRAINT pk_batch PRIMARY KEY (batch_id)
 );
 
@@ -625,4 +674,39 @@ CREATE TABLE form.task_recipient (
     CONSTRAINT pk_task_recipient PRIMARY KEY (recipient_id),
     CONSTRAINT fk_task_recipient_task FOREIGN KEY (task_id) REFERENCES form.task (task_id) ON DELETE CASCADE,
     CONSTRAINT ck_task_recipient_type CHECK (recipient_type IN ('ROLE', 'USER'))
+);
+
+CREATE TABLE collection.harvest (
+    harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hub_id uuid,
+    farm_id uuid,
+    plot_id uuid,
+    tree_id uuid,
+    harvest_date timestamp without time zone,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT pk_harvest PRIMARY KEY (harvest_id)
+);
+
+CREATE TABLE collection.harvest_grade_detail (
+    harvest_id uuid NOT NULL,
+    grade_code character varying NOT NULL,
+    quantity_kg numeric,
+    description character varying DEFAULT ''::character varying,
+    is_clean boolean,
+    is_appropriate_size boolean,
+    weight_gram_per_pod numeric,
+    is_sprout boolean,
+    is_dry boolean,
+    is_shriveled boolean,
+    cut_test_result character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE collection.harvest_collection (
+    collection_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    harvest_id uuid NOT NULL,
+    batch_id uuid NOT NULL,
+    CONSTRAINT pk_harvest_collection PRIMARY KEY (collection_id)
 );

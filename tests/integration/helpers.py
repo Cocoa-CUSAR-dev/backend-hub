@@ -14,6 +14,10 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth.service import load_actor
+from src.line.temp_task_picker import PendingTask, list_pending_tasks
+from tests.integration.auth_helpers import seed_role
+
 
 def sign_signature(body: bytes, secret: str) -> str:
     digest = hmac.new(secret.encode(), body, hashlib.sha256).digest()
@@ -110,7 +114,16 @@ def build_postback_event(*, line_user_id: str, data: str, reply_token: str | Non
     return json.dumps(payload).encode()
 
 
-async def seed_user_with_line_identity(session: AsyncSession, *, line_user_id: str) -> uuid.UUID:
+# What the farmer role holds in the database for the task routes.
+FARMER_PERMISSIONS = ["read:form:assigned", "read:response:own"]
+
+
+async def seed_user_with_line_identity(
+    session: AsyncSession, *, line_user_id: str, roles: tuple[str, ...] = ("farmer",)
+) -> uuid.UUID:
+    """A user with a linked LINE account. Like a real LINE user they hold the
+    farmer role unless `roles` says otherwise (`roles=()` is an account that
+    registered but never added a role)."""
     user_id = uuid.uuid4()
     await session.execute(
         text("INSERT INTO auth.user_account (user_id) VALUES (:user_id)"),
@@ -123,8 +136,21 @@ async def seed_user_with_line_identity(session: AsyncSession, *, line_user_id: s
         ),
         {"user_id": user_id, "line_user_id": line_user_id},
     )
+    for role in roles:
+        role_id = await seed_role(session, role, FARMER_PERMISSIONS)
+        await session.execute(
+            text("INSERT INTO auth.user_role (user_id, role_id) VALUES (:u, :r)"),
+            {"u": user_id, "r": role_id},
+        )
     await session.commit()
     return user_id
+
+
+async def pending_tasks_of(session: AsyncSession, user_id: uuid.UUID) -> list[PendingTask]:
+    """What the LINE picker lists for this user, loading their roles as the
+    webhook does."""
+    actor = await load_actor(session, user_id, "line")
+    return await list_pending_tasks(session, actor)
 
 
 async def seed_task_form(

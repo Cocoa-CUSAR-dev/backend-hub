@@ -8,6 +8,7 @@ from datetime import datetime, time
 from uuid import UUID
 
 from src import db
+from src.actor import Actor, require
 from src.database import Session, transaction
 from src.db.notify import Recipient, ScheduleRow
 
@@ -32,8 +33,15 @@ async def due_reminders(session: Session, now_time: time) -> list[DueReminder]:
     ]
 
 
+# Who may set up reminders: whoever may create forms (researchers, admins),
+# since a reminder belongs to a form. The reminder routes (API migration map
+# FORM-08..11) ask for the same key.
+_MANAGE = "create:form:all"
+
+
 async def create_schedule(
     session: Session,
+    actor: Actor,
     *,
     task_id: UUID,
     time_of_day: time,
@@ -44,6 +52,7 @@ async def create_schedule(
     recipient rules are collapsed, so the caller should trust this, not the
     request it sent.
     """
+    require(actor, _MANAGE)
     async with transaction(session):
         schedule_id = await db.notify.create_schedule(
             session,
@@ -56,12 +65,14 @@ async def create_schedule(
     return next(s for s in schedules if s.schedule_id == schedule_id)
 
 
-async def list_schedules(session: Session, task_id: UUID) -> list[ScheduleRow]:
+async def list_schedules(session: Session, actor: Actor, task_id: UUID) -> list[ScheduleRow]:
+    require(actor, _MANAGE)
     return await db.notify.list_schedules_for_task(session, task_id)
 
 
 async def update_schedule(
     session: Session,
+    actor: Actor,
     schedule_id: UUID,
     *,
     time_of_day: time | None = None,
@@ -69,6 +80,7 @@ async def update_schedule(
     recipients: list[Recipient] | None = None,
 ) -> ScheduleRow:
     """Changes only what is passed; `recipients` replaces the whole list."""
+    require(actor, _MANAGE)
     async with transaction(session):
         return await db.notify.update_schedule(
             session,

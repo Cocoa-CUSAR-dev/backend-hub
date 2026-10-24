@@ -22,10 +22,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
-from src.line.temp_task_picker import list_pending_tasks
 from tests.integration.helpers import (
     build_form_response,
     build_postback_event,
+    pending_tasks_of,
     question_json,
     seed_conversation,
     seed_conversation_answer,
@@ -66,12 +66,12 @@ class TestPickerKeepsMultiSubmitTasksListed:
         line_user_id = f"U{uuid.uuid4().hex}"
         user_id = await seed_user_with_line_identity(db_session, line_user_id=line_user_id)
 
-        before = await list_pending_tasks(db_session, user_id)
+        before = await pending_tasks_of(db_session, user_id)
         assert task_id in {t.task_id for t in before}
 
         await _seed_response(db_session, task_id=task_id, user_id=user_id)
 
-        after = await list_pending_tasks(db_session, user_id)
+        after = await pending_tasks_of(db_session, user_id)
         assert task_id not in {t.task_id for t in after}
 
     async def test_multi_submit_task_stays_listed_after_submitting(
@@ -83,7 +83,7 @@ class TestPickerKeepsMultiSubmitTasksListed:
 
         await _seed_response(db_session, task_id=task_id, user_id=user_id)
 
-        tasks = await list_pending_tasks(db_session, user_id)
+        tasks = await pending_tasks_of(db_session, user_id)
         assert task_id in {t.task_id for t in tasks}, (
             "a multi-submit task must stay listed after the first submission, "
             "or the second row is unreachable"
@@ -102,7 +102,7 @@ class TestPickerKeepsMultiSubmitTasksListed:
         for _ in range(3):
             await _seed_response(db_session, task_id=task_id, user_id=user_id)
 
-        tasks = await list_pending_tasks(db_session, user_id)
+        tasks = await pending_tasks_of(db_session, user_id)
         appearances = [t for t in tasks if t.task_id == task_id]
         assert len(appearances) == 1, f"listed {len(appearances)} times, want exactly 1"
 
@@ -117,7 +117,7 @@ class TestPickerKeepsMultiSubmitTasksListed:
 
         await _seed_response(db_session, task_id=task_id, user_id=their_user_id)
 
-        tasks = await list_pending_tasks(db_session, my_user_id)
+        tasks = await pending_tasks_of(db_session, my_user_id)
         assert task_id in {t.task_id for t in tasks}
 
 
