@@ -13,6 +13,7 @@ strict identifier pattern and quoted before use.
 
 import re
 from dataclasses import dataclass
+from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,3 +95,38 @@ async def grade_codes(session: AsyncSession) -> list[Choice]:
     its uuid, so id and name are both grade_name."""
     result = await session.execute(text("SELECT grade_name FROM ref.grade_constant"))
     return [Choice(id=name, name=name) for name in result.scalars()]
+
+
+@dataclass(frozen=True, slots=True)
+class PlaceIds:
+    """Where a place sits: its district and province (either may be None)."""
+
+    province_id: UUID | None
+    district_id: UUID | None
+
+
+async def subdistrict_place(session: AsyncSession, subdistrict_id: UUID) -> PlaceIds | None:
+    """The district and province a subdistrict is in, or None if it doesn't exist."""
+    row = (
+        await session.execute(
+            text(
+                """
+                SELECT d.province_id, s.district_id
+                FROM ref.subdistrict_constant s
+                JOIN ref.district_constant d ON d.district_id = s.district_id
+                WHERE s.subdistrict_id = :subdistrict_id
+                """
+            ),
+            {"subdistrict_id": subdistrict_id},
+        )
+    ).first()
+    return PlaceIds(**row._mapping) if row else None
+
+
+async def province_of_district(session: AsyncSession, district_id: UUID) -> UUID | None:
+    found = await session.execute(
+        text("SELECT province_id FROM ref.district_constant WHERE district_id = :district_id"),
+        {"district_id": district_id},
+    )
+    province: UUID | None = found.scalar()
+    return province
