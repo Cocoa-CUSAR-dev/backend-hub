@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from httpx import AsyncClient
 
-from src.reminders.schemas import RecipientRule
+from src.db.notify import Recipient, ScheduleRow
 
 # matches tests/conftest.py's CHATBOT_SERVICE_KEY
 _KEY = "test-service-key"
@@ -30,20 +30,12 @@ async def test_wrong_service_key_is_rejected(client: AsyncClient) -> None:
 async def test_valid_request_creates_a_daily_active_schedule(client: AsyncClient) -> None:
     task_id, created_by = uuid4(), uuid4()
     schedule_id = uuid4()
-    with (
-        patch(
-            "src.reminders.router.create_reminder_schedule",
-            new=AsyncMock(return_value=schedule_id),
-        ) as create,
-        patch(
-            "src.reminders.router.list_schedules_for_task",
-            new=AsyncMock(
-                return_value=[
-                    _row(schedule_id, task_id, time_of_day=time(17, 0), created_by=created_by)
-                ]
-            ),
+    with patch(
+        "src.reminders.service.create_schedule",
+        new=AsyncMock(
+            return_value=_row(schedule_id, task_id, time_of_day=time(17, 0), created_by=created_by)
         ),
-    ):
+    ) as create:
         resp = await client.post(
             "/service/reminders",
             json={"task_id": str(task_id), "time_of_day": "17:00", "created_by": str(created_by)},
@@ -75,16 +67,10 @@ async def test_request_has_no_way_to_specify_a_cadence(client: AsyncClient) -> N
     """
     task_id, created_by = uuid4(), uuid4()
     schedule_id = uuid4()
-    with (
-        patch(
-            "src.reminders.router.create_reminder_schedule",
-            new=AsyncMock(return_value=schedule_id),
-        ) as create,
-        patch(
-            "src.reminders.router.list_schedules_for_task",
-            new=AsyncMock(return_value=[_row(schedule_id, task_id, created_by=created_by)]),
-        ),
-    ):
+    with patch(
+        "src.reminders.service.create_schedule",
+        new=AsyncMock(return_value=_row(schedule_id, task_id, created_by=created_by)),
+    ) as create:
         resp = await client.post(
             "/service/reminders",
             json={
@@ -105,29 +91,18 @@ async def test_request_has_no_way_to_specify_a_cadence(client: AsyncClient) -> N
 async def test_create_passes_recipient_rules_through(client: AsyncClient) -> None:
     task_id, created_by, role_id, user_id = uuid4(), uuid4(), uuid4(), uuid4()
     schedule_id = uuid4()
-    persisted_recipients = [
-        RecipientRule(type="ROLE", id=role_id),
-        RecipientRule(type="USER", id=user_id),
-    ]
-    with (
-        patch(
-            "src.reminders.router.create_reminder_schedule",
-            new=AsyncMock(return_value=schedule_id),
-        ) as create,
-        patch(
-            "src.reminders.router.list_schedules_for_task",
-            new=AsyncMock(
-                return_value=[
-                    _row(
-                        schedule_id,
-                        task_id,
-                        created_by=created_by,
-                        recipients=persisted_recipients,
-                    )
-                ]
-            ),
+    persisted_recipients = (
+        Recipient(type="ROLE", id=role_id),
+        Recipient(type="USER", id=user_id),
+    )
+    with patch(
+        "src.reminders.service.create_schedule",
+        new=AsyncMock(
+            return_value=_row(
+                schedule_id, task_id, created_by=created_by, recipients=persisted_recipients
+            )
         ),
-    ):
+    ) as create:
         resp = await client.post(
             "/service/reminders",
             json={
@@ -173,8 +148,6 @@ async def test_list_and_update_require_the_service_key(client: AsyncClient) -> N
 
 
 def _row(schedule_id, task_id, **overrides):  # type: ignore[no-untyped-def]
-    from src.reminders.queries import ScheduleRow
-
     fields = {
         "schedule_id": schedule_id,
         "task_id": task_id,
@@ -182,7 +155,7 @@ def _row(schedule_id, task_id, **overrides):  # type: ignore[no-untyped-def]
         "time_of_day": time(9, 0),
         "is_active": True,
         "created_by": uuid4(),
-        "recipients": [],
+        "recipients": (),
     }
     fields.update(overrides)
     return ScheduleRow(**fields)
@@ -191,7 +164,7 @@ def _row(schedule_id, task_id, **overrides):  # type: ignore[no-untyped-def]
 async def test_list_returns_the_tasks_schedules(client: AsyncClient) -> None:
     schedule_id, task_id = uuid4(), uuid4()
     with patch(
-        "src.reminders.router.list_schedules_for_task",
+        "src.reminders.service.list_schedules",
         new=AsyncMock(return_value=[_row(schedule_id, task_id)]),
     ) as lst:
         resp = await client.get(
@@ -206,7 +179,7 @@ async def test_list_returns_the_tasks_schedules(client: AsyncClient) -> None:
 async def test_patch_updates_only_the_fields_sent(client: AsyncClient) -> None:
     schedule_id, task_id = uuid4(), uuid4()
     with patch(
-        "src.reminders.router.update_reminder_schedule",
+        "src.reminders.service.update_schedule",
         new=AsyncMock(return_value=_row(schedule_id, task_id, is_active=False)),
     ) as upd:
         resp = await client.patch(
@@ -224,7 +197,7 @@ async def test_patch_unknown_schedule_is_404(client: AsyncClient) -> None:
     from src.exceptions import ReminderNotFound
 
     with patch(
-        "src.reminders.router.update_reminder_schedule",
+        "src.reminders.service.update_schedule",
         new=AsyncMock(side_effect=ReminderNotFound()),
     ):
         resp = await client.patch(
@@ -237,7 +210,7 @@ async def test_bad_reference_is_422(client: AsyncClient) -> None:
     from src.exceptions import InvalidReminderReference
 
     with patch(
-        "src.reminders.router.create_reminder_schedule",
+        "src.reminders.service.create_schedule",
         new=AsyncMock(side_effect=InvalidReminderReference()),
     ):
         resp = await client.post(

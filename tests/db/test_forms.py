@@ -364,6 +364,25 @@ async def test_load_form_keeps_a_section_with_no_questions(db_session: AsyncSess
     assert [(s.title, s.questions) for s in form.sections] == [("S1", [])]
 
 
+async def test_child_handlers_are_the_active_ones_that_have_a_parent(
+    db_session: AsyncSession,
+) -> None:
+    await db_session.execute(
+        text(
+            "INSERT INTO form.handler_registry (handler, parent_handler, parent_field, is_active) "
+            "VALUES ('off_child', 'harvest', 'harvest_id', false)"
+        )
+    )
+
+    rows = await db.forms.child_handlers(db_session)
+
+    by_handler = {r.handler: (r.parent_handler, r.parent_field) for r in rows}
+    assert by_handler["farm_activity_fertilizer"] == ("farm_activity", "farm_activity_id")
+    assert by_handler["drying_batch"] == ("batch", "batch_id")
+    assert "off_child" not in by_handler  # inactive
+    assert "harvest" not in by_handler  # standalone: no parent
+
+
 # ---- the researcher's form list (FORM-01) ------------------------------------------
 
 

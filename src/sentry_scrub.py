@@ -1,7 +1,7 @@
 """Keeps SSO deep-link tokens out of Sentry events (US3-2 #125, F2).
 
 The diary card's link carries a short-lived SSO token
-(``{WEB_APP_URL}/sso#token=<jwt>``, src/line/router.py). Nothing here logs
+(``{WEB_APP_URL}/sso#token=<jwt>``, src/chat/router.py). Nothing here logs
 that link, but Sentry's Python SDK attaches the *local variables of every
 stack frame* to an exception by default. If ``push_flex`` fails -- LINE answers
 429 once the monthly message quota is spent, which has happened -- the event

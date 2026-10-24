@@ -22,7 +22,7 @@ dependencies = [
     "pyjwt>=2.9",
     "bcrypt>=4.2",
     "sentry-sdk[fastapi]>=2.17",
-    # src/conversation/text_parsing.py: thaiword_to_num (spelled-out Thai
+    # src/chat/text_parsing.py: thaiword_to_num (spelled-out Thai
     # numerals -> int) and dateparser (Thai relative/absolute dates).
     "pythainlp>=5.0",
     "dateparser>=1.2",

@@ -8,9 +8,8 @@ import logging
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src import db
+from src.database import Session
 from src.line.service import multicast_text_batched, push_text
 from src.notifications.schemas import FailedRecipient, SendNotificationResponse
 
@@ -45,7 +44,7 @@ async def _deliver(line_user_ids: list[str], message: str) -> tuple[list[str], l
 
 
 async def send_notification(
-    session: AsyncSession, user_ids: Sequence[UUID], message: str
+    session: Session, user_ids: Sequence[UUID], message: str
 ) -> SendNotificationResponse:
     ordered = _dedupe(user_ids)
     id_map = await db.auth.line_user_ids_for(session, ordered)

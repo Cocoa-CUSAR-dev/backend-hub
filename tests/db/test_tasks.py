@@ -154,6 +154,21 @@ async def test_responses_of_user_lists_only_mine_newest_first(db_session: AsyncS
     assert rows[0].status == "SUBMITTED"
 
 
+async def test_task_briefs_cover_only_tasks_that_exist(db_session: AsyncSession) -> None:
+    opens = datetime(2026, 10, 1, 8)
+    titled = await _task(db_session, "harvest", opens)
+    untitled = await insert(db_session, "form.task", title=None)
+    assert untitled is not None
+
+    briefs = await db.tasks.task_briefs(db_session, [titled, untitled, uuid4()])
+
+    assert briefs == {
+        titled: db.tasks.TaskBrief(title="harvest", open_at=opens),
+        untitled: db.tasks.TaskBrief(title=None, open_at=None),
+    }
+    assert await db.tasks.task_briefs(db_session, []) == {}
+
+
 # ---- the researcher's task view (FORM-01 / FORM-02 ?include=stats) -------------
 
 

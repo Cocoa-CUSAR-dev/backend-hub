@@ -1,18 +1,14 @@
 """Webhook signature verification -- see ADR 0003 (line-bot-sdk-python chosen
-specifically so this doesn't need hand-rolled HMAC verification).
+specifically so this doesn't need hand-rolled HMAC verification). The check
+itself lives in src/line/client.py; this is only the FastAPI dependency.
 """
 
-from typing import Annotated, cast
+from typing import Annotated
 
 from fastapi import Header, Request
-from linebot.v3 import WebhookParser
-from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.webhooks import Event
 
-from src.config import settings
-from src.exceptions import InvalidLineSignature
-
-_parser = WebhookParser(settings.LINE_CHANNEL_SECRET)
+from src.line import client
+from src.line.client import Event
 
 
 async def parse_line_events(
@@ -20,9 +16,4 @@ async def parse_line_events(
     x_line_signature: Annotated[str, Header()],
 ) -> list[Event]:
     body = (await request.body()).decode("utf-8")
-    try:
-        # line-bot-sdk's own stubs don't type WebhookParser.parse()'s return
-        # precisely enough for mypy to see past Any here.
-        return cast(list[Event], _parser.parse(body, x_line_signature))
-    except InvalidSignatureError as exc:
-        raise InvalidLineSignature from exc
+    return client.parse_events(body, x_line_signature)

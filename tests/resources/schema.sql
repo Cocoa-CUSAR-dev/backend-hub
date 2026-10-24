@@ -503,6 +503,60 @@ CREATE TABLE storage.geo (
     CONSTRAINT pk_geo PRIMARY KEY (geo_id)
 );
 
+-- What the chatbot's parent picker lists (src/db/agriculture.py, collection.py,
+-- processing.py and ref.py): the farmer's farm activities, the harvests of their
+-- farms or hubs, the batches of their stations. Only the columns those
+-- queries name; the real tables (database repo, V1 baseline) have many more.
+CREATE SCHEMA collection;
+
+CREATE TABLE ref.farm_activity_type_constant (
+    farm_activity_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    farm_activity_type_name character varying,
+    CONSTRAINT pk_farm_activity_type_constant PRIMARY KEY (farm_activity_type_id)
+);
+
+CREATE TABLE agriculture.farm_activity (
+    farm_activity_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    farm_id uuid NOT NULL,
+    farm_activity_type_id uuid,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_farm_activity PRIMARY KEY (farm_activity_id),
+    CONSTRAINT fk_farm_activity_farm FOREIGN KEY (farm_id) REFERENCES agriculture.farm (farm_id)
+);
+
+CREATE TABLE processing.hub (
+    hub_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hub_name character varying,
+    CONSTRAINT pk_hub PRIMARY KEY (hub_id)
+);
+
+CREATE TABLE collection.harvest (
+    harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    farm_id uuid,
+    hub_id uuid,
+    harvest_date date,
+    CONSTRAINT pk_harvest PRIMARY KEY (harvest_id)
+);
+
+CREATE TABLE processing.processing_station (
+    processing_station_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processing_station_name character varying,
+    CONSTRAINT pk_processing_station PRIMARY KEY (processing_station_id)
+);
+
+CREATE TABLE processing.processor_processing_station (
+    processor_id uuid NOT NULL,
+    processing_station_id uuid NOT NULL,
+    CONSTRAINT pk_processor_processing_station PRIMARY KEY (processor_id, processing_station_id)
+);
+
+CREATE TABLE processing.batch (
+    batch_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processing_station_id uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_batch PRIMARY KEY (batch_id)
+);
+
 -- docs-and-plan#271 (and the contract seed, tests/contract/web/seed): the
 -- researcher's form list and task view read these columns, and the seed's
 -- base.sql and forms.sql write them. Copied from the database repo's V1
@@ -574,40 +628,31 @@ CREATE TABLE form.task_recipient (
 );
 
 -- docs-and-plan#279 (raw-data export) and the contract seed's places.sql: the
--- hub and the harvests the export reads. Same definitions as docs-and-plan#266
--- (backend-hub#9) adds, with IF NOT EXISTS so either PR can merge first.
-CREATE SCHEMA IF NOT EXISTS collection;
+-- hub and the harvests the export and the dashboard read. The chatbot's picker
+-- (above) creates processing.hub and collection.harvest with only the columns it
+-- needs; this adds the rest, as in the database repo's V1 baseline. They stay
+-- nullable so the picker's tests that insert a bare row keep working.
+ALTER TABLE processing.hub
+    ADD COLUMN IF NOT EXISTS geo_id uuid,
+    ADD COLUMN IF NOT EXISTS found_date date,
+    ADD COLUMN IF NOT EXISTS address_detail character varying,
+    ADD COLUMN IF NOT EXISTS subdistrict_id uuid,
+    ADD COLUMN IF NOT EXISTS district_id uuid,
+    ADD COLUMN IF NOT EXISTS province_id uuid,
+    ADD COLUMN IF NOT EXISTS zip_code character varying,
+    ADD COLUMN IF NOT EXISTS contact_name character varying,
+    ADD COLUMN IF NOT EXISTS phone_number character varying,
+    ADD COLUMN IF NOT EXISTS line character varying,
+    ADD COLUMN IF NOT EXISTS facebook character varying,
+    ADD COLUMN IF NOT EXISTS created_at timestamp without time zone DEFAULT now() NOT NULL,
+    ADD COLUMN IF NOT EXISTS updated_at timestamp without time zone DEFAULT now() NOT NULL;
 
-CREATE TABLE IF NOT EXISTS processing.hub (
-    hub_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    hub_name character varying,
-    geo_id uuid,
-    found_date date,
-    address_detail character varying,
-    subdistrict_id uuid NOT NULL,
-    district_id uuid NOT NULL,
-    province_id uuid NOT NULL,
-    zip_code character varying,
-    contact_name character varying,
-    phone_number character varying,
-    line character varying,
-    facebook character varying,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT pk_hub PRIMARY KEY (hub_id)
-);
-
-CREATE TABLE IF NOT EXISTS collection.harvest (
-    harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    hub_id uuid NOT NULL,
-    farm_id uuid NOT NULL,
-    plot_id uuid,
-    tree_id uuid,
-    harvest_date timestamp without time zone,
-    created_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone DEFAULT now(),
-    CONSTRAINT pk_harvest PRIMARY KEY (harvest_id)
-);
+ALTER TABLE collection.harvest
+    ALTER COLUMN harvest_date TYPE timestamp without time zone,
+    ADD COLUMN IF NOT EXISTS plot_id uuid,
+    ADD COLUMN IF NOT EXISTS tree_id uuid,
+    ADD COLUMN IF NOT EXISTS created_at timestamp without time zone DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS updated_at timestamp without time zone DEFAULT now();
 
 CREATE TABLE IF NOT EXISTS collection.harvest_grade_detail (
     harvest_id uuid NOT NULL,
