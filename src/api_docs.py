@@ -43,6 +43,15 @@ TAGS: list[dict[str, Any]] = [
         "(open_at, close_at) are Bangkok wall-clock written with a Z, as the mobile app expects.",
     },
     {
+        "name": "forms",
+        "description": "Researchers: every form and one form's definition; `include=stats` gives "
+        "the task view (task dates and type). `{form_id}` is always a form id.",
+    },
+    {
+        "name": "reports",
+        "description": "Researchers: the raw-data Excel download (farm registry and harvests).",
+    },
+    {
         "name": "agriculture",
         "description": "Farms, plots and farm photos: register them and list mine. Photos are "
         "private; lists carry a link to each farm's newest photo, valid for an hour.",

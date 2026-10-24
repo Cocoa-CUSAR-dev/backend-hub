@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -97,3 +98,38 @@ class FormOut(_CamelOut):
     description: str | None
     is_multiple_submit: bool
     sections: list[SectionOut]
+
+
+# --- The researcher's form list and task view (FORM-01, FORM-02) -----------
+#
+# Same keys as web-backend's Form.Entity and Task.Entity, which the web app
+# reads today; times are Bangkok wall-clock with no zone, as Kotlin wrote them.
+
+
+class FormSummaryOut(_CamelOut):
+    """One row of GET /api/v1/forms."""
+
+    form_id: UUID
+    task_id: UUID
+    title: str | None
+    content: str | None
+    handler: str | None
+    is_multiple_submit: bool
+    description: str | None
+    created_at: datetime | None
+
+
+class FormTaskOut(_CamelOut):
+    """A form's task, for the researcher's task list (`?include=stats`).
+
+    Kotlin's GET /tasks rows plus `formId`, which the web app passes to
+    /forms/{id} from there on. `formId` is null for a task with no form.
+    """
+
+    form_id: UUID | None
+    task_id: UUID
+    title: str | None
+    description: str | None
+    task_type: str | None
+    open_at: datetime | None
+    close_at: datetime | None

@@ -1,0 +1,128 @@
+{
+  "kid": "K-09",
+  "after": "ME-04",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/me/history/{date}"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/me/history/{date}"
+  },
+  "seeds": [
+    "base",
+    "forms",
+    "answers"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "one day",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/me/history/2026-10-05",
+      "actor": "farmer_1",
+      "params": {
+        "date": "2026-10-05"
+      },
+      "body": null,
+      "response": [
+        {
+          "fieldName": "hub_id",
+          "label": "หน่วยรวบรวมที่จัดส่ง",
+          "inputType": "OPTION",
+          "rawValue": "42000000-0000-4000-8000-000000000001"
+        },
+        {
+          "fieldName": "harvest_date",
+          "label": "วันที่ส่งมา",
+          "inputType": "DATE",
+          "rawValue": "2026-10-05"
+        },
+        {
+          "fieldName": "logistic_result",
+          "label": "อธิบายการขนส่ง",
+          "inputType": "VARCHAR",
+          "rawValue": "รถกระบะ"
+        },
+        {
+          "fieldName": "farm_id",
+          "label": "เลือกฟาร์มที่จัดส่ง",
+          "inputType": "OPTION",
+          "rawValue": "40000000-0000-4000-8000-000000000001"
+        },
+        {
+          "fieldName": "description",
+          "label": "รายละเอียด",
+          "inputType": "VARCHAR",
+          "rawValue": "ใส่ปุ๋ย"
+        },
+        {
+          "fieldName": "plot_id",
+          "label": "แปลงที่ดำเนินการ",
+          "inputType": "OPTION",
+          "rawValue": "41000000-0000-4000-8000-000000000001"
+        },
+        {
+          "fieldName": "farm_id",
+          "label": "ฟาร์มที่ทำกิจกรรม",
+          "inputType": "OPTION",
+          "rawValue": "40000000-0000-4000-8000-000000000001"
+        }
+      ]
+    },
+    {
+      "name": "an empty day",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/me/history/2026-10-20",
+      "actor": "farmer_1",
+      "params": {
+        "date": "2026-10-20"
+      },
+      "body": null,
+      "response": []
+    },
+    {
+      "name": "only my own answers",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/me/history/2026-10-05",
+      "actor": "farmer_2",
+      "params": {
+        "date": "2026-10-05"
+      },
+      "body": null,
+      "response": []
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/me/history/2026-10-05",
+      "actor": "researcher",
+      "params": {
+        "date": "2026-10-05"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/me/history/2026-10-05",
+      "params": {
+        "date": "2026-10-05"
+      },
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:20.269+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/me/history/2026-10-05"
+      }
+    }
+  ]
+}

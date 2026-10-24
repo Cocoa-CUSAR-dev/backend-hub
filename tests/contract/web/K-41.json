@@ -1,0 +1,134 @@
+{
+  "kid": "K-41",
+  "after": "ANL-06",
+  "note": "",
+  "kotlin": {
+    "method": "POST",
+    "path": "/api/v1/analytics/harvest/spatial/summary/count"
+  },
+  "hub": {
+    "method": "POST",
+    "path": "/api/v1/analytics/harvest/spatial/summary/count"
+  },
+  "seeds": [
+    "base",
+    "places"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "drawn area around Chumphon",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/summary/count",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Number of Harvests",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "data": {
+          "label": "All Grades",
+          "value": 5.0,
+          "unit": "records"
+        }
+      }
+    },
+    {
+      "name": "no area",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/summary/count",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {},
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Number of Harvests",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "data": {
+          "label": "All Grades",
+          "value": 7.0,
+          "unit": "records"
+        }
+      }
+    },
+    {
+      "name": "grade A in the area",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/summary/count",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "gradeCode": "A"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Number of Harvests",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "data": {
+          "label": "Grade A",
+          "value": 3.0,
+          "unit": "records"
+        }
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/summary/count",
+      "actor": "farmer_1",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/summary/count",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "timestamp": "2026-10-23T12:37:43.848+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/analytics/harvest/spatial/summary/count"
+      }
+    }
+  ]
+}
