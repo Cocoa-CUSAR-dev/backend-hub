@@ -8,7 +8,10 @@
   },
   "hub": {
     "method": "GET",
-    "path": "/api/v1/analytics/harvest/time-series/sum"
+    "path": "/api/v1/analytics/harvest/time-series/{mode}",
+    "params": {
+      "mode": "=sum"
+    }
   },
   "seeds": [
     "base",

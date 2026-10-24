@@ -8,7 +8,13 @@
   },
   "hub": {
     "method": "POST",
-    "path": "/api/v1/analytics/harvest/spatial/summary/count"
+    "path": "/api/v1/analytics/harvest/spatial/summary/{mode}",
+    "params": {
+      "mode": "=count"
+    },
+    "requires": [
+      "postgis"
+    ]
   },
   "seeds": [
     "base",

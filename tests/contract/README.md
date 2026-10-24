@@ -70,6 +70,11 @@ Where the hub is meant to differ, set it on the case in the fixture file, and on
 The fixture's `hub` block says which route to call: `method`, `path`, extra `query`,
 and `params` (hub name → Kotlin name). `form_of:taskId` sends the form id of that task,
 because `/forms/{id}` takes a form id where Kotlin took a task id (docs-and-plan#271).
+A value starting with `=` is fixed: `"params": {"mode": "=sum"}` fills `{mode}` with `sum`,
+for the routes where several Kotlin routes became one with the mode in the path (ANL-01..06).
+`"requires": ["postgis"]` skips the case when the database has no PostGIS, as
+`tests/resources/schema.sql` doesn't: the drawn-area analytics (K-36..K-41) only replay
+against a database built from the migrations.
 
 ## Kotlin bugs found while recording
 

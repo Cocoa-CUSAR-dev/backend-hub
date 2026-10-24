@@ -8,7 +8,13 @@
   },
   "hub": {
     "method": "POST",
-    "path": "/api/v1/analytics/harvest/spatial/time-series/delta"
+    "path": "/api/v1/analytics/harvest/spatial/time-series/{mode}",
+    "params": {
+      "mode": "=delta"
+    },
+    "requires": [
+      "postgis"
+    ]
   },
   "seeds": [
     "base",

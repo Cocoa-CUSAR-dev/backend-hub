@@ -8,7 +8,13 @@
   },
   "hub": {
     "method": "POST",
-    "path": "/api/v1/analytics/harvest/spatial/time-series/sum"
+    "path": "/api/v1/analytics/harvest/spatial/time-series/{mode}",
+    "params": {
+      "mode": "=sum"
+    },
+    "requires": [
+      "postgis"
+    ]
   },
   "seeds": [
     "base",

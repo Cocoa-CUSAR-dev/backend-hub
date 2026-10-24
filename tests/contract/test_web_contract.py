@@ -67,6 +67,9 @@ async def _hub_path(session: AsyncSession, fx: Fixture, case: Case) -> str:
     assert fx.hub is not None
     path: str = fx.hub["path"]
     for hub_name, kotlin_name in fx.hub.get("params", {}).items():
+        if kotlin_name.startswith("="):  # a fixed value, e.g. {mode} = "sum"
+            path = path.replace("{" + hub_name + "}", kotlin_name[1:])
+            continue
         value = case.params[kotlin_name.removeprefix("form_of:")]
         if kotlin_name.startswith("form_of:"):
             # Kotlin took a task id where the hub takes that task's form id (docs-and-plan#271).
@@ -121,6 +124,13 @@ async def seeded() -> AsyncGenerator[AsyncSession, None]:
 async def test_hub_answers_like_kotlin(fx: Fixture, case: Case, seeded: AsyncSession) -> None:
     assert fx.hub is not None
     session = seeded
+    if (
+        "postgis" in fx.hub.get("requires", [])
+        and not (
+            await session.execute(text("SELECT 1 FROM pg_extension WHERE extname = 'postgis'"))
+        ).scalar()
+    ):
+        pytest.skip(f"{fx.kid} needs PostGIS, which tests/resources/schema.sql doesn't have")
     missing = [
         t
         for t in seed_tables(fx.seeds)
