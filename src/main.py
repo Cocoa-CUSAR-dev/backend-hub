@@ -34,12 +34,14 @@ from src.agriculture.router import router as agriculture_router
 from src.auth.router import router as auth_router
 from src.chat.liff import router as liff_tasks_router
 from src.chat.router import router as line_router
+from src.collection.router import router as collection_router
 from src.exceptions import register_exception_handlers
 from src.jobs.router import router as internal_router
 from src.jobs.scheduler import configure_jobs, scheduler
 from src.logging_config import configure_logging
 from src.me.router import router as me_router
 from src.notifications.router import router as notifications_router
+from src.processing.router import router as processing_router
 from src.reminders.router import router as reminders_router
 from src.request_id import request_id_middleware
 from src.tasks.router import router as tasks_router
@@ -113,6 +115,8 @@ app.include_router(me_router)
 app.include_router(admin_router)
 app.include_router(tasks_router)
 app.include_router(agriculture_router)
+app.include_router(collection_router)
+app.include_router(processing_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
 app.include_router(notifications_router)
