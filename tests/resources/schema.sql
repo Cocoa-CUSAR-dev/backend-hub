@@ -572,3 +572,55 @@ CREATE TABLE form.task_recipient (
     CONSTRAINT fk_task_recipient_task FOREIGN KEY (task_id) REFERENCES form.task (task_id) ON DELETE CASCADE,
     CONSTRAINT ck_task_recipient_type CHECK (recipient_type IN ('ROLE', 'USER'))
 );
+
+-- docs-and-plan#279 (raw-data export) and the contract seed's places.sql: the
+-- hub and the harvests the export reads. Same definitions as docs-and-plan#266
+-- (backend-hub#9) adds, with IF NOT EXISTS so either PR can merge first.
+CREATE SCHEMA IF NOT EXISTS collection;
+
+CREATE TABLE IF NOT EXISTS processing.hub (
+    hub_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hub_name character varying,
+    geo_id uuid,
+    found_date date,
+    address_detail character varying,
+    subdistrict_id uuid NOT NULL,
+    district_id uuid NOT NULL,
+    province_id uuid NOT NULL,
+    zip_code character varying,
+    contact_name character varying,
+    phone_number character varying,
+    line character varying,
+    facebook character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_hub PRIMARY KEY (hub_id)
+);
+
+CREATE TABLE IF NOT EXISTS collection.harvest (
+    harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hub_id uuid NOT NULL,
+    farm_id uuid NOT NULL,
+    plot_id uuid,
+    tree_id uuid,
+    harvest_date timestamp without time zone,
+    created_at timestamp without time zone DEFAULT now(),
+    updated_at timestamp without time zone DEFAULT now(),
+    CONSTRAINT pk_harvest PRIMARY KEY (harvest_id)
+);
+
+CREATE TABLE IF NOT EXISTS collection.harvest_grade_detail (
+    harvest_id uuid NOT NULL,
+    grade_code character varying NOT NULL,
+    quantity_kg numeric,
+    description character varying DEFAULT ''::character varying,
+    is_clean boolean,
+    is_appropriate_size boolean,
+    weight_gram_per_pod numeric,
+    is_sprout boolean,
+    is_dry boolean,
+    is_shriveled boolean,
+    cut_test_result character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);

@@ -42,6 +42,7 @@ from src.me.router import router as me_router
 from src.notifications.router import router as notifications_router
 from src.reminders.router import router as reminders_router
 from src.reminders.scheduler import configure_jobs, scheduler
+from src.reports.router import router as reports_router
 from src.request_id import request_id_middleware
 from src.tasks.router import router as tasks_router
 
@@ -114,6 +115,7 @@ app.include_router(me_router)
 app.include_router(admin_router)
 app.include_router(tasks_router)
 app.include_router(forms_router)
+app.include_router(reports_router)
 app.include_router(agriculture_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
