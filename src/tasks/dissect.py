@@ -10,6 +10,7 @@ Plain helpers with no permission check: the submit service that calls them
 (docs-and-plan#262) checks the caller first.
 """
 
+from collections.abc import Collection
 from typing import Any
 
 from src import db
@@ -43,15 +44,20 @@ async def handler_table(session: Session, handler: str) -> str:
     return table
 
 
-async def dissect(session: Session, handler: str, answer: dict[str, Any]) -> None:
-    """Insert the parts of `answer` whose keys are real columns of the
-    handler's table. Other keys (task_id, keys of a form the table doesn't
-    have) are left out: only real column names ever reach the INSERT.
-    Invalid (422) if nothing in the answer matches a column at all.
+async def dissect(
+    session: Session, handler: str, answer: dict[str, Any], fields: Collection[str]
+) -> None:
+    """Insert the parts of `answer` that are both one of the form's own
+    `fields` and a real column of the handler's table. Other keys (task_id,
+    keys of a form the table doesn't have) are left out, and so is any column
+    the form never asks for: a hand-made request can't set an owner id, a
+    primary key or a parent id that isn't a question on the form.
+    Invalid (422) if nothing in the answer matches at all.
     """
     table = await handler_table(session, handler)
     types = await _columns(session, table)
-    values = {key: value for key, value in answer.items() if key in types}
+    allowed = set(fields)
+    values = {key: value for key, value in answer.items() if key in types and key in allowed}
     if not values:
         raise Invalid(f"ไม่มีคำตอบที่ตรงกับคอลัมน์ของ handler {handler}")
     await db.handler_rows.insert_row(session, table, values, types)
