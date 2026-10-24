@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 from src import clock, db, pagination
 from src.actor import Actor, require
 from src.database import Session, transaction
-from src.exceptions import Forbidden
+from src.exceptions import Forbidden, Invalid
 from src.processing.schemas import BatchOut, StationCreatedOut, StationIn, StationOut
 
 
@@ -28,6 +28,14 @@ async def create_station(session: Session, actor: Actor, station: StationIn) -> 
     """Register a processing station run by the caller."""
     require(actor, "create:station:own")
     user_id = _caller(actor)
+    # Checked up front, as create_hub does: otherwise the foreign keys turn a
+    # missing processor profile or an unknown hub into a 500.
+    if await db.processing.processor_profile(session, user_id) is None:
+        raise Forbidden("Add the processor role first")
+    if station.hub_id and station.hub_id not in await db.processing.hub_names(
+        session, [station.hub_id]
+    ):
+        raise Invalid(fields={"hub_id": "ไม่พบศูนย์รวบรวมที่เลือก"})
     station_id = uuid4()
     now = clock.utc_now_naive()
     async with transaction(session):

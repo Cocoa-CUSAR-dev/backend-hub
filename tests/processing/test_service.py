@@ -13,7 +13,7 @@ import pytest
 from src import db
 from src.actor import Actor
 from src.db.processing import BatchDetailRow, StationRow
-from src.exceptions import Forbidden
+from src.exceptions import Forbidden, Invalid
 from src.processing import service
 from src.processing.schemas import StationIn
 
@@ -61,6 +61,8 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> dict[str, AsyncMock]:
             "batches",
         )
     }
+    fakes["processor_profile"] = AsyncMock(return_value={"first_name": "P"})
+    fakes["hub_names"] = AsyncMock(side_effect=lambda _session, ids: dict.fromkeys(ids, "hub"))
     for name, mock in fakes.items():
         monkeypatch.setattr(db.processing, name, mock)
     return fakes
@@ -79,6 +81,24 @@ async def test_create_station_links_it_to_me(fake: dict[str, AsyncMock]) -> None
     assert kwargs["created_at"].tzinfo is None
     fake["link_processor_station"].assert_awaited_once_with(SESSION, me.user_id, out.station_id)
     assert out.message == "สร้างสถานีแปรรูปสำเร็จ"
+
+
+async def test_create_station_needs_a_processor_profile(fake: dict[str, AsyncMock]) -> None:
+    fake["processor_profile"].return_value = None
+
+    with pytest.raises(Forbidden, match="processor role"):
+        await service.create_station(SESSION, _actor(), _station_in())
+    fake["insert_station"].assert_not_awaited()
+
+
+async def test_create_station_rejects_an_unknown_hub(fake: dict[str, AsyncMock]) -> None:
+    fake["hub_names"].side_effect = None
+    fake["hub_names"].return_value = {}
+
+    with pytest.raises(Invalid) as caught:
+        await service.create_station(SESSION, _actor(), _station_in(hub_id=str(uuid4())))
+    assert list(caught.value.fields) == ["hub_id"]
+    fake["insert_station"].assert_not_awaited()
 
 
 async def test_create_station_forbidden_without_permission(fake: dict[str, AsyncMock]) -> None:

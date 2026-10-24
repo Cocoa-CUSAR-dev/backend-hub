@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.actor import Actor
 from src.collection import service as collection
 from src.collection.schemas import HubIn
-from src.exceptions import Forbidden
+from src.exceptions import Forbidden, Invalid
 from src.processing import service as processing
 from src.processing.schemas import StationIn
 from tests.db.conftest import insert
@@ -22,6 +22,8 @@ async def _person(session: AsyncSession, role: str, perms: set[str]) -> Actor:
     assert isinstance(user_id, UUID)
     if role == "hub_collector":
         await insert(session, "processing.hub_collector", user_id=user_id, first_name="เก็บ")
+    if role == "processor":
+        await insert(session, "processing.processor", user_id=user_id, first_name="แปร")
     return Actor(user_id=user_id, roles=frozenset({role}), perms=frozenset(perms), channel="api")
 
 
@@ -125,3 +127,16 @@ async def test_processor_registers_stations_and_sees_their_batches(
     )
     assert [b.batch_id for b in station.batches] == [batch_id]
     assert (batch.batch_id, batch.quantity_kg) == (batch_id, 40)
+
+
+async def test_a_station_needs_a_processor_profile_and_a_real_hub(db_session: AsyncSession) -> None:
+    no_profile = await _person(db_session, "farmer", {"create:station:own"})
+    me = await _person(db_session, "processor", {"create:station:own"})
+
+    with pytest.raises(Forbidden, match="processor role"):
+        await processing.create_station(db_session, no_profile, StationIn.model_validate(_place()))
+    with pytest.raises(Invalid) as caught:
+        await processing.create_station(
+            db_session, me, StationIn.model_validate({"hub_id": str(uuid4()), **_place()})
+        )
+    assert list(caught.value.fields) == ["hub_id"]
