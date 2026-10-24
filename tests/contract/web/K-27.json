@@ -1,0 +1,224 @@
+{
+  "kid": "K-27",
+  "after": "ANL-01",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/analytics/harvest/time-series/sum"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/analytics/harvest/time-series/{mode}",
+    "params": {
+      "mode": "=sum"
+    }
+  },
+  "seeds": [
+    "base",
+    "places"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "all farms",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/time-series/sum",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Running Total Harvest Weight per Month",
+        "metadata": {
+          "provinceId": null,
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              215.5,
+              355.5
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade B",
+            "values": [
+              30.0,
+              90.0,
+              165.25
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade C",
+            "values": [
+              0.0,
+              0.0,
+              12.0
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "one province",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/time-series/sum",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "provinceId": "30000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Running Total Harvest Weight per Month",
+        "metadata": {
+          "provinceId": "30000000-0000-4000-8000-000000000001",
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              215.5,
+              355.5
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade B",
+            "values": [
+              30.0,
+              30.0,
+              30.0
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade C",
+            "values": [
+              0.0,
+              0.0,
+              12.0
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "grade A",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/time-series/sum",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "gradeCode": "A"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Running Total Harvest Weight per Month",
+        "metadata": {
+          "provinceId": null,
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              215.5,
+              355.5
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "district not in province",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/time-series/sum",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "provinceId": "30000000-0000-4000-8000-000000000001",
+        "districtId": "31000000-0000-4000-8000-000000000002"
+      },
+      "body": null,
+      "response": {
+        "error": "The geographic hierarchy provided (Province/District/Subdistrict/Farm) is inconsistent or invalid."
+      }
+    },
+    {
+      "name": "missing range",
+      "status": 500,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/time-series/sum",
+      "actor": "researcher",
+      "body": null,
+      "response": {
+        "error": "Internal server error"
+      },
+      "hub": {
+        "status": 422
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/time-series/sum",
+      "actor": "farmer_1",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/time-series/sum",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:33.813+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/analytics/harvest/time-series/sum"
+      }
+    }
+  ]
+}

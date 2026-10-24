@@ -158,6 +158,28 @@ async def farmer_owns_farm(session: AsyncSession, farmer_id: UUID, farm_id: UUID
     return bool(found.scalar())
 
 
+@dataclass(frozen=True, slots=True)
+class FarmPlace:
+    """Where a farm is: its province, district and subdistrict."""
+
+    province_id: UUID | None
+    district_id: UUID | None
+    subdistrict_id: UUID | None
+
+
+async def farm_place(session: AsyncSession, farm_id: UUID) -> FarmPlace | None:
+    row = (
+        await session.execute(
+            text(
+                "SELECT province_id, district_id, subdistrict_id"
+                " FROM agriculture.farm WHERE farm_id = :farm_id"
+            ),
+            {"farm_id": farm_id},
+        )
+    ).first()
+    return FarmPlace(**row._mapping) if row else None
+
+
 async def farm_exists(session: AsyncSession, farm_id: UUID) -> bool:
     found = await session.execute(
         text("SELECT EXISTS (SELECT 1 FROM agriculture.farm WHERE farm_id = :farm_id)"),

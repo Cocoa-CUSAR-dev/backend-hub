@@ -1,0 +1,94 @@
+{
+  "kid": "K-07",
+  "after": "ME-05",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/me/diaries/{date}"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/me/diaries/{date}"
+  },
+  "seeds": [
+    "base",
+    "forms",
+    "answers"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "a day with a diary",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/me/diaries/2026-10-05",
+      "actor": "farmer_1",
+      "params": {
+        "date": "2026-10-05"
+      },
+      "body": null,
+      "response": {
+        "userId": "20000000-0000-4000-8000-000000000003",
+        "entryDate": "2026-10-05",
+        "diaryText": "วันนี้ส่งโกโก้ที่จุดรวบรวมท่าตะเภา และใส่ปุ๋ยที่แปลง A",
+        "updatedAt": "2026-10-05T03:05:00"
+      }
+    },
+    {
+      "name": "a day without",
+      "status": 404,
+      "method": "GET",
+      "path": "/api/v1/me/diaries/2026-10-06",
+      "actor": "farmer_1",
+      "params": {
+        "date": "2026-10-06"
+      },
+      "body": null,
+      "response": {
+        "error": "No diary entry for 2026-10-06"
+      }
+    },
+    {
+      "name": "bad date",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/me/diaries/2026-13-01",
+      "actor": "farmer_1",
+      "params": {
+        "date": "2026-13-01"
+      },
+      "body": null,
+      "response": {
+        "error": "Invalid parameter value: 2026-13-01. Expected one of the supported types."
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/me/diaries/2026-10-05",
+      "actor": "researcher",
+      "params": {
+        "date": "2026-10-05"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/me/diaries/2026-10-05",
+      "params": {
+        "date": "2026-10-05"
+      },
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:19.228+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/me/diaries/2026-10-05"
+      }
+    }
+  ]
+}

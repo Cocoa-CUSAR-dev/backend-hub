@@ -130,6 +130,8 @@ async def test_ref_columns_and_choices(db_session: AsyncSession) -> None:
     assert await db.ref.columns_of(db_session, "province_constant") == [
         "province_id",
         "province_name_th",
+        "province_name_en",
+        "description",
     ]
     assert await db.ref.columns_of(db_session, "no_such_constant") == []
     choices = await db.ref.choices(
@@ -379,3 +381,28 @@ async def test_child_handlers_are_the_active_ones_that_have_a_parent(
     assert by_handler["drying_batch"] == ("batch", "batch_id")
     assert "off_child" not in by_handler  # inactive
     assert "harvest" not in by_handler  # standalone: no parent
+
+
+# ---- the researcher's form list (FORM-01) ------------------------------------------
+
+
+async def test_forms_with_sections_skips_a_form_without_one(db_session: AsyncSession) -> None:
+    _, with_section = await _form(db_session, created_at=datetime(2026, 8, 1))
+    _, newer = await _form(db_session, created_at=datetime(2026, 9, 1))
+    _, empty = await _form(db_session, created_at=datetime(2026, 10, 1))
+    await _section(db_session, with_section, 1)
+    await _section(db_session, newer, 1)
+
+    rows = await db.forms.forms_with_sections(db_session)
+
+    ids = [r.form_id for r in rows if r.form_id in {with_section, newer, empty}]
+    assert ids == [newer, with_section]
+
+
+async def test_form_by_id(db_session: AsyncSession) -> None:
+    task_id, form_id = await _form(db_session)
+
+    form = await db.forms.form_by_id(db_session, form_id)
+
+    assert form is not None and form.task_id == task_id and form.handler == "harvest"
+    assert await db.forms.form_by_id(db_session, uuid4()) is None

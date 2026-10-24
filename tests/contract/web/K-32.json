@@ -1,0 +1,170 @@
+{
+  "kid": "K-32",
+  "after": "ANL-02",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/analytics/harvest/summary/count"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/analytics/harvest/summary/{mode}",
+    "params": {
+      "mode": "=count"
+    }
+  },
+  "seeds": [
+    "base",
+    "places"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "all farms",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/count",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Number of Harvests",
+        "metadata": {
+          "provinceId": null,
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "data": {
+          "label": "All Grades",
+          "value": 7.0,
+          "unit": "records"
+        }
+      }
+    },
+    {
+      "name": "one province",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/count",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "provinceId": "30000000-0000-4000-8000-000000000001"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Number of Harvests",
+        "metadata": {
+          "provinceId": "30000000-0000-4000-8000-000000000001",
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "data": {
+          "label": "All Grades",
+          "value": 5.0,
+          "unit": "records"
+        }
+      }
+    },
+    {
+      "name": "grade A",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/count",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "gradeCode": "A"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Total Number of Harvests",
+        "metadata": {
+          "provinceId": null,
+          "districtId": null,
+          "subdistrictId": null,
+          "farmId": null
+        },
+        "data": {
+          "label": "Grade A",
+          "value": 3.0,
+          "unit": "records"
+        }
+      }
+    },
+    {
+      "name": "district not in province",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/count",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "provinceId": "30000000-0000-4000-8000-000000000001",
+        "districtId": "31000000-0000-4000-8000-000000000002"
+      },
+      "body": null,
+      "response": {
+        "error": "The geographic hierarchy provided (Province/District/Subdistrict/Farm) is inconsistent or invalid."
+      }
+    },
+    {
+      "name": "missing range",
+      "status": 500,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/count",
+      "actor": "researcher",
+      "body": null,
+      "response": {
+        "error": "Internal server error"
+      },
+      "hub": {
+        "status": 422
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/count",
+      "actor": "farmer_1",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/analytics/harvest/summary/count",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:35.637+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/analytics/harvest/summary/count"
+      }
+    }
+  ]
+}

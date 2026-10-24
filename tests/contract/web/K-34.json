@@ -1,0 +1,113 @@
+{
+  "kid": "K-34",
+  "after": "ANL-03",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/analytics/users/time-series/delta"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/analytics/users/time-series/{mode}",
+    "params": {
+      "mode": "=delta"
+    }
+  },
+  "seeds": [
+    "base"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "all roles",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/users/time-series/delta",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-07",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-07",
+        "to": "2026-10",
+        "title": "New User per Month",
+        "metadata": {},
+        "series": [
+          {
+            "label": "All Users",
+            "values": [
+              2.0,
+              2.0,
+              2.0,
+              1.0
+            ],
+            "unit": "users"
+          }
+        ]
+      }
+    },
+    {
+      "name": "farmers only",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/analytics/users/time-series/delta",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-07",
+        "to": "2026-10",
+        "roleName": "farmer"
+      },
+      "body": null,
+      "response": {
+        "from": "2026-07",
+        "to": "2026-10",
+        "title": "New User per Month",
+        "metadata": {},
+        "series": [
+          {
+            "label": "farmer",
+            "values": [
+              0.0,
+              1.0,
+              1.0,
+              0.0
+            ],
+            "unit": "users"
+          }
+        ]
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/analytics/users/time-series/delta",
+      "actor": "farmer_1",
+      "query": {
+        "from": "2026-07",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/analytics/users/time-series/delta",
+      "query": {
+        "from": "2026-07",
+        "to": "2026-10"
+      },
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:36.114+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/analytics/users/time-series/delta"
+      }
+    }
+  ]
+}

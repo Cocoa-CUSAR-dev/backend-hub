@@ -1,0 +1,194 @@
+{
+  "kid": "K-38",
+  "after": "ANL-05",
+  "note": "",
+  "kotlin": {
+    "method": "POST",
+    "path": "/api/v1/analytics/harvest/spatial/time-series/average"
+  },
+  "hub": {
+    "method": "POST",
+    "path": "/api/v1/analytics/harvest/spatial/time-series/{mode}",
+    "params": {
+      "mode": "=average"
+    },
+    "requires": [
+      "postgis"
+    ]
+  },
+  "seeds": [
+    "base",
+    "places"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "drawn area around Chumphon",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/average",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Average Harvest Weight per Month",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              95.0,
+              140.0
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade B",
+            "values": [
+              30.0,
+              0.0,
+              0.0
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade C",
+            "values": [
+              0.0,
+              0.0,
+              12.0
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no area",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/average",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {},
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Average Harvest Weight per Month",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              95.0,
+              140.0
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade B",
+            "values": [
+              30.0,
+              60.0,
+              75.25
+            ],
+            "unit": "kg"
+          },
+          {
+            "label": "Grade C",
+            "values": [
+              0.0,
+              0.0,
+              12.0
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "grade A in the area",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/average",
+      "actor": "researcher",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "gradeCode": "A"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "from": "2026-08",
+        "to": "2026-10",
+        "title": "Average Harvest Weight per Month",
+        "metadata": {
+          "type": "spatial_selection"
+        },
+        "series": [
+          {
+            "label": "Grade A",
+            "values": [
+              120.5,
+              95.0,
+              140.0
+            ],
+            "unit": "kg"
+          }
+        ]
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/average",
+      "actor": "farmer_1",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "POST",
+      "path": "/api/v1/analytics/harvest/spatial/time-series/average",
+      "query": {
+        "from": "2026-08",
+        "to": "2026-10"
+      },
+      "body": {
+        "geoJson": "{\"type\":\"Polygon\",\"coordinates\":[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
+      },
+      "response": {
+        "timestamp": "2026-10-23T12:37:39.847+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/analytics/harvest/spatial/time-series/average"
+      }
+    }
+  ]
+}

@@ -1,0 +1,482 @@
+{
+  "kid": "K-12",
+  "after": "FORM-03",
+  "note": "",
+  "kotlin": {
+    "method": "POST",
+    "path": "/api/v1/forms"
+  },
+  "hub": {
+    "method": "POST",
+    "path": "/api/v1/forms"
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "minimal harvest form",
+      "status": 201,
+      "method": "POST",
+      "path": "/api/v1/forms",
+      "actor": "researcher",
+      "body": {
+        "title": "ฟอร์มทดสอบ contract",
+        "description": "สร้างจาก contract test",
+        "taskType": "FORM",
+        "openAt": "2026-11-01T00:00:00",
+        "closeAt": "2026-11-30T16:59:59",
+        "handler": "harvest",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "title": "การส่ง",
+            "description": null,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "label": "ฟาร์ม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "farm_id",
+                "isMandatory": true,
+                "sortOrder": 0
+              },
+              {
+                "label": "จุดรวบรวม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "hub_id",
+                "isMandatory": true,
+                "sortOrder": 1
+              },
+              {
+                "label": "วันที่ส่ง",
+                "description": null,
+                "inputType": "DATE",
+                "fieldName": "harvest_date",
+                "isMandatory": true,
+                "sortOrder": 2
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "formId": "988e948c-b806-4967-b993-6c3b0d35fe25",
+        "title": "ฟอร์มทดสอบ contract",
+        "description": "สร้างจาก contract test",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "sectionId": "13b88c97-6ba5-4170-9c10-182f3c98b546",
+            "title": "การส่ง",
+            "description": null,
+            "sortOrder": 1,
+            "isActive": true,
+            "questions": [
+              {
+                "questionId": "6c3b056c-7aa9-4d05-b56d-814efa8cd633",
+                "sectionId": "13b88c97-6ba5-4170-9c10-182f3c98b546",
+                "label": "ฟาร์ม",
+                "inputType": "OPTION",
+                "description": null,
+                "fieldName": "farm_id",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 0,
+                "choices": [],
+                "validationRule": null
+              },
+              {
+                "questionId": "28a36792-1db5-4294-9215-f1fdadd74395",
+                "sectionId": "13b88c97-6ba5-4170-9c10-182f3c98b546",
+                "label": "จุดรวบรวม",
+                "inputType": "OPTION",
+                "description": null,
+                "fieldName": "hub_id",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 1,
+                "choices": [],
+                "validationRule": null
+              },
+              {
+                "questionId": "51ad2311-3f81-4e97-9564-1c6e35b885dd",
+                "sectionId": "13b88c97-6ba5-4170-9c10-182f3c98b546",
+                "label": "วันที่ส่ง",
+                "inputType": "DATE",
+                "description": null,
+                "fieldName": "harvest_date",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 2,
+                "choices": null,
+                "validationRule": {
+                  "errorMessage": "ห้ามระบุวันที่ในอนาคต",
+                  "maxDate": "today",
+                  "type": "DATE"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "with reminder, weekly repeat and recipients",
+      "status": 201,
+      "method": "POST",
+      "path": "/api/v1/forms",
+      "actor": "researcher",
+      "body": {
+        "title": "ฟอร์มทดสอบ contract ทำซ้ำ",
+        "description": "สร้างจาก contract test",
+        "taskType": "FORM",
+        "openAt": "2026-11-01T00:00:00",
+        "closeAt": "2026-11-30T16:59:59",
+        "handler": "harvest",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "title": "การส่ง",
+            "description": null,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "label": "ฟาร์ม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "farm_id",
+                "isMandatory": true,
+                "sortOrder": 0
+              },
+              {
+                "label": "จุดรวบรวม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "hub_id",
+                "isMandatory": true,
+                "sortOrder": 1
+              },
+              {
+                "label": "วันที่ส่ง",
+                "description": null,
+                "inputType": "DATE",
+                "fieldName": "harvest_date",
+                "isMandatory": true,
+                "sortOrder": 2
+              }
+            ]
+          }
+        ],
+        "reminder": {
+          "enabled": true,
+          "timeOfDay": "07:30:00",
+          "recipients": [
+            {
+              "type": "ROLE",
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          ]
+        },
+        "recurrence": {
+          "frequency": "WEEKLY",
+          "weekdays": [
+            1,
+            4
+          ],
+          "untilDate": "2026-12-31"
+        },
+        "recipients": [
+          {
+            "type": "ROLE",
+            "id": "10000000-0000-4000-8000-000000000003"
+          }
+        ]
+      },
+      "response": {
+        "formId": "9f3cd03c-ab93-4f66-81d0-1dc334ec5c65",
+        "title": "ฟอร์มทดสอบ contract ทำซ้ำ",
+        "description": "สร้างจาก contract test",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "sectionId": "b9483460-a1c4-473d-8525-3ca2bde1ea02",
+            "title": "การส่ง",
+            "description": null,
+            "sortOrder": 1,
+            "isActive": true,
+            "questions": [
+              {
+                "questionId": "2cbedcd4-082d-4ec4-bfe4-9c8c97c6e732",
+                "sectionId": "b9483460-a1c4-473d-8525-3ca2bde1ea02",
+                "label": "ฟาร์ม",
+                "inputType": "OPTION",
+                "description": null,
+                "fieldName": "farm_id",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 0,
+                "choices": [],
+                "validationRule": null
+              },
+              {
+                "questionId": "7adce52a-8c52-4cc2-9757-88985bbd6c5b",
+                "sectionId": "b9483460-a1c4-473d-8525-3ca2bde1ea02",
+                "label": "จุดรวบรวม",
+                "inputType": "OPTION",
+                "description": null,
+                "fieldName": "hub_id",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 1,
+                "choices": [],
+                "validationRule": null
+              },
+              {
+                "questionId": "7f6cb311-5855-4a83-819d-22296f47daf1",
+                "sectionId": "b9483460-a1c4-473d-8525-3ca2bde1ea02",
+                "label": "วันที่ส่ง",
+                "inputType": "DATE",
+                "description": null,
+                "fieldName": "harvest_date",
+                "defaultValue": null,
+                "isMandatory": true,
+                "isActive": true,
+                "carryForward": false,
+                "sortOrder": 2,
+                "choices": null,
+                "validationRule": {
+                  "errorMessage": "ห้ามระบุวันที่ในอนาคต",
+                  "maxDate": "today",
+                  "type": "DATE"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "no sections",
+      "status": 400,
+      "method": "POST",
+      "path": "/api/v1/forms",
+      "actor": "researcher",
+      "body": {
+        "title": "ฟอร์มทดสอบ contract",
+        "description": "สร้างจาก contract test",
+        "taskType": "FORM",
+        "openAt": "2026-11-01T00:00:00",
+        "closeAt": "2026-11-30T16:59:59",
+        "handler": "harvest",
+        "isMultipleSubmit": false,
+        "sections": []
+      },
+      "response": {
+        "error": "A form must have at least one section"
+      }
+    },
+    {
+      "name": "a field the handler doesn't have",
+      "status": 400,
+      "method": "POST",
+      "path": "/api/v1/forms",
+      "actor": "researcher",
+      "body": {
+        "title": "ฟอร์มทดสอบ contract",
+        "description": "สร้างจาก contract test",
+        "taskType": "FORM",
+        "openAt": "2026-11-01T00:00:00",
+        "closeAt": "2026-11-30T16:59:59",
+        "handler": "harvest",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "title": "การส่ง",
+            "description": null,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "label": "ผิด",
+                "description": null,
+                "inputType": "VARCHAR",
+                "fieldName": "not_a_column",
+                "isMandatory": false,
+                "sortOrder": 0
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "error": "ตาราง collection.harvest บังคับฟิลด์ hub_id, farm_id แต่ฟอร์มยังไม่มีคำถามสำหรับฟิลด์นี้"
+      }
+    },
+    {
+      "name": "unknown handler",
+      "status": 400,
+      "method": "POST",
+      "path": "/api/v1/forms",
+      "actor": "researcher",
+      "body": {
+        "title": "ฟอร์มทดสอบ contract",
+        "description": "สร้างจาก contract test",
+        "taskType": "FORM",
+        "openAt": "2026-11-01T00:00:00",
+        "closeAt": "2026-11-30T16:59:59",
+        "handler": "no_such_handler",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "title": "การส่ง",
+            "description": null,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "label": "ฟาร์ม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "farm_id",
+                "isMandatory": true,
+                "sortOrder": 0
+              },
+              {
+                "label": "จุดรวบรวม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "hub_id",
+                "isMandatory": true,
+                "sortOrder": 1
+              },
+              {
+                "label": "วันที่ส่ง",
+                "description": null,
+                "inputType": "DATE",
+                "fieldName": "harvest_date",
+                "isMandatory": true,
+                "sortOrder": 2
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "error": "Unknown handler: no_such_handler"
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "POST",
+      "path": "/api/v1/forms",
+      "actor": "farmer_1",
+      "body": {
+        "title": "ฟอร์มทดสอบ contract",
+        "description": "สร้างจาก contract test",
+        "taskType": "FORM",
+        "openAt": "2026-11-01T00:00:00",
+        "closeAt": "2026-11-30T16:59:59",
+        "handler": "harvest",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "title": "การส่ง",
+            "description": null,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "label": "ฟาร์ม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "farm_id",
+                "isMandatory": true,
+                "sortOrder": 0
+              },
+              {
+                "label": "จุดรวบรวม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "hub_id",
+                "isMandatory": true,
+                "sortOrder": 1
+              },
+              {
+                "label": "วันที่ส่ง",
+                "description": null,
+                "inputType": "DATE",
+                "fieldName": "harvest_date",
+                "isMandatory": true,
+                "sortOrder": 2
+              }
+            ]
+          }
+        ]
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "POST",
+      "path": "/api/v1/forms",
+      "actor": "admin",
+      "body": {
+        "title": "ฟอร์มทดสอบ contract",
+        "description": "สร้างจาก contract test",
+        "taskType": "FORM",
+        "openAt": "2026-11-01T00:00:00",
+        "closeAt": "2026-11-30T16:59:59",
+        "handler": "harvest",
+        "isMultipleSubmit": false,
+        "sections": [
+          {
+            "title": "การส่ง",
+            "description": null,
+            "sortOrder": 1,
+            "questions": [
+              {
+                "label": "ฟาร์ม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "farm_id",
+                "isMandatory": true,
+                "sortOrder": 0
+              },
+              {
+                "label": "จุดรวบรวม",
+                "description": null,
+                "inputType": "OPTION",
+                "fieldName": "hub_id",
+                "isMandatory": true,
+                "sortOrder": 1
+              },
+              {
+                "label": "วันที่ส่ง",
+                "description": null,
+                "inputType": "DATE",
+                "fieldName": "harvest_date",
+                "isMandatory": true,
+                "sortOrder": 2
+              }
+            ]
+          }
+        ]
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}
