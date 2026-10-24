@@ -72,7 +72,7 @@ async def _hub_scope(session: Session, actor: Actor) -> list[UUID] | None:
     if actor.can("read:hub:all"):
         return None
     require(actor, "read:hub:own")
-    return await db.processing.collector_hub_ids(session, _caller(actor))
+    return await db.processing.hub_ids_of_collector(session, _caller(actor))
 
 
 async def list_hubs(

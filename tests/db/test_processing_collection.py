@@ -48,9 +48,9 @@ async def test_set_collector_hub_and_read_it_back(db_session: AsyncSession) -> N
     collector = await _collector(db_session)
     hub_id = await _hub(db_session, "ศูนย์รวบรวม")
 
-    assert await db.processing.collector_hub_ids(db_session, collector) == []
+    assert await db.processing.hub_ids_of_collector(db_session, collector) == []
     assert await db.processing.set_collector_hub(db_session, collector, hub_id) is True
-    assert await db.processing.collector_hub_ids(db_session, collector) == [hub_id]
+    assert await db.processing.hub_ids_of_collector(db_session, collector) == [hub_id]
 
     [hub] = await db.processing.hubs(db_session, hub_ids=[hub_id], limit=10, offset=0)
     assert (hub.hub_id, hub.hub_name, hub.created_at) == (hub_id, "ศูนย์รวบรวม", NOW)

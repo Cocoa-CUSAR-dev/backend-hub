@@ -137,18 +137,6 @@ async def set_collector_hub(session: AsyncSession, user_id: UUID, hub_id: UUID) 
     return updated.first() is not None
 
 
-async def collector_hub_ids(session: AsyncSession, user_id: UUID) -> list[UUID]:
-    """The hub(s) this collector works at; empty if none registered yet."""
-    result = await session.execute(
-        text(
-            "SELECT hub_id FROM processing.hub_collector"
-            " WHERE user_id = :user_id AND hub_id IS NOT NULL"
-        ),
-        {"user_id": user_id},
-    )
-    return list(result.scalars())
-
-
 async def hubs(
     session: AsyncSession, *, hub_ids: list[UUID] | None, limit: int, offset: int
 ) -> list[HubRow]:
@@ -198,7 +186,7 @@ class StationRow:
 
 
 @dataclass(frozen=True, slots=True)
-class BatchRow:
+class BatchDetailRow:
     batch_id: UUID
     processing_station_id: UUID
     origin: str | None
@@ -272,7 +260,9 @@ async def stations(
     return [StationRow(**row._mapping) for row in result]
 
 
-async def batches_of_stations(session: AsyncSession, station_ids: list[UUID]) -> list[BatchRow]:
+async def batches_of_stations(
+    session: AsyncSession, station_ids: list[UUID]
+) -> list[BatchDetailRow]:
     """Every batch of these stations, ordered by batch_id."""
     if not station_ids:
         return []
@@ -287,12 +277,12 @@ async def batches_of_stations(session: AsyncSession, station_ids: list[UUID]) ->
         ),
         {"station_ids": station_ids},
     )
-    return [BatchRow(**row._mapping) for row in result]
+    return [BatchDetailRow(**row._mapping) for row in result]
 
 
 async def batches(
     session: AsyncSession, *, processor_id: UUID | None, limit: int, offset: int
-) -> list[BatchRow]:
+) -> list[BatchDetailRow]:
     """Batches ordered by batch_id: at a processor's stations, or all when None."""
     result = await session.execute(
         text(
@@ -312,5 +302,55 @@ async def batches(
             "limit": limit,
             "offset": offset,
         },
+    )
+    return [BatchDetailRow(**row._mapping) for row in result]
+
+
+@dataclass(frozen=True, slots=True)
+class BatchRow:
+    batch_id: UUID
+    created_at: datetime
+    station_name: str | None
+
+
+async def hub_ids_of_collector(session: AsyncSession, user_id: UUID) -> list[UUID]:
+    """The hubs this user collects for."""
+    result = await session.execute(
+        text("SELECT hub_id FROM processing.hub_collector WHERE user_id = :user_id"),
+        {"user_id": user_id},
+    )
+    return [hub_id for hub_id in result.scalars() if hub_id is not None]
+
+
+async def hub_names(session: AsyncSession, hub_ids: list[UUID]) -> dict[UUID, str | None]:
+    """hub_id -> hub name, for the hubs that exist."""
+    if not hub_ids:
+        return {}
+    result = await session.execute(
+        text("SELECT hub_id, hub_name FROM processing.hub WHERE hub_id = ANY(:ids)"),
+        {"ids": hub_ids},
+    )
+    return {row.hub_id: row.hub_name for row in result}
+
+
+async def batches_of_processor(
+    session: AsyncSession, processor_id: UUID, limit: int
+) -> list[BatchRow]:
+    """The newest batches at the processing stations this processor works at."""
+    result = await session.execute(
+        text(
+            """
+            SELECT b.batch_id, b.created_at, ps.processing_station_name AS station_name
+            FROM processing.batch b
+            JOIN processing.processor_processing_station pps
+                ON pps.processing_station_id = b.processing_station_id
+            JOIN processing.processing_station ps
+                ON ps.processing_station_id = b.processing_station_id
+            WHERE pps.processor_id = :processor_id
+            ORDER BY b.created_at DESC
+            LIMIT :limit
+            """
+        ),
+        {"processor_id": processor_id, "limit": limit},
     )
     return [BatchRow(**row._mapping) for row in result]

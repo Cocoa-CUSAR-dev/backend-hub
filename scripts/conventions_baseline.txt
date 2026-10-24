@@ -1,74 +1,7 @@
 # Legacy code written before CONVENTIONS.md. This list may only shrink.
 # Fix an item -> run `python scripts/check_conventions.py --prune`.
 # Never add lines by hand: new code must follow the conventions.
-http-exception|src/exceptions.py|uses HTTPException
 lib-outside-client|src/diary/client.py|imports httpx
 lib-outside-client|src/forms/client.py|imports httpx
-lib-outside-client|src/line/dependencies.py|imports linebot
-lib-outside-client|src/line/liff.py|imports httpx
-lib-outside-client|src/line/rich_menu.py|imports linebot
-lib-outside-client|src/line/router.py|imports linebot
-lib-outside-client|src/line/service.py|imports linebot
 lib-outside-client|src/sso/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx
-sql-outside-db|src/conversation/dev_queries.py|imports sqlalchemy
-sql-outside-db|src/conversation/jobs.py|imports sqlalchemy
-sql-outside-db|src/conversation/models.py|imports sqlalchemy
-sql-outside-db|src/conversation/router.py|imports sqlalchemy
-sql-outside-db|src/conversation/service.py|imports sqlalchemy
-sql-outside-db|src/line/handler_registry.py|imports sqlalchemy
-sql-outside-db|src/line/parent_picker.py|imports sqlalchemy
-sql-outside-db|src/line/plot_picker.py|imports sqlalchemy
-sql-outside-db|src/line/router.py|imports sqlalchemy
-sql-outside-db|src/line/temp_task_picker.py|imports sqlalchemy
-sql-outside-db|src/models.py|imports sqlalchemy
-sql-outside-db|src/notifications/router.py|imports sqlalchemy
-sql-outside-db|src/notifications/service.py|imports sqlalchemy
-sql-outside-db|src/reminders/jobs.py|imports sqlalchemy
-sql-outside-db|src/reminders/models.py|imports sqlalchemy
-sql-outside-db|src/reminders/queries.py|imports sqlalchemy
-sql-outside-db|src/reminders/router.py|imports sqlalchemy
-table-owner|src/conversation/dev_queries.py|auth.user_account (owner: src/db/auth.py)
-table-owner|src/conversation/dev_queries.py|form.field_validation_rule (owner: src/db/forms.py)
-table-owner|src/conversation/dev_queries.py|form.question (owner: src/db/forms.py)
-table-owner|src/conversation/dev_queries.py|form.section (owner: src/db/forms.py)
-table-owner|src/conversation/dev_queries.py|form.task (owner: src/db/tasks.py)
-table-owner|src/conversation/dev_queries.py|form.task_form (owner: src/db/forms.py)
-table-owner|src/conversation/reuse.py|form.response (owner: src/db/tasks.py)
-table-owner|src/conversation/service.py|form.field_dependency (owner: src/db/forms.py)
-table-owner|src/conversation/service.py|ref.farm_constant (owner: src/db/ref.py)
-table-owner|src/conversation/service.py|ref.plot_constant (owner: src/db/ref.py)
-table-owner|src/conversation/validation.py|form.field_validation_rule (owner: src/db/forms.py)
-table-owner|src/line/handler_registry.py|form.handler_registry (owner: src/db/forms.py)
-table-owner|src/line/parent_picker.py|agriculture.farm (owner: src/db/agriculture.py)
-table-owner|src/line/parent_picker.py|agriculture.farm_activity (owner: src/db/agriculture.py)
-table-owner|src/line/parent_picker.py|agriculture.farmer_farm (owner: src/db/agriculture.py)
-table-owner|src/line/parent_picker.py|collection.harvest (owner: src/db/collection.py)
-table-owner|src/line/parent_picker.py|processing.batch (owner: src/db/processing.py)
-table-owner|src/line/parent_picker.py|processing.hub (owner: src/db/processing.py)
-table-owner|src/line/parent_picker.py|processing.hub_collector (owner: src/db/processing.py)
-table-owner|src/line/parent_picker.py|processing.processing_station (owner: src/db/processing.py)
-table-owner|src/line/parent_picker.py|processing.processor_processing_station (owner: src/db/processing.py)
-table-owner|src/line/parent_picker.py|ref.farm_activity_type_constant (owner: src/db/ref.py)
-table-owner|src/line/plot_picker.py|agriculture.farm (owner: src/db/agriculture.py)
-table-owner|src/line/plot_picker.py|agriculture.farmer_farm (owner: src/db/agriculture.py)
-table-owner|src/line/plot_picker.py|agriculture.plot (owner: src/db/agriculture.py)
-table-owner|src/line/plot_picker.py|ref.plot_constant (owner: src/db/ref.py)
-table-owner|src/line/temp_task_picker.py|chat.conversation (owner: src/db/chat.py)
-table-owner|src/line/temp_task_picker.py|form.assignment (owner: src/db/tasks.py)
-table-owner|src/line/temp_task_picker.py|form.response (owner: src/db/tasks.py)
-table-owner|src/line/temp_task_picker.py|form.task (owner: src/db/tasks.py)
-table-owner|src/line/temp_task_picker.py|form.task_form (owner: src/db/forms.py)
-table-owner|src/reminders/queries.py|auth.line_identity (owner: src/db/auth.py)
-table-owner|src/reminders/queries.py|auth.user_role (owner: src/db/auth.py)
-table-owner|src/reminders/queries.py|form.assignment (owner: src/db/tasks.py)
-table-owner|src/reminders/queries.py|form.response (owner: src/db/tasks.py)
-table-owner|src/reminders/queries.py|form.task (owner: src/db/tasks.py)
-table-owner|src/reminders/queries.py|notify.reminder_log (owner: src/db/notify.py)
-table-owner|src/reminders/queries.py|notify.reminder_recipient (owner: src/db/notify.py)
-table-owner|src/reminders/queries.py|notify.reminder_schedule (owner: src/db/notify.py)
-table-owner|src/reminders/router.py|notify.reminder_log (owner: src/db/notify.py)
-table-owner|src/reminders/router.py|notify.reminder_recipient (owner: src/db/notify.py)
-table-owner|src/reminders/router.py|notify.reminder_schedule (owner: src/db/notify.py)
-table-owner|src/tasks/schemas.py|chat.conversation (owner: src/db/chat.py)
-table-owner|src/tasks/schemas.py|form.response (owner: src/db/tasks.py)

@@ -18,9 +18,9 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.chat.ui.messages import NOT_LINKED
 from src.config import settings
 from src.line import parent_picker
-from src.line.messages import NOT_LINKED
 from tests.integration.helpers import (
     build_form_response,
     build_postback_event,
@@ -40,7 +40,7 @@ async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -
     body = build_postback_event(line_user_id=line_user_id, data=data)
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -308,9 +308,9 @@ class TestEndingAConversation:
 
         push_flex = AsyncMock()
         with (
-            patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-            patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="tok")),
-            patch("src.line.router.push_flex", new=push_flex),
+            patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+            patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="tok")),
+            patch("src.chat.router.push_flex", new=push_flex),
         ):
             reply = await _send_postback(
                 client, line_user_id=line_user_id, data=f"finish_multi:{conversation_id}"
@@ -334,8 +334,8 @@ class TestDiaryCardWhenAPartFails:
 
         push_flex = AsyncMock()
         with (
-            patch("src.line.router.generate_diary", new=AsyncMock(side_effect=RuntimeError("llm"))),
-            patch("src.line.router.push_flex", new=push_flex),
+            patch("src.chat.router.generate_diary", new=AsyncMock(side_effect=RuntimeError("llm"))),
+            patch("src.chat.router.push_flex", new=push_flex),
         ):
             reply = await _send_postback(
                 client, line_user_id=line_user_id, data=f"finish_multi:{conversation_id}"
@@ -358,9 +358,9 @@ class TestDiaryCardWhenAPartFails:
 
         push_flex = AsyncMock()
         with (
-            patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-            patch("src.line.router.mint_sso_token", new=AsyncMock(side_effect=RuntimeError("sso"))),
-            patch("src.line.router.push_flex", new=push_flex),
+            patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+            patch("src.chat.router.mint_sso_token", new=AsyncMock(side_effect=RuntimeError("sso"))),
+            patch("src.chat.router.push_flex", new=push_flex),
         ):
             await _send_postback(
                 client, line_user_id=line_user_id, data=f"finish_multi:{conversation_id}"

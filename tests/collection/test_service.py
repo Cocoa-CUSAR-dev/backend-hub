@@ -14,7 +14,7 @@ from src import db
 from src.actor import Actor
 from src.collection import service
 from src.collection.schemas import HubIn
-from src.db.collection import HarvestRow
+from src.db.collection import HarvestGradeRow
 from src.db.processing import HubRow
 from src.exceptions import Forbidden, Invalid
 
@@ -46,8 +46,8 @@ def _hub_row(hub_id: UUID) -> HubRow:
     )  # fmt: skip
 
 
-def _harvest(hub_id: UUID, farm_id: UUID, grade: str | None = None) -> HarvestRow:
-    return HarvestRow(
+def _harvest(hub_id: UUID, farm_id: UUID, grade: str | None = None) -> HarvestGradeRow:
+    return HarvestGradeRow(
         uuid4(), hub_id, farm_id, None, None, NOW, NOW, NOW, grade,
         Decimal("3.5") if grade else None, None, None, None, None, None, None, None, None,
         None, None,
@@ -59,13 +59,13 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> dict[str, AsyncMock]:
     fakes = {
         "insert_hub": AsyncMock(),
         "set_collector_hub": AsyncMock(return_value=True),
-        "collector_hub_ids": AsyncMock(return_value=[]),
+        "hub_ids_of_collector": AsyncMock(return_value=[]),
         "hubs": AsyncMock(return_value=[]),
         "harvests": AsyncMock(return_value=[]),
         "farm_names": AsyncMock(return_value={}),
         "insert_geo": AsyncMock(),
     }
-    for name in ("insert_hub", "set_collector_hub", "collector_hub_ids", "hubs"):
+    for name in ("insert_hub", "set_collector_hub", "hub_ids_of_collector", "hubs"):
         monkeypatch.setattr(db.processing, name, fakes[name])
     monkeypatch.setattr(db.collection, "harvests", fakes["harvests"])
     monkeypatch.setattr(db.agriculture, "farm_names", fakes["farm_names"])
@@ -120,7 +120,7 @@ async def test_create_hub_needs_a_person(fake: dict[str, AsyncMock]) -> None:
 
 async def test_list_hubs_nests_harvests_with_farm_names(fake: dict[str, AsyncMock]) -> None:
     hub_id, quiet_hub, farm = uuid4(), uuid4(), uuid4()
-    fake["collector_hub_ids"].return_value = [hub_id, quiet_hub]
+    fake["hub_ids_of_collector"].return_value = [hub_id, quiet_hub]
     fake["hubs"].return_value = [_hub_row(hub_id), _hub_row(quiet_hub)]
     fake["harvests"].return_value = [_harvest(hub_id, farm, "A"), _harvest(hub_id, farm, "B")]
     fake["farm_names"].return_value = {farm: "สวน"}
@@ -155,12 +155,12 @@ async def test_researchers_see_every_hub(fake: dict[str, AsyncMock]) -> None:
 
     assert fake["hubs"].await_args.kwargs["hub_ids"] is None
     assert fake["harvests"].await_args.kwargs == {"hub_ids": None, "limit": 50, "offset": 0}
-    fake["collector_hub_ids"].assert_not_awaited()
+    fake["hub_ids_of_collector"].assert_not_awaited()
 
 
 async def test_list_harvests_is_paged_and_has_no_farm_name(fake: dict[str, AsyncMock]) -> None:
     hub_id = uuid4()
-    fake["collector_hub_ids"].return_value = [hub_id]
+    fake["hub_ids_of_collector"].return_value = [hub_id]
     fake["harvests"].return_value = [_harvest(hub_id, uuid4())]
 
     [harvest] = await service.list_harvests(SESSION, _actor(), page=2, page_size=5)

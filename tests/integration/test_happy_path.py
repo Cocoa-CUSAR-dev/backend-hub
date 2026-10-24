@@ -27,9 +27,9 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.chat import intent
+from src.chat.ui import messages
 from src.config import settings
-from src.conversation import intent
-from src.line import messages
 from src.tasks.schemas import TaskSubmission
 from tests.integration.helpers import (
     build_form_response,
@@ -50,18 +50,18 @@ async def _post(client: AsyncClient, body: bytes) -> Any:
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
         # The greeting is classified before any flow runs; no LLM here.
         patch(
-            "src.line.router.intent.classify",
+            "src.chat.router.intent.classify",
             new=AsyncMock(return_value=intent.IntentResult(intent=intent.Intent.GREETING)),
         ),
         # A first-time farmer has no previous answer to offer reusing.
-        patch("src.line.router.fetch_last_answer", new=AsyncMock(return_value=None)),
-        patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-        patch("src.line.router.push_flex", new=AsyncMock()),
-        patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="token")),
+        patch("src.chat.router.fetch_last_answer", new=AsyncMock(return_value=None)),
+        patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+        patch("src.chat.router.push_flex", new=AsyncMock()),
+        patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -145,7 +145,7 @@ class TestHappyPath:
             respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
                 return_value=Response(200, json=form_response)
             )
-            with patch("src.conversation.service.submit_task", new=submit_task):
+            with patch("src.chat.service.submit_task", new=submit_task):
                 # 1. A greeting gets the welcome and a one-tap way in.
                 welcome = await _say(client, line_user_id, "สวัสดีครับ")
                 assert _text(welcome) == messages.WELCOME_BACK

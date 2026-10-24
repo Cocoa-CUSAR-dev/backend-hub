@@ -12,7 +12,7 @@ import pytest
 
 from src import db
 from src.actor import Actor
-from src.db.processing import BatchRow, StationRow
+from src.db.processing import BatchDetailRow, StationRow
 from src.exceptions import Forbidden
 from src.processing import service
 from src.processing.schemas import StationIn
@@ -45,8 +45,8 @@ def _station_row(station_id: UUID) -> StationRow:
     )  # fmt: skip
 
 
-def _batch_row(station_id: UUID) -> BatchRow:
-    return BatchRow(uuid4(), station_id, "farm", "", Decimal("10"), NOW, NOW)
+def _batch_row(station_id: UUID) -> BatchDetailRow:
+    return BatchDetailRow(uuid4(), station_id, "farm", "", Decimal("10"), NOW, NOW)
 
 
 @pytest.fixture

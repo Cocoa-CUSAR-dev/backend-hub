@@ -503,19 +503,38 @@ CREATE TABLE storage.geo (
     CONSTRAINT pk_geo PRIMARY KEY (geo_id)
 );
 
--- docs-and-plan#266: hubs, processing stations, batches and harvests, read
--- and written by src/db/processing.py and src/db/collection.py. Shaped as
--- in the database repo's V1 baseline, without FKs so tests can insert rows
--- in any order.
+-- What the chatbot's parent picker lists (src/db/agriculture.py, collection.py,
+-- processing.py and ref.py) and the mobile hub / station / batch / harvest
+-- routes (docs-and-plan#266) read and write. Shaped as in the database repo's
+-- V1 baseline, without FKs so tests can insert rows in any order; the
+-- address and owner columns that are NOT NULL there are nullable here so a
+-- test can insert just the columns it cares about.
+CREATE SCHEMA collection;
+
+CREATE TABLE ref.farm_activity_type_constant (
+    farm_activity_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    farm_activity_type_name character varying,
+    CONSTRAINT pk_farm_activity_type_constant PRIMARY KEY (farm_activity_type_id)
+);
+
+CREATE TABLE agriculture.farm_activity (
+    farm_activity_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    farm_id uuid NOT NULL,
+    farm_activity_type_id uuid,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_farm_activity PRIMARY KEY (farm_activity_id),
+    CONSTRAINT fk_farm_activity_farm FOREIGN KEY (farm_id) REFERENCES agriculture.farm (farm_id)
+);
+
 CREATE TABLE processing.hub (
     hub_id uuid DEFAULT gen_random_uuid() NOT NULL,
     hub_name character varying,
     geo_id uuid,
     found_date date,
     address_detail character varying,
-    subdistrict_id uuid NOT NULL,
-    district_id uuid NOT NULL,
-    province_id uuid NOT NULL,
+    subdistrict_id uuid,
+    district_id uuid,
+    province_id uuid,
     zip_code character varying,
     contact_name character varying,
     phone_number character varying,
@@ -534,9 +553,9 @@ CREATE TABLE processing.processing_station (
     found_date date,
     processing_station_area numeric,
     address_detail character varying,
-    subdistrict_id uuid NOT NULL,
-    district_id uuid NOT NULL,
-    province_id uuid NOT NULL,
+    subdistrict_id uuid,
+    district_id uuid,
+    province_id uuid,
     zip_code character varying,
     contact_name character varying,
     phone_number character varying,
@@ -565,12 +584,10 @@ CREATE TABLE processing.batch (
     CONSTRAINT pk_batch PRIMARY KEY (batch_id)
 );
 
-CREATE SCHEMA collection;
-
 CREATE TABLE collection.harvest (
     harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    hub_id uuid NOT NULL,
-    farm_id uuid NOT NULL,
+    hub_id uuid,
+    farm_id uuid,
     plot_id uuid,
     tree_id uuid,
     harvest_date timestamp without time zone,

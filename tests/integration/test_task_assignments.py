@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.line.temp_task_picker import list_pending_tasks
-from src.reminders.queries import users_owing_task
+from src.reminders.service import users_owing_task
 from tests.integration.helpers import (
     seed_form_response,
     seed_task_form,

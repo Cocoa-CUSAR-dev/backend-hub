@@ -20,6 +20,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 @dataclass(frozen=True, slots=True)
 class HarvestRow:
+    harvest_id: UUID
+    harvest_date: datetime | None  # a timestamp column in V1
+    farm_id: UUID | None
+    hub_id: UUID | None
+
+
+async def harvests_of(
+    session: AsyncSession, *, farm_ids: list[UUID], hub_ids: list[UUID], limit: int
+) -> list[HarvestRow]:
+    """The newest harvests made on any of these farms or collected at any of
+    these hubs."""
+    result = await session.execute(
+        text(
+            """
+            SELECT harvest_id, harvest_date, farm_id, hub_id
+            FROM collection.harvest
+            WHERE farm_id = ANY(CAST(:farm_ids AS uuid[]))
+               OR hub_id = ANY(CAST(:hub_ids AS uuid[]))
+            ORDER BY harvest_date DESC
+            LIMIT :limit
+            """
+        ),
+        {"farm_ids": farm_ids, "hub_ids": hub_ids, "limit": limit},
+    )
+    return [HarvestRow(**row._mapping) for row in result]
+
+
+@dataclass(frozen=True, slots=True)
+class HarvestGradeRow:
     """One harvest with one of its grade rows (and the batch it went into).
 
     A harvest graded into several grades comes back once per grade, as in
@@ -55,7 +84,7 @@ async def harvests(
     hub_ids: list[UUID] | None,
     limit: int | None = None,
     offset: int = 0,
-) -> list[HarvestRow]:
+) -> list[HarvestGradeRow]:
     """Harvests at these hubs (or every hub when None), newest first.
     No limit means all of them."""
     result = await session.execute(
@@ -83,4 +112,4 @@ async def harvests(
             "offset": offset,
         },
     )
-    return [HarvestRow(**row._mapping) for row in result]
+    return [HarvestGradeRow(**row._mapping) for row in result]
