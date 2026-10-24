@@ -628,40 +628,31 @@ CREATE TABLE form.task_recipient (
 );
 
 -- docs-and-plan#279 (raw-data export) and the contract seed's places.sql: the
--- hub and the harvests the export reads. Same definitions as docs-and-plan#266
--- (backend-hub#9) adds, with IF NOT EXISTS so either PR can merge first.
-CREATE SCHEMA IF NOT EXISTS collection;
+-- hub and the harvests the export and the dashboard read. The chatbot's picker
+-- (above) creates processing.hub and collection.harvest with only the columns it
+-- needs; this adds the rest, as in the database repo's V1 baseline. They stay
+-- nullable so the picker's tests that insert a bare row keep working.
+ALTER TABLE processing.hub
+    ADD COLUMN IF NOT EXISTS geo_id uuid,
+    ADD COLUMN IF NOT EXISTS found_date date,
+    ADD COLUMN IF NOT EXISTS address_detail character varying,
+    ADD COLUMN IF NOT EXISTS subdistrict_id uuid,
+    ADD COLUMN IF NOT EXISTS district_id uuid,
+    ADD COLUMN IF NOT EXISTS province_id uuid,
+    ADD COLUMN IF NOT EXISTS zip_code character varying,
+    ADD COLUMN IF NOT EXISTS contact_name character varying,
+    ADD COLUMN IF NOT EXISTS phone_number character varying,
+    ADD COLUMN IF NOT EXISTS line character varying,
+    ADD COLUMN IF NOT EXISTS facebook character varying,
+    ADD COLUMN IF NOT EXISTS created_at timestamp without time zone DEFAULT now() NOT NULL,
+    ADD COLUMN IF NOT EXISTS updated_at timestamp without time zone DEFAULT now() NOT NULL;
 
-CREATE TABLE IF NOT EXISTS processing.hub (
-    hub_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    hub_name character varying,
-    geo_id uuid,
-    found_date date,
-    address_detail character varying,
-    subdistrict_id uuid NOT NULL,
-    district_id uuid NOT NULL,
-    province_id uuid NOT NULL,
-    zip_code character varying,
-    contact_name character varying,
-    phone_number character varying,
-    line character varying,
-    facebook character varying,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT pk_hub PRIMARY KEY (hub_id)
-);
-
-CREATE TABLE IF NOT EXISTS collection.harvest (
-    harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    hub_id uuid NOT NULL,
-    farm_id uuid NOT NULL,
-    plot_id uuid,
-    tree_id uuid,
-    harvest_date timestamp without time zone,
-    created_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone DEFAULT now(),
-    CONSTRAINT pk_harvest PRIMARY KEY (harvest_id)
-);
+ALTER TABLE collection.harvest
+    ALTER COLUMN harvest_date TYPE timestamp without time zone,
+    ADD COLUMN IF NOT EXISTS plot_id uuid,
+    ADD COLUMN IF NOT EXISTS tree_id uuid,
+    ADD COLUMN IF NOT EXISTS created_at timestamp without time zone DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS updated_at timestamp without time zone DEFAULT now();
 
 CREATE TABLE IF NOT EXISTS collection.harvest_grade_detail (
     harvest_id uuid NOT NULL,
