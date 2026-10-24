@@ -110,13 +110,13 @@ class TestDoubleConfirmNeverDuplicates:
         )
         with (
             respx.mock,
-            patch("src.conversation.service.submit_task", new=submit_task),
+            patch("src.chat.service.submit_task", new=submit_task),
             patch(
-                "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+                "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
             ) as reply_message,
-            patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-            patch("src.line.router.push_flex", new=AsyncMock()),
-            patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="token")),
+            patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+            patch("src.chat.router.push_flex", new=AsyncMock()),
+            patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),
         ):
             _mock_form(fixture)
             responses = await asyncio.gather(
@@ -149,7 +149,7 @@ class TestDoubleConfirmNeverDuplicates:
         conversation_id = await _park_at_confirmation(db_session, fixture)
         submit_task = AsyncMock()
 
-        with respx.mock, patch("src.conversation.service.submit_task", new=submit_task):
+        with respx.mock, patch("src.chat.service.submit_task", new=submit_task):
             _mock_form(fixture)
             await _send_postback(
                 client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
@@ -175,7 +175,7 @@ class TestNoEditAfterAPartialSave:
         conversation_id = await _park_at_confirmation(db_session, fixture, submitted=[plot_a])
         submit_task = AsyncMock()
 
-        with respx.mock, patch("src.conversation.service.submit_task", new=submit_task):
+        with respx.mock, patch("src.chat.service.submit_task", new=submit_task):
             _mock_form(fixture)
             edit = await _send_postback(
                 client, line_user_id=fixture.line_user_id, data=f"edit:{conversation_id}"
@@ -227,7 +227,7 @@ class TestStaleConfirmMidSelection:
         await db_session.commit()
         submit_task = AsyncMock()
 
-        with respx.mock, patch("src.conversation.service.submit_task", new=submit_task):
+        with respx.mock, patch("src.chat.service.submit_task", new=submit_task):
             _mock_form(fixture)
             reply_message = await _send_postback(
                 client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
@@ -253,7 +253,7 @@ class TestStaleConfirmMidSelection:
         await db_session.commit()
         submit_task = AsyncMock()
 
-        with respx.mock, patch("src.conversation.service.submit_task", new=submit_task):
+        with respx.mock, patch("src.chat.service.submit_task", new=submit_task):
             _mock_form(fixture)
             reply_message = await _send_postback(
                 client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"

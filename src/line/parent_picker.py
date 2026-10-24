@@ -3,36 +3,31 @@ farm_activity_fertilizer, farm_activity_chemical, harvest_grade_detail,
 fermentation_batch, drying_batch. Each needs a parent row ID (a farm
 activity, harvest, or batch) that isn't part of the form's own questions;
 the farmer picks it from a list scoped to their own farm/station, via the
-membership tables confirmed with the original schema designer (เป็นเอก
-สิทธิมงคล): agriculture.farmer_farm, processing.hub_collector,
-processing.processor_processing_station. See
-docs/plans/chatbot-child-handler-design.md for the full design.
+membership links confirmed with the original schema designer (เป็นเอก
+สิทธิมงคล): farmer to farm, hub collector to hub, processor to processing
+station. See docs/plans/chatbot-child-handler-design.md for the full design.
 
 harvest_grade_detail is the one case that answer didn't fully resolve --
-collection.harvest carries BOTH farm_id and hub_id, and grading may be done
-by the farmer or by hub staff. Rather than blocking on that decision, the
-harvest picker shows the union of both memberships: offered if the
-requester is on its farm OR works at its hub. Showing one extra choice is a
-much smaller problem than hiding the right one -- worth narrowing later if
-it turns out one side never applies in practice.
+a harvest carries BOTH a farm and a hub, and grading may be done by the
+farmer or by hub staff. Rather than blocking on that decision, the harvest
+picker shows the union of both memberships: offered if the requester is on
+its farm OR works at its hub. Showing one extra choice is a much smaller
+problem than hiding the right one -- worth narrowing later if it turns out
+one side never applies in practice.
 
-Deliberate, permanent exception to "the chatbot never touches form.*
-directly" (ADR 0001) -- these queries read agriculture.*/collection.*/
-processing.* directly rather than form.*, which is a different domain Go
-owns for writes but never exposed a scoped read API for. Same shape of
-exception src/line/temp_task_picker.py already takes, but that one is
-explicitly temporary scaffolding; this one is the actual recommended
-design, not a stand-in for something else shipping later.
+The queries are in the owner files under src/db/ (agriculture, collection,
+processing, ref); this module composes them into labelled options. That the
+chatbot lists these rows itself, rather than asking Go, is deliberate and
+permanent: Go owns the writes but never exposed a scoped read API for them.
 """
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from src import db
+from src.database import Session
 from src.line import handler_registry
 
 logger = logging.getLogger(__name__)
@@ -73,7 +68,7 @@ class ParentOption:
 UNSUPPORTED_PROMPT = "ขออภัยครับ แบบฟอร์มนี้ยังไม่รองรับการกรอกในแชท กรุณากรอกผ่านแอปนะครับ"
 
 
-async def kind_for_handler(session: AsyncSession, handler: str) -> str | None:
+async def kind_for_handler(session: Session, handler: str) -> str | None:
     """The parent kind to pick before this handler's questions, from the
     registry -- or None for a standalone handler."""
     return await handler_registry.parent_kind_for(session, handler)
@@ -89,7 +84,7 @@ def has_picker(kind: str) -> bool:
     return supported
 
 
-async def field_name_for(session: AsyncSession, kind: str) -> str:
+async def field_name_for(session: Session, kind: str) -> str:
     """The real destination column a picked parent rides under in the answer
     payload (see docs' "field_name trick"), from the registry."""
     field_name = await handler_registry.parent_field_for(session, kind)
@@ -101,77 +96,72 @@ async def field_name_for(session: AsyncSession, kind: str) -> str:
     return field_name
 
 
-def _label(prefix: str, when: datetime, place: str) -> str:
-    return f"{prefix} {when:%d/%m/%Y} — {place}"
+def _label(prefix: str, when: date | datetime | None, place: str) -> str:
+    day = f"{when:%d/%m/%Y}" if when is not None else ""
+    return f"{prefix} {day} — {place}"
 
 
-async def _farm_activity_choices(session: AsyncSession, user_id: UUID) -> list[ParentOption]:
-    rows = await session.execute(
-        text(
-            """
-            SELECT fa.farm_activity_id AS id, fa.created_at, f.farm_name,
-                   COALESCE(t.farm_activity_type_name, '') AS type_name
-            FROM agriculture.farm_activity fa
-            JOIN agriculture.farmer_farm ff ON ff.farm_id = fa.farm_id
-            JOIN agriculture.farm f ON f.farm_id = fa.farm_id
-            LEFT JOIN ref.farm_activity_type_constant t
-                ON t.farm_activity_type_id = fa.farm_activity_type_id
-            WHERE ff.farmer_id = :user_id
-            ORDER BY fa.created_at DESC
-            LIMIT :limit
-            """
-        ),
-        {"user_id": str(user_id), "limit": _QUICK_REPLY_LIMIT},
+async def _farm_activity_choices(session: Session, user_id: UUID) -> list[ParentOption]:
+    activities = await db.agriculture.farm_activities_of_farmer(
+        session, user_id, _QUICK_REPLY_LIMIT
     )
+    type_names = {
+        c.id: c.name
+        for c in await db.ref.choices(
+            session,
+            "farm_activity_type_constant",
+            "farm_activity_type_id",
+            "farm_activity_type_name",
+        )
+    }
     return [
-        ParentOption(id=str(r.id), label=_label(r.type_name or "กิจกรรม", r.created_at, r.farm_name))
-        for r in rows
+        ParentOption(
+            id=str(a.farm_activity_id),
+            label=_label(
+                type_names.get(str(a.farm_activity_type_id)) or "กิจกรรม",
+                a.created_at,
+                a.farm_name or "",
+            ),
+        )
+        for a in activities
     ]
 
 
-async def _harvest_choices(session: AsyncSession, user_id: UUID) -> list[ParentOption]:
-    rows = await session.execute(
-        text(
-            """
-            SELECT h.harvest_id AS id, h.harvest_date AS created_at,
-                   COALESCE(f.farm_name, hb.hub_name, '') AS place
-            FROM collection.harvest h
-            LEFT JOIN agriculture.farm f ON f.farm_id = h.farm_id
-            LEFT JOIN processing.hub hb ON hb.hub_id = h.hub_id
-            WHERE h.farm_id IN (
-                SELECT farm_id FROM agriculture.farmer_farm WHERE farmer_id = :user_id
-            ) OR h.hub_id IN (
-                SELECT hub_id FROM processing.hub_collector WHERE user_id = :user_id
-            )
-            ORDER BY h.harvest_date DESC
-            LIMIT :limit
-            """
-        ),
-        {"user_id": str(user_id), "limit": _QUICK_REPLY_LIMIT},
+async def _harvest_choices(session: Session, user_id: UUID) -> list[ParentOption]:
+    harvests = await db.collection.harvests_of(
+        session,
+        farm_ids=await db.agriculture.farm_ids_of_farmer(session, user_id),
+        hub_ids=await db.processing.hub_ids_of_collector(session, user_id),
+        limit=_QUICK_REPLY_LIMIT,
     )
+    farm_names = await db.agriculture.farm_names(
+        session, [h.farm_id for h in harvests if h.farm_id is not None]
+    )
+    hub_names = await db.processing.hub_names(
+        session, [h.hub_id for h in harvests if h.hub_id is not None]
+    )
+
+    def place(farm_id: UUID | None, hub_id: UUID | None) -> str:
+        # The farm's name when it has one, else the hub's, else nothing.
+        farm_name = farm_names.get(farm_id) if farm_id is not None else None
+        hub_name = hub_names.get(hub_id) if hub_id is not None else None
+        return farm_name if farm_name is not None else (hub_name or "")
+
     return [
-        ParentOption(id=str(r.id), label=_label("เก็บเกี่ยว", r.created_at, r.place)) for r in rows
+        ParentOption(
+            id=str(h.harvest_id),
+            label=_label("เก็บเกี่ยว", h.harvest_date, place(h.farm_id, h.hub_id)),
+        )
+        for h in harvests
     ]
 
 
-async def _batch_choices(session: AsyncSession, user_id: UUID) -> list[ParentOption]:
-    rows = await session.execute(
-        text(
-            """
-            SELECT b.batch_id AS id, b.created_at, ps.processing_station_name AS place
-            FROM processing.batch b
-            JOIN processing.processor_processing_station pps
-                ON pps.processing_station_id = b.processing_station_id
-            JOIN processing.processing_station ps
-                ON ps.processing_station_id = b.processing_station_id
-            WHERE pps.processor_id = :user_id
-            ORDER BY b.created_at DESC
-            LIMIT :limit
-            """
-        ),
-        {"user_id": str(user_id), "limit": _QUICK_REPLY_LIMIT},
-    )
-    return [ParentOption(id=str(r.id), label=_label("แบทช์", r.created_at, r.place)) for r in rows]
+async def _batch_choices(session: Session, user_id: UUID) -> list[ParentOption]:
+    batches = await db.processing.batches_of_processor(session, user_id, _QUICK_REPLY_LIMIT)
+    return [
+        ParentOption(id=str(b.batch_id), label=_label("แบทช์", b.created_at, b.station_name or ""))
+        for b in batches
+    ]
 
 
 _CHOICE_QUERY = {
@@ -181,5 +171,5 @@ _CHOICE_QUERY = {
 }
 
 
-async def choices_for(session: AsyncSession, kind: str, user_id: UUID) -> list[ParentOption]:
+async def choices_for(session: Session, kind: str, user_id: UUID) -> list[ParentOption]:
     return await _CHOICE_QUERY[kind](session, user_id)

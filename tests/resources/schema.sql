@@ -524,3 +524,57 @@ WHERE handler = v.h;
 ALTER TABLE form.handler_registry
     ALTER COLUMN schema_name SET NOT NULL,
     ALTER COLUMN table_name SET NOT NULL;
+
+-- What the chatbot's parent picker lists (src/db/agriculture.py, collection.py,
+-- processing.py and ref.py): the farmer's farm activities, the harvests of their
+-- farms or hubs, the batches of their stations. Only the columns those
+-- queries name; the real tables (database repo, V1 baseline) have many more.
+CREATE SCHEMA collection;
+
+CREATE TABLE ref.farm_activity_type_constant (
+    farm_activity_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    farm_activity_type_name character varying,
+    CONSTRAINT pk_farm_activity_type_constant PRIMARY KEY (farm_activity_type_id)
+);
+
+CREATE TABLE agriculture.farm_activity (
+    farm_activity_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    farm_id uuid NOT NULL,
+    farm_activity_type_id uuid,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_farm_activity PRIMARY KEY (farm_activity_id),
+    CONSTRAINT fk_farm_activity_farm FOREIGN KEY (farm_id) REFERENCES agriculture.farm (farm_id)
+);
+
+CREATE TABLE processing.hub (
+    hub_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hub_name character varying,
+    CONSTRAINT pk_hub PRIMARY KEY (hub_id)
+);
+
+CREATE TABLE collection.harvest (
+    harvest_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    farm_id uuid,
+    hub_id uuid,
+    harvest_date date,
+    CONSTRAINT pk_harvest PRIMARY KEY (harvest_id)
+);
+
+CREATE TABLE processing.processing_station (
+    processing_station_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processing_station_name character varying,
+    CONSTRAINT pk_processing_station PRIMARY KEY (processing_station_id)
+);
+
+CREATE TABLE processing.processor_processing_station (
+    processor_id uuid NOT NULL,
+    processing_station_id uuid NOT NULL,
+    CONSTRAINT pk_processor_processing_station PRIMARY KEY (processor_id, processing_station_id)
+);
+
+CREATE TABLE processing.batch (
+    batch_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processing_station_id uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_batch PRIMARY KEY (batch_id)
+);

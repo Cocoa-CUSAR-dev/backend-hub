@@ -13,7 +13,7 @@ class TaskListItem(BaseModel):
     mobile-backend#176) -- the service-key twin of GetTasks used by the
     chatbot's LIFF to-do list (docs-and-plan#176). `status` is one of
     NOT_STARTED / IN_PROGRESS / OVERDUE / COMPLETED, computed by Go from
-    close_at and whether a form.response row exists -- see that endpoint's
+    close_at and whether the user has answered -- see that endpoint's
     own docstring for the exact ladder (multi-submit forms never reach
     COMPLETED there, by design).
     """
@@ -34,7 +34,7 @@ class TaskSubmission(BaseModel):
     chatbot's own service-account credential -- see tasks/client.py).
     user_id is explicit here because there's no farmer session for Go to
     derive it from on this path; Go independently verifies a matching
-    chat.conversation row exists before trusting it.
+    conversation exists before trusting it.
 
     Also reused as the LLM's structured-output schema for extraction
     (ADR 0004) -- one schema definition, two consumers, per ADR 0003's

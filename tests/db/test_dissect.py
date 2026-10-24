@@ -13,6 +13,9 @@ from src.forms import registry
 from src.tasks import dissect
 from tests.db.conftest import insert
 
+# The form's questions; "not_a_column" is one too, but not a column.
+FIELDS = ("farm_id", "amount", "done_on", "not_a_column")
+
 
 @pytest.fixture(autouse=True)
 def _fresh_caches() -> Iterator[None]:
@@ -54,6 +57,7 @@ async def test_dissect_writes_only_real_columns(probe: AsyncSession) -> None:
             "done_on": "2026-10-23",
             "not_a_column": "ignored",
         },
+        FIELDS,
     )
 
     row = (
@@ -62,9 +66,25 @@ async def test_dissect_writes_only_real_columns(probe: AsyncSession) -> None:
     assert (row.farm_id, float(row.amount), str(row.done_on)) == (farm_id, 7.5, "2026-10-23")
 
 
+async def test_columns_the_form_does_not_ask_for_are_never_written(probe: AsyncSession) -> None:
+    sneaky_id = uuid4()
+
+    await dissect.dissect(
+        probe,
+        "probe",
+        {"probe_id": str(sneaky_id), "farm_id": str(uuid4()), "amount": 1},
+        ("farm_id",),
+    )
+
+    row = (
+        await probe.execute(text("SELECT probe_id, amount FROM agriculture.probe_activity"))
+    ).one()
+    assert (row.probe_id == sneaky_id, row.amount) == (False, None)
+
+
 async def test_an_answer_matching_no_column_is_invalid(probe: AsyncSession) -> None:
     with pytest.raises(Invalid, match="probe"):
-        await dissect.dissect(probe, "probe", {"task_id": "t", "colour": "red"})
+        await dissect.dissect(probe, "probe", {"task_id": "t", "colour": "red"}, FIELDS)
 
 
 async def test_an_unknown_or_inactive_handler_is_not_supported(probe: AsyncSession) -> None:
@@ -73,7 +93,7 @@ async def test_an_unknown_or_inactive_handler_is_not_supported(probe: AsyncSessi
     )
 
     with pytest.raises(HandlerNotSupported):
-        await dissect.dissect(probe, "probe", {"farm_id": str(uuid4())})
+        await dissect.dissect(probe, "probe", {"farm_id": str(uuid4())}, FIELDS)
     with pytest.raises(HandlerNotSupported):
         await dissect.handler_table(probe, "no_such_handler")
 

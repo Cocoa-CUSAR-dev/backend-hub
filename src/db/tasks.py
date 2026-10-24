@@ -36,6 +36,23 @@ class TaskRow:
 
 
 @dataclass(frozen=True, slots=True)
+class TaskBrief:
+    """A task's name and when it opens, for lists that only need those."""
+
+    title: str | None
+    open_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class TaskWindow:
+    """When a task accepts answers. None on either side means no limit there.
+    Bangkok wall-clock, no zone stored."""
+
+    open_at: datetime | None
+    close_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
 class ResponseRow:
     response_id: UUID
     task_form_id: UUID | None
@@ -95,6 +112,46 @@ async def tasks_for_user(
         {"user_id": user_id, "open_on": open_on, "limit": limit, "offset": offset},
     )
     return [TaskRow(**row._mapping) for row in result]
+
+
+async def task_window(session: AsyncSession, task_id: UUID) -> TaskWindow | None:
+    """None if the task does not exist."""
+    row = (
+        await session.execute(
+            text("SELECT open_at, close_at FROM form.task WHERE task_id = :task_id"),
+            {"task_id": task_id},
+        )
+    ).first()
+    return TaskWindow(**row._mapping) if row else None
+
+
+async def assignee_ids(session: AsyncSession, task_id: UUID) -> list[UUID]:
+    """Who the task is assigned to. Empty means it is for everyone."""
+    result = await session.execute(
+        text("SELECT user_id FROM form.assignment WHERE task_id = :task_id"),
+        {"task_id": task_id},
+    )
+    return list(result.scalars())
+
+
+async def responder_ids(session: AsyncSession, task_id: UUID) -> set[UUID]:
+    """Everyone who has filed at least one response to the task."""
+    result = await session.execute(
+        text("SELECT DISTINCT user_id FROM form.response WHERE task_log_id = :task_id"),
+        {"task_id": task_id},
+    )
+    return set(result.scalars())
+
+
+async def task_briefs(session: AsyncSession, task_ids: list[UUID]) -> dict[UUID, TaskBrief]:
+    """task_id -> title and opening time, for the ids that exist."""
+    if not task_ids:
+        return {}
+    rows = await session.execute(
+        text("SELECT task_id, title, open_at FROM form.task WHERE task_id = ANY(:ids)"),
+        {"ids": task_ids},
+    )
+    return {row.task_id: TaskBrief(title=row.title, open_at=row.open_at) for row in rows}
 
 
 async def task_visible_to(session: AsyncSession, user_id: UUID, task_id: UUID) -> bool:

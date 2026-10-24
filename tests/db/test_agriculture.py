@@ -219,3 +219,76 @@ async def test_latest_file_path_per_row(db_session: AsyncSession) -> None:
         )
         == {}
     )
+
+
+async def test_farm_and_plot_ids_of_a_farmer_cover_only_their_farms(
+    db_session: AsyncSession,
+) -> None:
+    me, other = await _farmer(db_session), await _farmer(db_session)
+    my_farm, other_farm = await _farm(db_session, me), await _farm(db_session, other)
+    my_plot, _ = await _plot(db_session, my_farm), await _plot(db_session, other_farm)
+
+    assert await db.agriculture.farm_ids_of_farmer(db_session, me) == [my_farm]
+    assert await db.agriculture.plot_ids_of_farmer(db_session, me) == [my_plot]
+    assert await db.agriculture.farm_ids_of_farmer(db_session, await _farmer(db_session)) == []
+
+
+async def test_plots_with_farm_name_can_narrow_to_a_farmer_and_a_farm(
+    db_session: AsyncSession,
+) -> None:
+    me, other = await _farmer(db_session), await _farmer(db_session)
+    north, south = await _farm(db_session, me, "north"), await _farm(db_session, me, "south")
+    elsewhere = await _farm(db_session, other, "elsewhere")
+    p_north, p_south = await _plot(db_session, north, "a"), await _plot(db_session, south, "b")
+    p_else = await _plot(db_session, elsewhere, "c")
+
+    def ids(rows: list[db.agriculture.PlotWithFarmRow]) -> list[UUID]:
+        return [r.plot_id for r in rows]
+
+    mine = await db.agriculture.plots_with_farm_name(db_session, farmer_id=me, farm_id=None)
+    everyone = await db.agriculture.plots_with_farm_name(db_session, farmer_id=None, farm_id=None)
+    one_farm = await db.agriculture.plots_with_farm_name(db_session, farmer_id=me, farm_id=south)
+    wrong_farm = await db.agriculture.plots_with_farm_name(
+        db_session, farmer_id=me, farm_id=elsewhere
+    )
+
+    assert ids(mine) == [p_north, p_south]  # ordered by farm name, then plot name
+    assert [(r.farm_name, r.plot_name) for r in mine] == [("north", "a"), ("south", "b")]
+    assert set(ids(everyone)) == {p_north, p_south, p_else}
+    assert ids(one_farm) == [p_south]
+    assert wrong_farm == []
+
+
+async def test_farm_activities_are_the_farmers_newest_with_their_farm_name(
+    db_session: AsyncSession,
+) -> None:
+    me, other = await _farmer(db_session), await _farmer(db_session)
+    mine, theirs = await _farm(db_session, me, "mine"), await _farm(db_session, other, "theirs")
+    kind = uuid4()
+    older = await insert(
+        db_session, "agriculture.farm_activity", farm_id=mine, created_at=datetime(2026, 8, 1)
+    )
+    newer = await insert(
+        db_session,
+        "agriculture.farm_activity",
+        farm_id=mine,
+        farm_activity_type_id=kind,
+        created_at=datetime(2026, 8, 2),
+    )
+    await insert(db_session, "agriculture.farm_activity", farm_id=theirs, created_at=NOW)
+
+    rows = await db.agriculture.farm_activities_of_farmer(db_session, me, limit=10)
+    capped = await db.agriculture.farm_activities_of_farmer(db_session, me, limit=1)
+
+    assert [(r.farm_activity_id, r.farm_name, r.farm_activity_type_id) for r in rows] == [
+        (newer, "mine", kind),
+        (older, "mine", None),
+    ]
+    assert [r.farm_activity_id for r in capped] == [newer]
+
+
+async def test_farm_names_cover_only_farms_that_exist(db_session: AsyncSession) -> None:
+    farm = await _farm(db_session, None, "north")
+
+    assert await db.agriculture.farm_names(db_session, [farm, uuid4()]) == {farm: "north"}
+    assert await db.agriculture.farm_names(db_session, []) == {}
