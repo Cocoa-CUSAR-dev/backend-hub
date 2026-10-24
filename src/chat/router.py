@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from src import db
+from src.auth.service import load_actor
 from src.chat import intent, reuse, service, text_parsing
 from src.chat.constants import PAUSE_LABEL, ActiveSubstate
 from src.chat.intent import Intent
@@ -15,7 +16,7 @@ from src.config import settings
 from src.database import Session, async_session_maker
 from src.db.models import Conversation
 from src.diary.client import generate_diary
-from src.exceptions import ConversationNotFound, UpstreamServiceError
+from src.exceptions import ConversationNotFound, Forbidden, UpstreamServiceError
 from src.forms.client import get_form
 from src.line import parent_picker, temp_task_picker
 from src.line.client import (
@@ -356,6 +357,20 @@ async def _handle_event(event: Event) -> None:
         logger.info("unhandled event type: %s", type(event).__name__)
 
 
+async def _pending_tasks(
+    session: Session, user_id: UUID
+) -> list[temp_task_picker.PendingTask] | None:
+    """The farmer's pending tasks, or None when this account is not allowed to
+    fill in forms (no role yet: the person registered but never became a
+    farmer, hub collector or processor).
+    """
+    actor = await load_actor(session, user_id, "line")
+    try:
+        return await temp_task_picker.list_pending_tasks(session, actor)
+    except Forbidden:
+        return None
+
+
 async def _reply_task_list(
     reply_token: str,
     session: Session,
@@ -382,7 +397,10 @@ async def _reply_task_list(
     # TEMPORARY (see src/line/temp_task_picker.py): Boom's real LIFF to-do
     # list is Sprint 5. Until then, pending tasks come back as Quick Reply
     # buttons instead of leaving the farmer stuck.
-    tasks = await temp_task_picker.list_pending_tasks(session, user_id)
+    tasks = await _pending_tasks(session, user_id)
+    if tasks is None:
+        await reply_text(reply_token, messages.NO_FORM_ACCESS)
+        return
     if only_title is not None:
         tasks = [task for task in tasks if task.title == only_title] or tasks
     if not tasks:
@@ -563,7 +581,10 @@ async def _handle_message(event: MessageEvent) -> None:
                 # OTHER path above stays exactly as it was -- in particular
                 # an ACTIVE conversation never reaches the classifier, so a
                 # real answer like "เริ่มเก็บเกี่ยววันนี้" is still an answer.
-                tasks = await temp_task_picker.list_pending_tasks(session, user_id)
+                tasks = await _pending_tasks(session, user_id)
+                if tasks is None:
+                    await reply_text(event.reply_token, messages.NO_FORM_ACCESS)
+                    return
                 classified = await intent.classify(message.text, [task.title for task in tasks])
                 await _reply_for_intent(
                     event.reply_token,

@@ -128,6 +128,27 @@ Several writes that must succeed together go inside `async with transaction(sess
 - **Doors identify.** HTTP (cookie or Bearer), LINE (userId) and jobs (`Actor.system()`) all produce an `Actor`.
 - **Services authorise.** `require(actor, perm)` sits *inside* the service, never only in the router.
 - **Permission keys look like `verb:resource:scope`** (`read:farm:all`), not role names. `actor.perms` is the union over all of the user's roles, so one person can be a farmer and a processor.
+- **Every permission key is listed below.** A new key comes with a Flyway migration in the `database` repo that grants it, and a new row here, in the same PR. A `require()` with an unlisted key means nobody can pass it.
+
+  | Key | Lets you | Roles | Source |
+  |---|---|---|---|
+  | `read:profile:own` | read my own profile | admin, researcher, farmer, hub_collector, processor | baseline, V24, V32 |
+  | `update:profile:own` | edit my profiles | admin, researcher, farmer, hub_collector, processor | baseline, V32 |
+  | `create:user:any` | create researcher/admin accounts | admin | baseline |
+  | `update:role:any` | grant/remove researcher, admin | admin | V32 |
+  | `read:researcher:all` / `update:researcher:any` / `delete:researcher:any` | manage researchers | admin | baseline |
+  | `read:researcher:own` / `create:researcher:own` | my researcher record | researcher | baseline |
+  | `read:form:all` | every form | admin, researcher | baseline |
+  | `create:form:all` / `update:form:all` | build and edit forms | researcher (update also admin) | baseline, V15 |
+  | `read:form:assigned` | forms of tasks I can answer | farmer, hub_collector, processor | V10, V32 |
+  | `read:task:all` | every task (researcher view) | researcher | V11 |
+  | `read:response:all` / `update:response:all` | every answer, correct a field | researcher | V11, V28 |
+  | `read:response:own` | my own answers | farmer, hub_collector, processor | V23, V32 |
+  | `read:report:all` | dashboards, Excel export | admin, researcher | baseline |
+  | `create:farm:own` / `read:farm:own` / `update:farm:own` | my farms, plots, farm photo | farmer | V33 |
+  | `read:farm:all` | every farm and plot | researcher | V33 |
+
+  No permission key is needed for things about your own account that a brand-new account (no roles yet) must be able to do: `GET /me`, adding a self-service role, changing your password.
 - **One login.** `POST /api/v1/auth/login` returns tokens in the body **and** sets the cookie. There is no separate mobile login and web login.
 
 ---

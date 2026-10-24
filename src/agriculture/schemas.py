@@ -13,13 +13,9 @@ from uuid import UUID
 from pydantic import BaseModel, Field, StringConstraints
 
 from src.go_json import GoDate, GoTime
+from src.registration import GisPoint
 
 Required = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-
-
-class GisPoint(BaseModel):
-    lat: float = Field(ge=-90, le=90)
-    lng: float = Field(ge=-180, le=180)
 
 
 class FarmIn(BaseModel):
