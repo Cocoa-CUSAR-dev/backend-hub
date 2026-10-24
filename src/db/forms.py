@@ -224,6 +224,35 @@ async def form_rows(session: AsyncSession, form_id: UUID) -> list[FormRow]:
     return [FormRow(**row._mapping) for row in result]
 
 
+@dataclass(frozen=True, slots=True)
+class HandlerRow:
+    """One handler_registry row: which table a form's answers are written to.
+    A child handler (parent_handler set) hangs off an existing row of its
+    parent, stored under parent_field on its own table."""
+
+    handler: str
+    schema_name: str
+    table_name: str
+    parent_handler: str | None
+    parent_field: str | None
+    is_active: bool
+
+
+async def handler_rows(session: AsyncSession) -> list[HandlerRow]:
+    """Every handler_registry row as stored, active or not. Not validated:
+    the caller drops rows with bad identifiers or a missing table."""
+    result = await session.execute(
+        text(
+            """
+            SELECT handler, schema_name, table_name, parent_handler, parent_field, is_active
+            FROM form.handler_registry
+            ORDER BY handler
+            """
+        )
+    )
+    return [HandlerRow(**row._mapping) for row in result]
+
+
 async def field_dependencies(session: AsyncSession) -> list[FieldDependencyRow]:
     """Every field_dependency row as stored. Not validated: the caller drops
     rows with bad identifiers or a missing link table."""

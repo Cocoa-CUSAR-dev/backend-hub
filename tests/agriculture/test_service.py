@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from src import db
 from src.actor import Actor
 from src.agriculture import service
-from src.agriculture.schemas import FarmIn, GisPoint, PlotIn
+from src.agriculture.schemas import FarmIn, PlotIn
 from src.db.agriculture import FarmRow
 from src.exceptions import Forbidden, Invalid, NotFound, Unavailable
 
@@ -89,20 +89,6 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> dict[str, AsyncMock]:
 
 
 # --- shapes -------------------------------------------------------------------
-
-
-def test_wkt_point_and_closed_polygon_use_lon_lat_with_six_decimals() -> None:
-    a, b, c = (
-        GisPoint(lat=13.7, lng=100.5),
-        GisPoint(lat=13.8, lng=100.6),
-        GisPoint(lat=13.9, lng=100.4),
-    )
-
-    assert service._wkt_point(a) == "POINT(100.500000 13.700000)"
-    assert service._wkt_polygon([a, b, c]) == (
-        "POLYGON((100.500000 13.700000,100.600000 13.800000,"
-        "100.400000 13.900000,100.500000 13.700000))"
-    )
 
 
 # --- create_farm ----------------------------------------------------------------

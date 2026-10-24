@@ -80,16 +80,31 @@ def owner_of(table: str, owned: dict[str, str]) -> str | None:
     return owned.get(table) or owned.get(table.split(".")[0] + ".*")
 
 
+def _string_literals(text: str) -> list[str]:
+    """The text of every string literal. An f-string (its own tokens since
+    Python 3.12) is its literal parts joined, with each {...} field replaced
+    by a space, so the SQL around a placeholder still reads as SQL."""
+    literals: list[str] = []
+    stack: list[list[str]] = []  # open f-strings; they can nest inside {...}
+    for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+        if tok.type == tokenize.STRING:
+            literals.append(tok.string)
+        elif tok.type == tokenize.FSTRING_START:
+            stack.append([])
+        elif tok.type == tokenize.FSTRING_MIDDLE and stack:
+            stack[-1].append(tok.string)
+        elif tok.type == tokenize.FSTRING_END and stack:
+            literals.append(" ".join(stack.pop()))
+    return literals
+
+
 def string_tables(text: str) -> set[str]:
     """schema.table names that appear inside string literals (SQL, comments in
     docstrings excluded on purpose: docstrings are strings too, so a module that
     only *mentions* a table in prose is skipped by checking for SQL keywords).
     """
     found: set[str] = set()
-    for tok in tokenize.generate_tokens(io.StringIO(text).readline):
-        if tok.type != tokenize.STRING:
-            continue
-        s = tok.string
+    for s in _string_literals(text):
         if not re.search(r"\b(select|insert|update|delete|from|join|into)\b", s, re.I):
             continue
         found.update(f"{m.group(1)}.{m.group(2)}" for m in TABLE_RE.finditer(s))

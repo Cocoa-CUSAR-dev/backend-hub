@@ -192,6 +192,16 @@ def actor_from_access_token(token: str, channel: Channel) -> Actor:
     return Actor(user_id=claims.user_id, roles=claims.roles, perms=claims.perms, channel=channel)
 
 
+async def actor_for_line(session: Session, line_user_id: str) -> Actor | None:
+    """LINE webhook door: the linked person with their roles and permissions,
+    or None if this LINE account isn't linked yet.
+    """
+    user_id = await db.auth.user_id_for_line(session, line_user_id)
+    if user_id is None:
+        return None
+    return await load_actor(session, user_id, channel="line")
+
+
 async def load_actor(session: Session, user_id: UUID, channel: Channel) -> Actor:
     """Actor straight from the DB -- for doors without a token (LINE webhook)."""
     roles, perms = await db.auth.roles_and_permissions(session, user_id)

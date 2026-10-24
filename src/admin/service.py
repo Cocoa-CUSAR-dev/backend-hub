@@ -1,15 +1,51 @@
-"""Admin-only account management: granting and removing roles."""
+"""Admin-only account management: creating accounts, granting and removing roles."""
 
 from uuid import UUID
 
 from src import db
 from src.actor import Actor, require
+from src.auth import passwords
 from src.database import Session, transaction
 from src.exceptions import Conflict, Forbidden, NotFound
 
 # Roles that carry a full profile (farmer, hub_collector, processor) are added
 # by the person themselves, because only they can fill the profile in.
 ADMIN_GRANTED_ROLES = frozenset({"researcher", "admin"})
+
+
+async def create_user(
+    session: Session,
+    actor: Actor,
+    username: str,
+    temporary_password: str,
+    role: str,
+    profile: dict[str, str | None],
+) -> tuple[UUID, list[str]]:
+    """Create an account for someone else (a researcher or another admin).
+    They must pick their own password at first sign-in (must_reset_password),
+    the same rule web-backend's POST /admin/users had.
+    """
+    require(actor, "create:user:any")
+    if role not in ADMIN_GRANTED_ROLES:
+        raise Forbidden(f"'{role}' is added by the user with their own profile")
+    passwords.check_strength(temporary_password)
+    async with transaction(session):
+        user_id = await db.auth.create_user(
+            session,
+            username.strip(),
+            passwords.hash_password(temporary_password),
+            requires_reset=True,
+        )
+        if user_id is None:
+            raise Conflict("ชื่อผู้ใช้นี้ถูกใช้งานแล้ว")
+        try:
+            await db.auth.add_role(session, user_id, role)
+        except LookupError as exc:
+            raise NotFound(f"Role '{role}' is not set up in this database") from exc
+        if role == "researcher":
+            await db.research.create_researcher_profile(session, user_id, profile)
+        roles, _ = await db.auth.roles_and_permissions(session, user_id)
+    return user_id, sorted(roles)
 
 
 async def grant_role(session: Session, actor: Actor, user_id: UUID, role: str) -> list[str]:

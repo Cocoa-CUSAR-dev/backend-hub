@@ -59,9 +59,4 @@ async def test_harvests_are_capped_at_the_limit(db_session: AsyncSession) -> Non
 
     rows = await db.collection.harvests_of(db_session, farm_ids=[farm], hub_ids=[], limit=3)
 
-    # harvest_date is a timestamp in the database repo (V1), as schema.sql now has it.
-    assert [r.harvest_date for r in rows] == [
-        datetime(2026, 8, 5),
-        datetime(2026, 8, 4),
-        datetime(2026, 8, 3),
-    ]
+    assert [r.harvest_date for r in rows] == [datetime(2026, 8, day) for day in (5, 4, 3)]
