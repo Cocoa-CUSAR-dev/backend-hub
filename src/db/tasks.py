@@ -13,6 +13,7 @@ All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2
 Other code calls the functions here.
 """
 
+import json
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -152,3 +153,86 @@ async def responses_of_user(
         {"task_id": task_id, "user_id": user_id},
     )
     return [ResponseRow(**row._mapping) for row in result]
+
+
+async def insert_response(
+    session: AsyncSession,
+    *,
+    response_id: UUID,
+    task_id: UUID,
+    task_form_id: UUID,
+    user_id: UUID,
+    answer: dict[str, Any],
+    submitted_at: datetime,
+    status: str,
+) -> None:
+    """Save one submitted answer (task_log_id holds the task id, as it always has)."""
+    await session.execute(
+        text(
+            """
+            INSERT INTO form.response
+                (response_id, task_log_id, task_form_id, user_id, answer, submitted_at, status)
+            VALUES
+                (:response_id, :task_id, :task_form_id, :user_id, CAST(:answer AS jsonb),
+                 :submitted_at, :status)
+            """
+        ),
+        {
+            "response_id": response_id,
+            "task_id": task_id,
+            "task_form_id": task_form_id,
+            "user_id": user_id,
+            "answer": json.dumps(answer, ensure_ascii=False),
+            "submitted_at": submitted_at,
+            "status": status,
+        },
+    )
+
+
+async def latest_response_id(session: AsyncSession, user_id: UUID, task_id: UUID) -> UUID | None:
+    """The user's most recent response to a task, or None."""
+    found = await session.execute(
+        text(
+            """
+            SELECT response_id FROM form.response
+            WHERE task_log_id = :task_id AND user_id = :user_id
+            ORDER BY submitted_at DESC NULLS LAST
+            LIMIT 1
+            """
+        ),
+        {"task_id": task_id, "user_id": user_id},
+    )
+    response_id: UUID | None = found.scalar()
+    return response_id
+
+
+async def update_response(
+    session: AsyncSession,
+    *,
+    response_id: UUID,
+    task_id: UUID,
+    user_id: UUID,
+    answer: dict[str, Any],
+    submitted_at: datetime,
+) -> bool:
+    """Rewrite one of the user's own responses to this task. False if no such
+    response (wrong id, someone else's, or another task's): user_id and
+    task_id are part of the match, so an id alone can't touch it."""
+    updated = await session.execute(
+        text(
+            """
+            UPDATE form.response
+            SET answer = CAST(:answer AS jsonb), submitted_at = :submitted_at
+            WHERE response_id = :response_id AND user_id = :user_id AND task_log_id = :task_id
+            RETURNING response_id
+            """
+        ),
+        {
+            "response_id": response_id,
+            "task_id": task_id,
+            "user_id": user_id,
+            "answer": json.dumps(answer, ensure_ascii=False),
+            "submitted_at": submitted_at,
+        },
+    )
+    return updated.first() is not None

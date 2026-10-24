@@ -152,3 +152,46 @@ async def test_responses_of_user_lists_only_mine_newest_first(db_session: AsyncS
     assert rows[0].answer == {"grade": "B"}
     assert rows[0].submitted_at == datetime(2026, 10, 1, 10)
     assert rows[0].status == "SUBMITTED"
+
+
+async def test_insert_find_and_update_my_response(db_session: AsyncSession) -> None:
+    me = await _user(db_session)
+    other = await _user(db_session)
+    task = await _task(db_session, "t", datetime(2026, 10, 1, 8))
+    other_task = await _task(db_session, "u", datetime(2026, 10, 1, 8))
+    form_id, response_id = uuid4(), uuid4()
+
+    await db.tasks.insert_response(
+        db_session,
+        response_id=response_id,
+        task_id=task,
+        task_form_id=form_id,
+        user_id=me,
+        answer={"grade": "A", "note": "ไทย"},
+        submitted_at=datetime(2026, 10, 1, 2),
+        status="COMPLETED",
+    )
+
+    assert await db.tasks.latest_response_id(db_session, me, task) == response_id
+    assert await db.tasks.latest_response_id(db_session, other, task) is None
+    [row] = await db.tasks.responses_of_user(db_session, me, task)
+    assert (row.answer, row.task_form_id, row.status) == (
+        {"grade": "A", "note": "ไทย"},
+        form_id,
+        "COMPLETED",
+    )
+
+    async def update(user: UUID, on_task: UUID) -> bool:
+        return await db.tasks.update_response(
+            db_session,
+            response_id=response_id,
+            task_id=on_task,
+            user_id=user,
+            answer={"grade": "B"},
+            submitted_at=datetime(2026, 10, 2, 2),
+        )
+
+    assert await update(other, task) is False  # not theirs
+    assert await update(me, other_task) is False  # not that task's
+    assert await update(me, task) is True
+    assert await db.tasks.latest_answer(db_session, me, task) == {"grade": "B"}

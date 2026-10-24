@@ -13,7 +13,10 @@ import re
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.exceptions import AnswerRejectedByDatabase
 
 _IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
 
@@ -71,10 +74,35 @@ async def insert_row(
     params = ", ".join(
         f"CAST(CAST(:p{i} AS text) AS {types[column]})" for i, column in enumerate(columns)
     )
-    await session.execute(
-        text(f"INSERT INTO {_qualified(table)} ({names}) VALUES ({params})"),
-        {f"p{i}": _as_text(values[column]) for i, column in enumerate(columns)},
-    )
+    try:
+        await session.execute(
+            text(f"INSERT INTO {_qualified(table)} ({names}) VALUES ({params})"),
+            {f"p{i}": _as_text(values[column]) for i, column in enumerate(columns)},
+        )
+    except DBAPIError as exc:
+        rejected = _rejected(exc)
+        if rejected is None:
+            raise
+        raise rejected from exc
+
+
+# Postgres' FK violation detail: `Key (farm_id)=(...) is not present in table "farm".`
+_FK_COLUMN = re.compile(r"Key \(([a-z_][a-z0-9_]*)\)=")
+
+
+def _rejected(exc: DBAPIError) -> AnswerRejectedByDatabase | None:
+    """The farmer-caused constraint errors as AnswerRejectedByDatabase; None
+    for anything else (which stays a 500)."""
+    pg = exc.orig.__cause__ if exc.orig is not None else None
+    state = getattr(pg, "sqlstate", None)
+    if state == "23502":  # not_null_violation
+        return AnswerRejectedByDatabase("missing", getattr(pg, "column_name", None))
+    if state == "23503":  # foreign_key_violation
+        found = _FK_COLUMN.search(getattr(pg, "detail", None) or "")
+        return AnswerRejectedByDatabase("gone", found.group(1) if found else None)
+    if state in ("22P02", "22007", "22008", "22003"):  # bad text / date / range
+        return AnswerRejectedByDatabase("format")
+    return None
 
 
 async def link_exists(
