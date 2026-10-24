@@ -216,3 +216,20 @@ async def test_permissions(db_session: AsyncSession, task: UUID) -> None:
         await answers.edit(db_session, reader, task, {})
     with pytest.raises(Forbidden, match="user"):
         await answers.submit(db_session, Actor.system(), task, {})
+
+
+async def test_a_column_the_form_does_not_ask_for_is_not_written(
+    db_session: AsyncSession, task: UUID
+) -> None:
+    me = await _farmer(db_session)
+    sneaky_id = uuid4()
+
+    await answers.submit(
+        db_session,
+        me,
+        task,
+        {"farm_id": await _farm(db_session), "weight_kg": 1, "probe_id": str(sneaky_id)},
+    )
+
+    [row] = await _rows(db_session, "SELECT probe_id FROM agriculture.probe_answers")
+    assert row.probe_id != sneaky_id

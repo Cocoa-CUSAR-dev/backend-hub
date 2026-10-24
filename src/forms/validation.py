@@ -186,6 +186,18 @@ def _question_error(question: QuestionOut, value: Any) -> str | None:
     return None
 
 
+def checked_fields(form: FormOut) -> set[str]:
+    """Field names of the form's active questions: the only answer keys
+    answer_errors checks, so the only ones safe to write anywhere."""
+    return {
+        question.field_name
+        for section in form.sections
+        if section.is_active
+        for question in section.questions
+        if question.is_active and question.field_name
+    }
+
+
 def answer_errors(form: FormOut, answer: dict[str, Any]) -> dict[str, str]:
     """field -> message for every active question the answer gets wrong."""
     errors: dict[str, str] = {}

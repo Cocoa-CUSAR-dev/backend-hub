@@ -9,7 +9,7 @@ import pytest
 
 from src import clock
 from src.forms.schemas import ChoiceOut, FormOut, QuestionOut, SectionOut
-from src.forms.validation import REQUIRED, answer_errors
+from src.forms.validation import REQUIRED, answer_errors, checked_fields
 
 
 def q(field: str | None, input_type: str, mandatory: bool = True, **extra: Any) -> QuestionOut:
@@ -203,3 +203,9 @@ def test_optional_empty_field_skips_its_rule() -> None:
         q("note", "VARCHAR", mandatory=False, validation_rule=rule(type="VARCHAR", maxLength=1))
     )
     assert answer_errors(f, {"note": ""}) == {}
+
+
+def test_checked_fields_are_the_active_questions_with_a_field_name() -> None:
+    f = form(q("note", "VARCHAR"), q(None, "VARCHAR"), q("hidden", "VARCHAR", is_active=False))
+    assert checked_fields(f) == {"note"}
+    assert checked_fields(form(q("x", "VARCHAR"), section_active=False)) == set()

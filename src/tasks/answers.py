@@ -8,6 +8,8 @@ chatbot once it calls these in-process instead of Go (docs-and-plan#259).
 Order, as in Go: find the task's form, refuse a form type that can't be
 saved yet, validate the whole answer (nothing is written until it passes),
 then save the response and write its handler-table row in one transaction.
+Only the form's own checked fields reach the handler table (dissect's
+allow-list), so a hand-made request can't set a column the form never asks.
 
 Permissions (database V35): create:response:own to submit, update:response:own
 to edit one of your own answers. Go accepted any signed-in user.
@@ -22,7 +24,7 @@ from src.database import Session, transaction
 from src.exceptions import AnswerRejectedByDatabase, Forbidden, Invalid, NotFound
 from src.forms.detail import load_form
 from src.forms.schemas import FormOut
-from src.forms.validation import answer_errors
+from src.forms.validation import answer_errors, checked_fields
 from src.tasks import dissect
 from src.tasks.schemas import AnswerSavedOut
 
@@ -104,7 +106,7 @@ async def submit(
                 submitted_at=clock.utc_now_naive(),
                 status="COMPLETED",
             )
-            await dissect.dissect(session, handler, stored)
+            await dissect.dissect(session, handler, stored, checked_fields(form))
     except AnswerRejectedByDatabase as error:
         raise _labelled(error, form) from error
     return AnswerSavedOut(message=SUBMITTED, response_id=response_id)
