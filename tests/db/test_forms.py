@@ -177,6 +177,46 @@ async def test_ref_refuses_unsafe_identifiers(db_session: AsyncSession) -> None:
 # --- src/forms/registry.py --------------------------------------------------
 
 
+async def test_handler_rows_read_the_seeded_registry(db_session: AsyncSession) -> None:
+    rows = {row.handler: row for row in await db.forms.handler_rows(db_session)}
+
+    assert (rows["harvest"].schema_name, rows["harvest"].table_name) == ("collection", "harvest")
+    assert (
+        rows["harvest_grade_detail"].parent_handler,
+        rows["harvest_grade_detail"].parent_field,
+    ) == (
+        "harvest",
+        "harvest_id",
+    )
+
+
+async def test_registry_maps_handlers_to_tables_that_exist(
+    db_session: AsyncSession, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Own tables, created inside the test's transaction and rolled back with it.
+    await db_session.execute(text("CREATE TABLE agriculture.probe_activity (probe_id uuid)"))
+    await db_session.execute(text("CREATE TABLE agriculture.probe_retired (probe_id uuid)"))
+    await db_session.execute(
+        text(
+            "INSERT INTO form.handler_registry (handler, schema_name, table_name, is_active)"
+            " VALUES ('probe', 'agriculture', 'probe_activity', true),"
+            "        ('probe_missing', 'agriculture', 'probe_gone', true),"
+            "        ('probe_bad_name', 'agriculture', 'probe_activity; --', true),"
+            "        ('probe_retired', 'agriculture', 'probe_retired', false)"
+        )
+    )
+
+    reg = await registry.current(db_session)
+
+    assert reg.tables["probe"] == "agriculture.probe_activity"
+    for dropped in ("probe_missing", "probe_bad_name", "probe_retired"):
+        assert dropped not in reg.tables
+    # Parents come from every row, as seeded from V30.
+    assert reg.parents["harvest_grade_detail"] == "harvest"
+    assert {"farm_activity_id", "harvest_id", "batch_id"} <= reg.parent_fields
+    assert "missing table" in caplog.text and "invalid identifier" in caplog.text
+
+
 async def test_registry_keeps_valid_dependencies_and_drops_broken_ones(
     db_session: AsyncSession, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -367,8 +407,9 @@ async def test_child_handlers_are_the_active_ones_that_have_a_parent(
 ) -> None:
     await db_session.execute(
         text(
-            "INSERT INTO form.handler_registry (handler, parent_handler, parent_field, is_active) "
-            "VALUES ('off_child', 'harvest', 'harvest_id', false)"
+            "INSERT INTO form.handler_registry"
+            " (handler, schema_name, table_name, parent_handler, parent_field, is_active)"
+            " VALUES ('off_child', 'collection', 'off_child', 'harvest', 'harvest_id', false)"
         )
     )
 

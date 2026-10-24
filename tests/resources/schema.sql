@@ -503,6 +503,28 @@ CREATE TABLE storage.geo (
     CONSTRAINT pk_geo PRIMARY KEY (geo_id)
 );
 
+-- docs-and-plan#263: src/forms/registry.py also reads which table each
+-- handler writes to (V30's schema_name / table_name), filled in for the
+-- rows seeded above with the values V30 inserts.
+ALTER TABLE form.handler_registry
+    ADD COLUMN schema_name character varying,
+    ADD COLUMN table_name character varying;
+UPDATE form.handler_registry SET schema_name = v.s, table_name = v.t
+FROM (VALUES
+    ('farm_activity', 'agriculture', 'farm_activity'),
+    ('farm_activity_fertilizer', 'agriculture', 'farm_activity_fertilizer'),
+    ('farm_activity_chemical', 'agriculture', 'farm_activity_chemical'),
+    ('harvest', 'collection', 'harvest'),
+    ('harvest_grade_detail', 'collection', 'harvest_grade_detail'),
+    ('batch', 'processing', 'batch'),
+    ('fermentation_batch', 'processing', 'fermentation_batch'),
+    ('drying_batch', 'processing', 'drying_batch')
+) AS v(h, s, t)
+WHERE handler = v.h;
+ALTER TABLE form.handler_registry
+    ALTER COLUMN schema_name SET NOT NULL,
+    ALTER COLUMN table_name SET NOT NULL;
+
 -- What the chatbot's parent picker lists (src/db/agriculture.py, collection.py,
 -- processing.py and ref.py): the farmer's farm activities, the harvests of their
 -- farms or hubs, the batches of their stations. Only the columns those
