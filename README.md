@@ -12,7 +12,7 @@ The one backend for the Cocoa Supply Chain Databank (Is Thai Cacao). It started 
 
 | Part | Status |
 |---|---|
-| LINE chatbot (webhook, LIFF, conversation, reminders) | here, being reorganised into the conventions' layout |
+| LINE chatbot (webhook, LIFF, conversation, reminders) | moved into `chat/`, `jobs/`, `line/client.py` and `reminders/`; all of its SQL is in `src/db/` and the conventions check passes with only the Kotlin/Go clients left in the baseline. Still to do: its services take an `actor` and check permissions, and `chat/service.py` stops editing ORM objects in place |
 | Foundation: one `config.py`, one `exceptions.py`, `actor.py`, `clock.py`, `src/db/` owners, conventions check in CI | done |
 | Login + roles (from Kotlin + Go) | next |
 | Mobile endpoints (from Go) / web endpoints (from Kotlin) | planned |
@@ -39,9 +39,11 @@ src/
 ├── main.py  config.py  exceptions.py  database.py  actor.py  clock.py   # shared core
 ├── db/                  # ALL SQL, one file per schema (owners listed in each file)
 ├── llm/                 # the only LiteLLM caller
-├── line/  conversation/ # LINE door + chatbot brain (moving to chat/)
+├── chat/                # LINE door + chatbot brain (webhook, LIFF, ui/, state machine, intent, parsing)
+├── line/                # client.py (the one linebot importer) + service.py (outgoing messages); the rest is moving out
 ├── forms/  tasks/  diary/  sso/   # temporary clients to Kotlin/Go
-├── reminders/  notifications/  internal/
+├── reminders/  notifications/
+├── jobs/                # cron door (/internal/cron/*) and the scheduler
 └── ...                  # feature folders arrive with the merge: auth/ me/ agriculture/ ...
 scripts/check_conventions.py       # CI guard for CONVENTIONS.md
 tests/                             # mirrors src/

@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     API_DOCS_ENABLED: bool | None = None
     # Set by Vercel itself on every deployment. Only main.py's lifespan reads
     # it: the in-process scheduler can't run on serverless (see
-    # src/internal/router.py), so it is skipped there.
+    # src/jobs/router.py), so it is skipped there.
     VERCEL: str = ""
 
     # ---- database -------------------------------------------------------

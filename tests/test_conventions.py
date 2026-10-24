@@ -30,3 +30,31 @@ def test_only_sql_strings_count_as_table_use() -> None:
     assert check.string_tables(sql) == {"form.response"}
     assert check.string_tables(prose) == set()
     assert check.string_tables(attribute) == set()
+
+
+def test_sql_inside_f_strings_is_checked_too() -> None:
+    # Python 3.12+ tokenizes f-strings separately; the literal parts around
+    # {placeholders} must still be read as SQL (docs-and-plan#268).
+    simple = 'x = 1\nq = f"SELECT farm_id FROM agriculture.farm WHERE id = {x}"\n'
+    split = 'q = f"SELECT {cols} FROM {table} JOIN form.task t ON t.task_id = {tid}"\n'
+    nested = 'q = f"SELECT 1 FROM form.response WHERE a = {f"{b}"}"\n'
+    prose = 'doc = f"the answer lives in form.response for {who}"\n'
+    assert check.string_tables(simple) == {"agriculture.farm"}
+    assert check.string_tables(split) == {"form.task"}
+    assert check.string_tables(nested) == {"form.response"}
+    assert check.string_tables(prose) == set()
+
+
+def test_an_f_string_query_outside_its_owner_is_flagged() -> None:
+    owned, _ = check.owners()
+    module = check.ROOT / "src" / "db" / "_f_string_probe.py"
+    module.write_text('cols = "farm_id"\nq = f"SELECT {cols} FROM agriculture.farm"\n')
+    try:
+        found = check.check_file(module, owned)
+    finally:
+        module.unlink()
+
+    assert (
+        "table-owner|src/db/_f_string_probe.py|agriculture.farm (owner: src/db/agriculture.py)"
+        in found
+    )

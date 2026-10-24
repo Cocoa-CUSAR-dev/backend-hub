@@ -255,6 +255,23 @@ async def line_user_ids_for(session: AsyncSession, user_ids: Sequence[UUID]) -> 
     return {row.user_id: row.line_user_id for row in rows}
 
 
+async def line_linked_user_ids(session: AsyncSession) -> list[UUID]:
+    """Everyone who has linked a LINE account, i.e. everyone a LINE push can reach."""
+    result = await session.execute(text("SELECT user_id FROM auth.line_identity"))
+    return list(result.scalars())
+
+
+async def user_ids_with_any_role(session: AsyncSession, role_ids: Sequence[UUID]) -> set[UUID]:
+    """Who holds at least one of these roles."""
+    if not role_ids:
+        return set()
+    result = await session.execute(
+        text("SELECT DISTINCT user_id FROM auth.user_role WHERE role_id = ANY(:ids)"),
+        {"ids": list(role_ids)},
+    )
+    return set(result.scalars())
+
+
 async def link_line(
     session: AsyncSession, user_id: UUID, line_user_id: str, display_name: str | None
 ) -> bool:

@@ -18,7 +18,7 @@ def _patched_client(response: MagicMock):
     client.post = AsyncMock(return_value=response)
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=False)
-    return patch("src.line.liff.httpx.AsyncClient", return_value=client)
+    return patch("src.line.client.httpx.AsyncClient", return_value=client)
 
 
 async def test_verify_id_token_returns_claims_on_success() -> None:

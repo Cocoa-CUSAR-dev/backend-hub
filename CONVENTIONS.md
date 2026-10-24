@@ -46,8 +46,8 @@ src/
 │   ├── schemas.py       #   pydantic models for input/output
 │   └── (extra logic files when service.py gets long, e.g. tasks/answers.py)
 │
-├── chat/                # LINE door + chatbot brain (today: src/line/ + src/conversation/)
-└── jobs/                # cron door + scheduler   (today: src/internal/ + src/reminders/scheduler.py)
+├── chat/                # LINE door + chatbot brain (today: src/line/ + src/chat/)
+└── jobs/                # cron door + scheduler   (today: src/internal/ + src/jobs/scheduler.py)
 ```
 
 ---
@@ -246,7 +246,7 @@ python scripts/check_conventions.py
 
 ## 13. Code from before these rules
 
-Code written before these rules (mostly `src/line/`, `src/conversation/` and `src/reminders/`) is listed in `scripts/conventions_baseline.txt`.
+Code written before these rules (mostly `src/line/`, `src/chat/` and `src/reminders/`) is listed in `scripts/conventions_baseline.txt`.
 
 - **That list may only shrink.** A *new* violation fails CI. When you fix an old one, run `python scripts/check_conventions.py --prune`; CI also fails if a fixed line is still listed.
 - **Never add lines to the baseline by hand.** If new code needs SQL, put the SQL in `src/db/`.

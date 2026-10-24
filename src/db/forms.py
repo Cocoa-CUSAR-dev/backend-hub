@@ -13,6 +13,7 @@ All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2
 Other code calls the functions here.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -76,6 +77,17 @@ class FieldDependencyRow:
     label_th: str
 
 
+@dataclass(frozen=True, slots=True)
+class ChildHandlerRow:
+    """A handler whose rows hang off another handler's row (a fertilizer
+    record under a farm activity). `parent_field` is the column on the child's
+    table that stores the parent's id."""
+
+    handler: str
+    parent_handler: str
+    parent_field: str | None
+
+
 _TASK_FORM_COLUMNS = """
     task_id, form_id, version, handler,
     COALESCE(is_multiple_submit, FALSE) AS is_multiple_submit
@@ -101,6 +113,26 @@ async def forms_of_tasks(session: AsyncSession, task_ids: list[UUID]) -> dict[UU
         {"task_ids": task_ids},
     )
     return {row.task_id: TaskForm(**row._mapping) for row in result}
+
+
+async def forms_with_handlers(session: AsyncSession, handlers: Sequence[str]) -> list[TaskForm]:
+    """Every form whose handler is one of these."""
+    result = await session.execute(
+        text(f"SELECT {_TASK_FORM_COLUMNS} FROM form.task_form WHERE handler = ANY(:handlers)"),
+        {"handlers": list(handlers)},
+    )
+    return [TaskForm(**row._mapping) for row in result]
+
+
+async def child_handlers(session: AsyncSession) -> list[ChildHandlerRow]:
+    """Every active handler that has a parent, from form.handler_registry."""
+    result = await session.execute(
+        text(
+            "SELECT handler, parent_handler, parent_field FROM form.handler_registry "
+            "WHERE is_active AND parent_handler IS NOT NULL"
+        )
+    )
+    return [ChildHandlerRow(**row._mapping) for row in result]
 
 
 async def form_rows(session: AsyncSession, form_id: UUID) -> list[FormRow]:
@@ -144,6 +176,35 @@ async def form_rows(session: AsyncSession, form_id: UUID) -> list[FormRow]:
         {"form_id": form_id},
     )
     return [FormRow(**row._mapping) for row in result]
+
+
+@dataclass(frozen=True, slots=True)
+class HandlerRow:
+    """One handler_registry row: which table a form's answers are written to.
+    A child handler (parent_handler set) hangs off an existing row of its
+    parent, stored under parent_field on its own table."""
+
+    handler: str
+    schema_name: str
+    table_name: str
+    parent_handler: str | None
+    parent_field: str | None
+    is_active: bool
+
+
+async def handler_rows(session: AsyncSession) -> list[HandlerRow]:
+    """Every handler_registry row as stored, active or not. Not validated:
+    the caller drops rows with bad identifiers or a missing table."""
+    result = await session.execute(
+        text(
+            """
+            SELECT handler, schema_name, table_name, parent_handler, parent_field, is_active
+            FROM form.handler_registry
+            ORDER BY handler
+            """
+        )
+    )
+    return [HandlerRow(**row._mapping) for row in result]
 
 
 async def field_dependencies(session: AsyncSession) -> list[FieldDependencyRow]:
