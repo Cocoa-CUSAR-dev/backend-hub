@@ -556,3 +556,73 @@ CREATE TABLE processing.batch (
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     CONSTRAINT pk_batch PRIMARY KEY (batch_id)
 );
+
+-- docs-and-plan#271 (and the contract seed, tests/contract/web/seed): the
+-- researcher's form list and task view read these columns, and the seed's
+-- base.sql and forms.sql write them. Copied from the database repo's V1
+-- baseline and V31 (recurring tasks, task recipients).
+ALTER TABLE form.task
+    ADD COLUMN IF NOT EXISTS description character varying DEFAULT '',
+    ADD COLUMN IF NOT EXISTS task_type character varying DEFAULT 'FORM',
+    ADD COLUMN IF NOT EXISTS recurrence_id uuid,
+    ADD COLUMN IF NOT EXISTS period_date date;
+ALTER TABLE form.task_form
+    ADD COLUMN IF NOT EXISTS description character varying,
+    ADD COLUMN IF NOT EXISTS content character varying DEFAULT '',
+    ADD COLUMN IF NOT EXISTS created_at timestamp without time zone NOT NULL DEFAULT now();
+ALTER TABLE ref.province_constant
+    ADD COLUMN IF NOT EXISTS province_name_en character varying(255),
+    ADD COLUMN IF NOT EXISTS description character varying DEFAULT '';
+ALTER TABLE ref.grade_constant
+    ADD COLUMN IF NOT EXISTS is_fail boolean DEFAULT false;
+
+CREATE TABLE ref.district_constant (
+    district_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    district_name_th character varying(255),
+    district_name_en character varying(255),
+    province_id uuid NOT NULL,
+    description character varying DEFAULT '',
+    CONSTRAINT pk_district PRIMARY KEY (district_id),
+    CONSTRAINT fk_district_province FOREIGN KEY (province_id) REFERENCES ref.province_constant (province_id)
+);
+
+CREATE TABLE ref.subdistrict_constant (
+    subdistrict_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    subdistrict_name_th character varying(255),
+    subdistrict_name_en character varying(255),
+    district_id uuid NOT NULL,
+    description character varying DEFAULT '',
+    zipcode character varying,
+    CONSTRAINT pk_subdistrict PRIMARY KEY (subdistrict_id),
+    CONSTRAINT fk_subdistrict_district FOREIGN KEY (district_id) REFERENCES ref.district_constant (district_id)
+);
+
+CREATE TABLE form.task_recurrence (
+    recurrence_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    template_task_id uuid NOT NULL,
+    frequency character varying NOT NULL,
+    weekdays smallint[],
+    start_date date NOT NULL,
+    until_date date,
+    is_active boolean DEFAULT true NOT NULL,
+    created_by uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_task_recurrence PRIMARY KEY (recurrence_id),
+    CONSTRAINT uq_task_recurrence_template UNIQUE (template_task_id),
+    CONSTRAINT fk_task_recurrence_template FOREIGN KEY (template_task_id) REFERENCES form.task (task_id),
+    CONSTRAINT ck_task_recurrence_frequency CHECK (frequency IN ('DAILY', 'WEEKLY'))
+);
+ALTER TABLE form.task
+    ADD CONSTRAINT fk_task_recurrence FOREIGN KEY (recurrence_id) REFERENCES form.task_recurrence (recurrence_id);
+
+CREATE TABLE form.task_recipient (
+    recipient_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    task_id uuid NOT NULL,
+    recipient_type character varying NOT NULL,
+    role_id uuid,
+    user_id uuid,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_task_recipient PRIMARY KEY (recipient_id),
+    CONSTRAINT fk_task_recipient_task FOREIGN KEY (task_id) REFERENCES form.task (task_id) ON DELETE CASCADE,
+    CONSTRAINT ck_task_recipient_type CHECK (recipient_type IN ('ROLE', 'USER'))
+);
