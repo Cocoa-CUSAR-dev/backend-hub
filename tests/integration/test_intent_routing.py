@@ -19,8 +19,8 @@ from httpx import AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.chat import intent
 from src.config import settings
-from src.conversation import intent
 from tests.integration.helpers import (
     build_form_response,
     build_text_message_event,
@@ -48,9 +48,9 @@ async def _send(
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
-        patch("src.line.router.intent.classify", new=classify),
+        patch("src.chat.router.intent.classify", new=classify),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}

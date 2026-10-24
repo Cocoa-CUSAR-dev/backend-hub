@@ -19,8 +19,8 @@ from unittest.mock import patch
 
 import pytest
 
+from src.chat import intent
 from src.config import settings
-from src.conversation import intent
 from src.exceptions import LLMUnavailable
 
 pytestmark = pytest.mark.skipif(
@@ -107,7 +107,7 @@ async def _extract_with_retry(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
 
 async def test_phrasings_route_where_a_farmer_would_expect() -> None:
     rows = []
-    with patch("src.conversation.intent.extract_slots", new=_extract_with_retry):
+    with patch("src.chat.intent.extract_slots", new=_extract_with_retry):
         for words, acceptable, kind in CASES:
             result = await intent.classify(words, TASKS)
             rows.append(

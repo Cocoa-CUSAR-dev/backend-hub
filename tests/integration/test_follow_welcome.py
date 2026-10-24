@@ -24,7 +24,7 @@ async def _follow(client: AsyncClient, *, line_user_id: str) -> AsyncMock:
     body = build_follow_event(line_user_id=line_user_id)
     signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}

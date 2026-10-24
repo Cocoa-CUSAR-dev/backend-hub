@@ -9,7 +9,7 @@ backend or the existing Next.js `web-app`.
 ## What it does
 
 1. Initializes LIFF, logs the farmer in if needed (`src/liffClient.ts`).
-2. `GET /line/liff/tasks` (the chatbot backend, `src/line/liff_tasks.py`) --
+2. `GET /line/liff/tasks` (the chatbot backend, `src/chat/liff.py`) --
    lists pending tasks with due status.
 3. Tapping "เปิด" on a task calls `POST /line/liff/tasks/{task_id}/start`,
    then closes the LIFF window (`liff.closeWindow()`). The actual

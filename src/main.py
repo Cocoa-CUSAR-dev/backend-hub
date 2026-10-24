@@ -32,16 +32,16 @@ sentry_sdk.init(
 from src.admin.router import router as admin_router
 from src.agriculture.router import router as agriculture_router
 from src.auth.router import router as auth_router
+from src.chat.liff import router as liff_tasks_router
+from src.chat.router import router as line_router
 from src.exceptions import register_exception_handlers
 from src.forms.router import router as forms_router
-from src.internal.router import router as internal_router
-from src.line.liff_tasks import router as liff_tasks_router
-from src.line.router import router as line_router
+from src.jobs.router import router as internal_router
+from src.jobs.scheduler import configure_jobs, scheduler
 from src.logging_config import configure_logging
 from src.me.router import router as me_router
 from src.notifications.router import router as notifications_router
 from src.reminders.router import router as reminders_router
-from src.reminders.scheduler import configure_jobs, scheduler
 from src.reports.router import router as reports_router
 from src.request_id import request_id_middleware
 from src.tasks.router import router as tasks_router
@@ -53,14 +53,14 @@ from src.tasks.router import router as tasks_router
 configure_logging()
 
 if not settings.ENVIRONMENT.is_deployed:
-    from src.conversation.router import router as conversation_test_router
+    from src.chat.dev_router import router as conversation_test_router
 
 # Vercel sets this env var on every deployment automatically. A serverless
 # function there is frozen between requests -- APScheduler's own in-process
 # timers never get a chance to fire on schedule (live-caught 2026-09: nothing
 # but "Run time of job ... was missed by ..." warnings, no on-time runs
 # ever). Starting it there anyway is pure noise: it can't work, and the
-# misfire warnings are misleading. src/internal/router.py's endpoints are
+# misfire warnings are misleading. src/jobs/router.py's endpoints are
 # the real trigger path on Vercel (wired to Vercel Cron / an external
 # scheduler instead); on a persistent host (Render, a VM, local `uvicorn`)
 # this is unset and the scheduler starts exactly as before.
