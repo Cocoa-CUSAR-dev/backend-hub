@@ -1,5 +1,5 @@
 # Companion to cron-reminders.yml -- see that file's header for why this
-# exists (Vercel serverless can't run src/reminders/scheduler.py's own
+# exists (Vercel serverless can't run src/jobs/scheduler.py's own
 # in-process CronTrigger). Manual trigger only.
 #
 # `schedule:` is disabled -- production scheduling moved to cron-job.org,

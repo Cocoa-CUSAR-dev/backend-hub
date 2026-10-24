@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src import db
 from src.auth import service
+from src.chat import liff as liff_tasks
 from src.config import settings
 from src.exceptions import InvalidLiffToken
-from src.line import liff_tasks
 from tests.integration.auth_helpers import seed_user
 
 AUTH = "/api/v1/auth"

@@ -104,7 +104,7 @@ async def fetch_last_answer(*, user_id: str, handler: str) -> dict[str, Any] | N
     or None if there isn't one yet. Deliberately unfiltered: task_id, stale
     parent IDs (farm_activity_id/harvest_id/batch_id), and OPTION values
     that may no longer resolve in the CURRENT form are all still in here --
-    src.conversation.reuse.sanitize_for_autofill is what strips those
+    sanitize_for_autofill (in src/chat/reuse.py) is what strips those
     before anything gets offered to a farmer, not this function.
     """
     async with httpx.AsyncClient(base_url=settings.GO_BACKEND_URL, timeout=30.0) as client:
@@ -143,7 +143,7 @@ async def fetch_sanitized_autofill(
     farmer with from a past submission. `questions` must already be in
     mobile-backend's internal/validation.Question JSON shape
     (fieldName/inputType/choices, choices as {id, name}) --
-    src.conversation.reuse.sanitize_for_autofill builds that from this
+    sanitize_for_autofill (in src/chat/reuse.py) builds that from this
     chatbot's own Question dataclasses; this function is just the HTTP call.
     """
     async with httpx.AsyncClient(base_url=settings.GO_BACKEND_URL, timeout=30.0) as client:

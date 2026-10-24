@@ -7,7 +7,7 @@ Services raise these; each door translates them once:
 Raise a generic type (`NotFound("farm")`, `Forbidden(...)`) when it says
 enough. Add a named subclass here only when a caller needs to catch that
 specific case (e.g. `LLMUnavailable` switches the chat into guided mode).
-Never raise fastapi's HTTPException outside a router.
+Never raise FastAPI's own HTTP error class outside a router.
 """
 
 from typing import Any
