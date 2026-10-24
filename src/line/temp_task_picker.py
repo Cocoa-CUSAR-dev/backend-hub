@@ -13,7 +13,11 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from src import db
+from src.actor import Actor
 from src.database import Session
+from src.exceptions import Forbidden
+from src.tasks import service as tasks_service
+from src.tasks.schemas import TaskOut
 
 # The one keyword every hint message names (#186 item 1). START_KEYWORDS is a
 # set, so `next(iter(...))` -- what the hint used to do -- could tell one
@@ -26,7 +30,7 @@ PRIMARY_START_KEYWORD = "เริ่ม"
 START_KEYWORDS = {PRIMARY_START_KEYWORD, "start", "ทำแบบฟอร์ม"}
 
 _QUICK_REPLY_LIMIT = 13  # LINE's own cap on Quick Reply items per message
-_PAGE_SIZE = 50  # how many visible tasks to look at per read while filling the list
+_PAGE_SIZE = 50  # how many tasks to read at a time while filling the list
 
 
 @dataclass(frozen=True)
@@ -42,57 +46,48 @@ class PendingTask:
     has_conversation: bool
 
 
-async def list_pending_tasks(session: Session, user_id: UUID) -> list[PendingTask]:
-    """A task is "pending" if it has a form and this user has not answered it
-    yet, OR its form is multiple-submit (in which case it stays listed no
-    matter how many responses exist) -- mirrors mobile-backend's real GetTasks
-    logic (form_handler.go).
+async def list_pending_tasks(session: Session, actor: Actor) -> list[PendingTask]:
+    """A task is "pending" while it is not COMPLETED: not answered yet, or a
+    multiple-submit form (which never reaches COMPLETED, because the farmer is
+    expected to file several rows against it). Overdue tasks stay, they are
+    still owed. Only tasks with a form can be started, so the rest are left out.
 
-    US4-4 (docs-and-plan#236): only the tasks this user can see, by the same
-    rule the task list uses (src/db/tasks.py): a task that has assignees is
-    listed only to them, and a task with none is listed to everyone, as it
-    was before assignments were ever written -- so no existing task
-    disappears. Deliberately blind to conversation status for this filter: a
-    task with an ACTIVE/PAUSED-but-unconfirmed conversation has no response
-    yet, so it already shows up here correctly -- has_conversation only
-    changes how it's labeled/handled, not whether it's listed at all.
+    This is tasks.service.list_for, the same function the mobile app's task
+    list uses: same visibility (a task with assignees is listed only to them),
+    same order (newest first), same status. Which tasks are in the list is that
+    function's job; what this adds is the Quick Reply cap and which of them the
+    farmer already has a conversation open for.
+
+    `actor` must be allowed to read forms (read:form:assigned); anyone else
+    gets Forbidden, which the caller turns into a reply.
 
     handler is included so callers can warn the farmer before they invest
     time answering a form Go can't save yet -- previously this picker had no
     way to know that at all, and the farmer only found out after answering
     every question and tapping confirm.
     """
-    pending: list[tuple[db.tasks.TaskRow, db.forms.TaskForm]] = []
-    offset = 0
+    if actor.user_id is None:
+        raise Forbidden("A user is required")
+
+    pending: list[TaskOut] = []
+    page = 0
     while len(pending) < _QUICK_REPLY_LIMIT:
-        page = await db.tasks.tasks_for_user(
-            session, user_id, open_on=None, limit=_PAGE_SIZE, offset=offset
-        )
-        if not page:
+        rows = await tasks_service.list_for(session, actor, page=page, page_size=_PAGE_SIZE)
+        pending += [t for t in rows if t.task_form_id is not None and t.status != "COMPLETED"]
+        if len(rows) < _PAGE_SIZE:
             break
-        forms = await db.forms.forms_of_tasks(session, [t.task_id for t in page])
-        for task in page:
-            form = forms.get(task.task_id)
-            # A multiple-submit form is the whole point of this change: it
-            # stays listed after the first submission, because the farmer is
-            # expected to file several rows against it (three grades for one
-            # harvest). Dropping it the moment one response existed made the
-            # second one unreachable.
-            if form is not None and (form.is_multiple_submit or not task.answered):
-                pending.append((task, form))
-        if len(page) < _PAGE_SIZE:
-            break
-        offset += _PAGE_SIZE
+        page += 1
 
     pending = pending[:_QUICK_REPLY_LIMIT]
-    open_tasks = await db.chat.open_task_ids(session, user_id, [t.task_id for t, _ in pending])
+    open_tasks = await db.chat.open_task_ids(session, actor.user_id, [t.task_id for t in pending])
     return [
         PendingTask(
             task_id=task.task_id,
-            task_form_id=form.form_id,
+            task_form_id=task.task_form_id,
             title=task.title or "",
-            handler=form.handler or "",
+            handler=task.handler or "",
             has_conversation=task.task_id in open_tasks,
         )
-        for task, form in pending
+        for task in pending
+        if task.task_form_id is not None
     ]

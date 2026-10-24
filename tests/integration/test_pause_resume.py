@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.chat.jobs import pause_idle_conversations
+from src.chat.ui import messages
 from src.config import settings
 from src.line.parent_picker import ParentOption
 from tests.integration.helpers import (
@@ -218,6 +219,20 @@ class TestResume:
 
 
 class TestStartKeywordListsTasks:
+    async def test_an_account_with_no_role_is_told_to_register_first(
+        self, db_session: AsyncSession, client: AsyncClient
+    ) -> None:
+        await seed_task_form(db_session, title="งานทดสอบ", handler="notes")
+        line_user_id = f"U{uuid.uuid4().hex}"
+        await seed_user_with_line_identity(db_session, line_user_id=line_user_id, roles=())
+
+        reply_message = await _send_message(
+            client, line_user_id=line_user_id, text_content=_START_KEYWORD
+        )
+
+        reply_message.assert_awaited_once()
+        assert reply_message.await_args.args[0].messages[0].text == messages.NO_FORM_ACCESS
+
     async def test_start_keyword_pauses_active_conversation_and_lists_it(
         self, db_session: AsyncSession, client: AsyncClient
     ) -> None:

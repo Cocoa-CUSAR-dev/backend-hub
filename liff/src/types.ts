@@ -1,5 +1,7 @@
-// Mirrors src/tasks/schemas.py's TaskListItem (chatbot repo) -- the
-// service-key twin of mobile-backend's GetTasks, docs-and-plan#176.
+// Mirrors src/tasks/schemas.py's TaskOut -- what GET /line/liff/tasks answers
+// with, the same list the mobile app gets from GET /api/v1/tasks
+// (docs-and-plan#176). Tasks without a form are left out, so the ids and the
+// handler are always there.
 export type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
 
 export interface PendingTask {

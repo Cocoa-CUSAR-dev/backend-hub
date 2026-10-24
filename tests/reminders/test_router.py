@@ -172,7 +172,7 @@ async def test_list_returns_the_tasks_schedules(client: AsyncClient) -> None:
         )
 
     assert resp.status_code == 200
-    assert lst.await_args.args[1] == task_id
+    assert lst.await_args.args[2] == task_id
     assert resp.json()[0]["schedule_id"] == str(schedule_id)
 
 
