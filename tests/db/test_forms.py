@@ -447,3 +447,48 @@ async def test_form_by_id(db_session: AsyncSession) -> None:
 
     assert form is not None and form.task_id == task_id and form.handler == "harvest"
     assert await db.forms.form_by_id(db_session, uuid4()) is None
+
+
+async def test_question_fields_per_form_in_question_order(db_session: AsyncSession) -> None:
+    task = await insert(db_session, "form.task", title="probe")
+    form = await insert(db_session, "form.task_form", task_id=task, handler="harvest", version=1)
+    other = await insert(db_session, "form.task_form", task_id=task, handler="harvest", version=2)
+    late = await insert(db_session, "form.section", form_id=form, title="b", sort_order=1)
+    early = await insert(db_session, "form.section", form_id=form, title="a", sort_order=0)
+    elsewhere = await insert(db_session, "form.section", form_id=other, title="x", sort_order=0)
+    for section, field, label, order in (
+        (late, "hub_id", "หน่วย", 0),
+        (early, "harvest_date", "วันที่", 1),
+        (early, "farm_id", "ฟาร์ม", 0),
+        (elsewhere, "farm_id", "ฟาร์มอื่น", 0),
+    ):
+        await insert(
+            db_session, "form.question", section_id=section, label=label, field_name=field,
+            input_type="OPTION", sort_order=order,
+        )  # fmt: skip
+
+    fields = await db.forms.question_fields(db_session, [form, other])
+
+    assert [k for k in fields if k[0] == form] == [
+        (form, "farm_id"),
+        (form, "harvest_date"),
+        (form, "hub_id"),
+    ]
+    assert fields[(other, "farm_id")].label == "ฟาร์มอื่น"  # one field, per-form labels
+    assert await db.forms.question_fields(db_session, []) == {}
+
+
+async def test_ref_label_names_an_option_answer(db_session: AsyncSession) -> None:
+    province = await insert(db_session, "ref.province_constant", province_name_th="เชียงใหม่")
+    await insert(db_session, "ref.grade_constant", grade_name="A")
+
+    assert await detail.ref_label(db_session, "province_id", str(province)) == "เชียงใหม่"
+    assert await detail.ref_label(db_session, "province_id", str(uuid4())) is None  # deleted
+    assert await detail.ref_label(db_session, "no_such_id", "x") is None  # no ref table
+    assert await detail.ref_label(db_session, "grade_code", "A") == "A"  # stores the name
+    assert (
+        await db.ref.choice_name(
+            db_session, "province_constant", "province_id", "province_name_th", str(province)
+        )
+        == "เชียงใหม่"
+    )

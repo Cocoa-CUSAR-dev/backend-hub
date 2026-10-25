@@ -710,3 +710,16 @@ CREATE TABLE collection.harvest_collection (
     batch_id uuid NOT NULL,
     CONSTRAINT pk_harvest_collection PRIMARY KEY (collection_id)
 );
+
+-- docs-and-plan#277 (the farmer's daily diary): as in the database repo's V22.
+CREATE TABLE form.diary_entry (
+    diary_entry_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    entry_date date NOT NULL,
+    diary_text text NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_diary_entry PRIMARY KEY (diary_entry_id),
+    CONSTRAINT uq_diary_entry_user_date UNIQUE (user_id, entry_date),
+    CONSTRAINT fk_diary_entry_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id)
+);

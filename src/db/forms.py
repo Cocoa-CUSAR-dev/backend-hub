@@ -275,3 +275,40 @@ async def existing_tables(session: AsyncSession) -> set[str]:
         text("SELECT table_schema, table_name FROM information_schema.tables")
     )
     return {f"{row.table_schema}.{row.table_name}" for row in result}
+
+
+@dataclass(frozen=True, slots=True)
+class QuestionField:
+    """What a farmer was asked for one field of one form."""
+
+    label: str | None
+    input_type: str | None
+
+
+async def question_fields(
+    session: AsyncSession, form_ids: Sequence[UUID]
+) -> dict[tuple[UUID, str], QuestionField]:
+    """(form_id, field_name) -> its question's label and input type, in the
+    forms' question order (section, then question). Scoped per form: one
+    field_name can be asked with a different label on another form. A field
+    asked twice on one form keeps its last question, as web-backend did."""
+    if not form_ids:
+        return {}
+    result = await session.execute(
+        text(
+            """
+            SELECT s.form_id, q.field_name, q.label, q.input_type
+            FROM form.question q
+            JOIN form.section s ON s.section_id = q.section_id
+            WHERE s.form_id = ANY(:form_ids) AND q.field_name IS NOT NULL
+            ORDER BY s.form_id, s.sort_order NULLS LAST, q.sort_order NULLS LAST, q.question_id
+            """
+        ),
+        {"form_ids": list(form_ids)},
+    )
+    fields: dict[tuple[UUID, str], QuestionField] = {}
+    for row in result:
+        key = (row.form_id, row.field_name)
+        fields.pop(key, None)  # re-insert so the last question decides the order too
+        fields[key] = QuestionField(label=row.label, input_type=row.input_type)
+    return fields
