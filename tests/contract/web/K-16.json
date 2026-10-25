@@ -1,0 +1,290 @@
+{
+  "kid": "K-16",
+  "after": "FORM-07",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/forms/handlers/{handler}/fields"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/handlers/{handler}/fields"
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "harvest",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers/harvest/fields",
+      "actor": "researcher",
+      "params": {
+        "handler": "harvest"
+      },
+      "body": null,
+      "response": [
+        {
+          "name": "harvest_id",
+          "dataType": "uuid",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "OPTION"
+          ]
+        },
+        {
+          "name": "hub_id",
+          "dataType": "uuid",
+          "required": true,
+          "references": "processing.hub",
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "OPTION"
+          ]
+        },
+        {
+          "name": "farm_id",
+          "dataType": "uuid",
+          "required": true,
+          "references": "agriculture.farm",
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "OPTION"
+          ]
+        },
+        {
+          "name": "plot_id",
+          "dataType": "uuid",
+          "required": false,
+          "references": "agriculture.plot",
+          "dependsOn": "farm_id",
+          "allowedInputTypes": [
+            "OPTION"
+          ]
+        },
+        {
+          "name": "tree_id",
+          "dataType": "uuid",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "OPTION"
+          ]
+        },
+        {
+          "name": "harvest_date",
+          "dataType": "timestamp",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "DATETIME",
+            "DATE"
+          ]
+        },
+        {
+          "name": "created_at",
+          "dataType": "timestamp",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "DATETIME",
+            "DATE"
+          ]
+        },
+        {
+          "name": "updated_at",
+          "dataType": "timestamp",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "DATETIME",
+            "DATE"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "child handler",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers/harvest_grade_detail/fields",
+      "actor": "researcher",
+      "params": {
+        "handler": "harvest_grade_detail"
+      },
+      "body": null,
+      "response": [
+        {
+          "name": "harvest_id",
+          "dataType": "uuid",
+          "required": false,
+          "references": "collection.harvest",
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "OPTION"
+          ]
+        },
+        {
+          "name": "grade_code",
+          "dataType": "varchar",
+          "required": true,
+          "references": "ref.grade_constant",
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "OPTION",
+            "VARCHAR"
+          ]
+        },
+        {
+          "name": "quantity_kg",
+          "dataType": "numeric",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "FLOAT",
+            "INT"
+          ]
+        },
+        {
+          "name": "description",
+          "dataType": "varchar",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "VARCHAR"
+          ]
+        },
+        {
+          "name": "is_clean",
+          "dataType": "boolean",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "BOOLEAN"
+          ]
+        },
+        {
+          "name": "is_appropriate_size",
+          "dataType": "boolean",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "BOOLEAN"
+          ]
+        },
+        {
+          "name": "weight_gram_per_pod",
+          "dataType": "numeric",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "FLOAT",
+            "INT"
+          ]
+        },
+        {
+          "name": "is_sprout",
+          "dataType": "boolean",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "BOOLEAN"
+          ]
+        },
+        {
+          "name": "is_dry",
+          "dataType": "boolean",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "BOOLEAN"
+          ]
+        },
+        {
+          "name": "is_shriveled",
+          "dataType": "boolean",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "BOOLEAN"
+          ]
+        },
+        {
+          "name": "cut_test_result",
+          "dataType": "varchar",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "VARCHAR"
+          ]
+        },
+        {
+          "name": "created_at",
+          "dataType": "timestamp",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "DATETIME",
+            "DATE"
+          ]
+        },
+        {
+          "name": "updated_at",
+          "dataType": "timestamp",
+          "required": false,
+          "references": null,
+          "dependsOn": null,
+          "allowedInputTypes": [
+            "DATETIME",
+            "DATE"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unknown handler",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers/no_such_handler/fields",
+      "actor": "researcher",
+      "params": {
+        "handler": "no_such_handler"
+      },
+      "body": null,
+      "response": {
+        "error": "Unknown handler: no_such_handler"
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers/harvest/fields",
+      "actor": "farmer_1",
+      "params": {
+        "handler": "harvest"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

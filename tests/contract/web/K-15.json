@@ -1,0 +1,74 @@
+{
+  "kid": "K-15",
+  "after": "FORM-06",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/forms/handlers"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/handlers"
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers",
+      "actor": "researcher",
+      "body": null,
+      "response": [
+        "farm_activity",
+        "farm_activity_fertilizer",
+        "farm_activity_chemical",
+        "farm_pest_disease_record",
+        "harvest",
+        "harvest_grade_detail",
+        "batch",
+        "processing_record",
+        "fermentation_batch",
+        "drying_batch",
+        "farm_initial_cost",
+        "farm_economic_eval",
+        "plot_breed"
+      ]
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers",
+      "actor": "farmer_1",
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers",
+      "actor": "admin",
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers",
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:27.413+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/forms/handlers"
+      }
+    }
+  ]
+}

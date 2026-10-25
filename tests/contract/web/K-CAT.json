@@ -1,0 +1,1680 @@
+{
+  "kid": "K-CAT",
+  "after": "FORM-CATALOG",
+  "note": "Not on the Before sheet (added to Kotlin after 2026-10-14).",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/forms/handlers/catalog"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/handlers/catalog"
+  },
+  "seeds": [
+    "base",
+    "forms",
+    "answers"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers/catalog",
+      "actor": "researcher",
+      "body": null,
+      "response": {
+        "handlers": [
+          {
+            "handler": "farm_activity",
+            "labelTh": "กิจกรรมในสวน",
+            "descriptionTh": "บันทึกกิจกรรมที่ทำในสวนแต่ละวัน เช่น ใส่ปุ๋ย ตัดแต่งกิ่ง กำจัดวัชพืช",
+            "category": "garden",
+            "frequency": "daily",
+            "table": "agriculture.farm_activity",
+            "parentHandler": null,
+            "parentField": null,
+            "fields": [
+              {
+                "name": "farm_activity_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "farm_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "agriculture.farm",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "plot_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "agriculture.plot",
+                "dependsOn": "farm_id",
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "farm_activity_type_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "ref.farm_activity_type_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "description",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "created_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "updated_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 1,
+              "latestTitle": "กิจกรรมในสวนประจำสัปดาห์",
+              "latestOpenAt": "2026-10-01T00:00:00"
+            },
+            "responseCount": 2
+          },
+          {
+            "handler": "farm_activity_fertilizer",
+            "labelTh": "การใส่ปุ๋ย",
+            "descriptionTh": "ปุ๋ยที่ใช้ในกิจกรรมในสวนที่บันทึกไว้แล้ว",
+            "category": "garden",
+            "frequency": "daily",
+            "table": "agriculture.farm_activity_fertilizer",
+            "parentHandler": "farm_activity",
+            "parentField": "farm_activity_id",
+            "fields": [
+              {
+                "name": "farm_activity_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "agriculture.farm_activity",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "fertilizer_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "ref.fertilizer_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "farm_activity_chemical",
+            "labelTh": "การใช้สารเคมี/ชีวภัณฑ์",
+            "descriptionTh": "สารเคมีหรือชีวภัณฑ์ที่ใช้ในกิจกรรมในสวนที่บันทึกไว้แล้ว",
+            "category": "garden",
+            "frequency": "daily",
+            "table": "agriculture.farm_activity_chemical",
+            "parentHandler": "farm_activity",
+            "parentField": "farm_activity_id",
+            "fields": [
+              {
+                "name": "farm_activity_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "agriculture.farm_activity",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "chem_bio_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "ref.chem_bio_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "amount",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "farm_pest_disease_record",
+            "labelTh": "โรคและศัตรูพืช",
+            "descriptionTh": "บันทึกโรคและศัตรูพืชที่พบในสวน",
+            "category": "garden",
+            "frequency": "daily",
+            "table": "agriculture.farm_pest_disease_record",
+            "parentHandler": null,
+            "parentField": null,
+            "fields": [
+              {
+                "name": "pest_disease_record_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "farm_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "agriculture.farm",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "plot_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "agriculture.plot",
+                "dependsOn": "farm_id",
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "pest_disease_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "ref.pest_disease_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "management_method",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "is_quality_damage",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "created_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "updated_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 1,
+              "latestTitle": "รายงานโรคและศัตรูพืช",
+              "latestOpenAt": "2026-08-01T00:00:00"
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "harvest",
+            "labelTh": "การเก็บเกี่ยว",
+            "descriptionTh": "บันทึกการเก็บเกี่ยวผลโกโก้และจุดรวบรวมที่นำไปส่ง",
+            "category": "harvest",
+            "frequency": "per_season",
+            "table": "collection.harvest",
+            "parentHandler": null,
+            "parentField": null,
+            "fields": [
+              {
+                "name": "harvest_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "hub_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "processing.hub",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "farm_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "agriculture.farm",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "plot_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "agriculture.plot",
+                "dependsOn": "farm_id",
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "tree_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "harvest_date",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 1
+              },
+              {
+                "name": "created_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "updated_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 2,
+              "latestTitle": "บันทึกยอดส่งโกโก้",
+              "latestOpenAt": "2026-09-01T00:00:00"
+            },
+            "responseCount": 2
+          },
+          {
+            "handler": "harvest_grade_detail",
+            "labelTh": "การคัดเกรด",
+            "descriptionTh": "แยกน้ำหนักผลผลิตตามเกรดของการเก็บเกี่ยวที่บันทึกไว้แล้ว",
+            "category": "harvest",
+            "frequency": "per_season",
+            "table": "collection.harvest_grade_detail",
+            "parentHandler": "harvest",
+            "parentField": "harvest_id",
+            "fields": [
+              {
+                "name": "harvest_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "collection.harvest",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "grade_code",
+                "dataType": "varchar",
+                "required": true,
+                "references": "ref.grade_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION",
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "quantity_kg",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "description",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "is_clean",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "is_appropriate_size",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "weight_gram_per_pod",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "is_sprout",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "is_dry",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "is_shriveled",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "cut_test_result",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "created_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "updated_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "batch",
+            "labelTh": "แบทช์แปรรูป",
+            "descriptionTh": "เปิดแบทช์การแปรรูปที่สถานีแปรรูป",
+            "category": "processing",
+            "frequency": "per_season",
+            "table": "processing.batch",
+            "parentHandler": null,
+            "parentField": null,
+            "fields": [
+              {
+                "name": "batch_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "processing_station_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "processing.processing_station",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "origin",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "notes",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "quantity_kg",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "created_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "updated_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "processing_record",
+            "labelTh": "บันทึกการแปรรูป",
+            "descriptionTh": "บันทึกขั้นตอนการแปรรูปแต่ละวัน",
+            "category": "processing",
+            "frequency": "daily",
+            "table": "processing.processing_record",
+            "parentHandler": null,
+            "parentField": null,
+            "fields": [
+              {
+                "name": "processing_record_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "batch_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "processing.batch",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "processing_activity_type_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "ref.processing_activity_type_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "temp_outside",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "temp_inside",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "humi",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "weather_condition_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "ref.weather_condition_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "bean_color_outside",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "bean_color_inside",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "smell",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "recorded_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "fermentation_batch",
+            "labelTh": "การหมัก",
+            "descriptionTh": "รายละเอียดการหมักของแบทช์ที่เปิดไว้แล้ว",
+            "category": "processing",
+            "frequency": "per_season",
+            "table": "processing.fermentation_batch",
+            "parentHandler": "batch",
+            "parentField": "batch_id",
+            "fields": [
+              {
+                "name": "batch_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "processing.batch",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "air_exposure_type_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "ref.air_exposure_type_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "tank_material_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "ref.tank_material_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "tank_volume_liter",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "notes",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "started_at",
+                "dataType": "timestamp",
+                "required": true,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "ends_at",
+                "dataType": "timestamp",
+                "required": true,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "drying_batch",
+            "labelTh": "การตาก",
+            "descriptionTh": "รายละเอียดการตากของแบทช์ที่เปิดไว้แล้ว",
+            "category": "processing",
+            "frequency": "per_season",
+            "table": "processing.drying_batch",
+            "parentHandler": "batch",
+            "parentField": "batch_id",
+            "fields": [
+              {
+                "name": "batch_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "processing.batch",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "drying_facility_type_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "ref.drying_facility_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "has_air_flow",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "fan_count",
+                "dataType": "integer",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "fan_power",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "notes",
+                "dataType": "varchar",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "VARCHAR"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "started_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "ends_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "farm_initial_cost",
+            "labelTh": "ต้นทุนเริ่มต้นการปลูก",
+            "descriptionTh": "ต้นทุนตอนเริ่มปลูก เช่น ค่ากล้า วัสดุรองหลุม ค่าแรง และระบบน้ำ",
+            "category": "cost",
+            "frequency": "once",
+            "table": "agriculture.farm_initial_cost",
+            "parentHandler": null,
+            "parentField": null,
+            "fields": [
+              {
+                "name": "farm_initial_cost_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "farm_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "agriculture.farm",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "plant_cost_per_tree",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "hole_filler_material_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": "ref.hole_filler_material_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "hole_filler_amount_g",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "hole_filler_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "prep_area_by_self",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "prep_area_labor_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "dig_hole_by_self",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "dig_hole_labor_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "planting_by_self",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "planting_labor_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "watering_system_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "created_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "updated_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "farm_economic_eval",
+            "labelTh": "ประเมินต้นทุนและรายได้รายปี",
+            "descriptionTh": "ต้นทุนและรายได้ของฟาร์มในรอบปี เช่น ปุ๋ย ค่าแรง ผลผลิต ราคาโกโก้",
+            "category": "cost",
+            "frequency": "yearly",
+            "table": "agriculture.farm_economic_eval",
+            "parentHandler": null,
+            "parentField": null,
+            "fields": [
+              {
+                "name": "eval_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "farm_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "agriculture.farm",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "is_naive_planter",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "fertilizer_use_times_per_year",
+                "dataType": "integer",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "fertilizer_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "chem_bio_use_times_per_year",
+                "dataType": "integer",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "chem_bio_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "weeding_times_per_year",
+                "dataType": "integer",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "weeding_by_self",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "weeding_labor_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "pruning_times_per_year",
+                "dataType": "integer",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "pruning_by_self",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "pruning_labor_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "harvest_times_per_month",
+                "dataType": "integer",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "harvest_by_self",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "harvest_labor_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "harvest_volume_kg_per_time",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "cocoa_price",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "electricity_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "fuel_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "other_expenses_cost",
+                "dataType": "numeric",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "FLOAT",
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "created_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "updated_at",
+                "dataType": "timestamp",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "DATETIME",
+                  "DATE"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          },
+          {
+            "handler": "plot_breed",
+            "labelTh": "สายพันธุ์ในแปลง",
+            "descriptionTh": "สายพันธุ์โกโก้ที่ปลูกในแต่ละแปลงและจำนวนต้น (หนึ่งแถวต่อหนึ่งสายพันธุ์)",
+            "category": "plot_info",
+            "frequency": "once",
+            "table": "agriculture.plot_breed",
+            "parentHandler": null,
+            "parentField": null,
+            "fields": [
+              {
+                "name": "plot_breed_id",
+                "dataType": "uuid",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "plot_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "agriculture.plot",
+                "dependsOn": "farm_id",
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "breed_id",
+                "dataType": "uuid",
+                "required": true,
+                "references": "ref.breed_constant",
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "OPTION"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "tree_count",
+                "dataType": "integer",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "INT"
+                ],
+                "usedByForms": 0
+              },
+              {
+                "name": "is_primary_breed",
+                "dataType": "boolean",
+                "required": false,
+                "references": null,
+                "dependsOn": null,
+                "allowedInputTypes": [
+                  "BOOLEAN"
+                ],
+                "usedByForms": 0
+              }
+            ],
+            "forms": {
+              "count": 0,
+              "latestTitle": null,
+              "latestOpenAt": null
+            },
+            "responseCount": 0
+          }
+        ],
+        "dependencies": [
+          {
+            "childField": "district_id",
+            "parentField": "province_id",
+            "linkTable": "ref.district_constant",
+            "linkColumn": "province_id",
+            "labelTh": "อำเภอต้องอยู่ในจังหวัดที่เลือก"
+          },
+          {
+            "childField": "plot_id",
+            "parentField": "farm_id",
+            "linkTable": "agriculture.plot",
+            "linkColumn": "farm_id",
+            "labelTh": "แปลงต้องอยู่ในฟาร์มที่เลือก"
+          },
+          {
+            "childField": "subdistrict_id",
+            "parentField": "district_id",
+            "linkTable": "ref.subdistrict_constant",
+            "linkColumn": "district_id",
+            "labelTh": "ตำบลต้องอยู่ในอำเภอที่เลือก"
+          }
+        ],
+        "registrationTables": [
+          {
+            "table": "agriculture.farmer",
+            "labelTh": "เกษตรกร"
+          },
+          {
+            "table": "agriculture.farm",
+            "labelTh": "ฟาร์ม"
+          },
+          {
+            "table": "agriculture.plot",
+            "labelTh": "แปลง"
+          },
+          {
+            "table": "processing.hub",
+            "labelTh": "จุดรวบรวม"
+          },
+          {
+            "table": "processing.processing_station",
+            "labelTh": "สถานีแปรรูป"
+          }
+        ],
+        "fieldLabels": {
+          "description": "รายละเอียด",
+          "farm_id": "ฟาร์มที่ทำกิจกรรม",
+          "gis": "ตำแหน่งปัจจุบัน",
+          "harvest_date": "วันที่ส่งมา",
+          "hub_id": "หน่วยรวบรวมที่จัดส่ง",
+          "is_quality_damage": "ทำให้ผลเสียคุณภาพหรือไม่",
+          "logistic_result": "อธิบายการขนส่ง",
+          "management_method": "วิธีจัดการ",
+          "notes": "ในหัวข้อที่ปิดไว้",
+          "plot_id": "แปลงที่ดำเนินการ"
+        }
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers/catalog",
+      "actor": "farmer_1",
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/forms/handlers/catalog",
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:28.020+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/forms/handlers/catalog"
+      }
+    }
+  ]
+}

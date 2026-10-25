@@ -1,0 +1,82 @@
+{
+  "kid": "K-45",
+  "after": "ADMIN-02",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/researchers"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/admin/researchers"
+  },
+  "seeds": [
+    "base"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "admin",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/researchers",
+      "actor": "admin",
+      "body": null,
+      "response": [
+        {
+          "userId": "20000000-0000-4000-8000-000000000008",
+          "firstName": "วิจัย",
+          "lastName": "สอง",
+          "organization": "CU Intania"
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000002",
+          "firstName": "วิจัย",
+          "lastName": "หนึ่ง",
+          "organization": "CUSAR"
+        }
+      ]
+    },
+    {
+      "name": "by organization",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/researchers",
+      "actor": "admin",
+      "query": {
+        "organization": "CUSAR"
+      },
+      "body": null,
+      "response": [
+        {
+          "userId": "20000000-0000-4000-8000-000000000002",
+          "firstName": "วิจัย",
+          "lastName": "หนึ่ง",
+          "organization": "CUSAR"
+        }
+      ]
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/researchers",
+      "actor": "researcher",
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/researchers",
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:44.528+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/researchers"
+      }
+    }
+  ]
+}
