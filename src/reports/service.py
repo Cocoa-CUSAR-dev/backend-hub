@@ -2,12 +2,14 @@
 ReportController.downloadRawData and XlsxService.
 
 Two sheets, FARM (farm registry) and HARVEST (one row per harvest and grade);
-no `sheets` means both, in that order. Rows are read a page at a time and
-streamed into a write-only workbook, as Kotlin meant to: its export answered
+no `sheets` means both, in that order. Rows are read a page at a time (keyset
+paging, see db/reports.py) and streamed into a write-only workbook, as Kotlin
+meant to: its export answered
 400 for every request (it paged 1000 rows where its PageRequest allows 500),
 and its harvest sheet threw on a missing yes/no or number.
 """
 
+import asyncio
 from dataclasses import dataclass
 
 from src import clock, db
@@ -43,22 +45,26 @@ async def raw_data_xlsx(session: Session, actor: Actor, sheets: list[str] | None
     require(actor, "read:report:all")
     chosen = _sheets(sheets)
     writer = xlsx.Writer()
+    # Building the workbook is CPU work (openpyxl is synchronous), so it runs
+    # in a worker thread, a page at a time, while the event loop keeps
+    # serving other requests between the database reads.
     for name in chosen:
         if name == "FARM":
-            writer.sheet(xlsx.FARM_SHEET, xlsx.FARM_HEADERS)
-            offset = 0
+            await asyncio.to_thread(writer.sheet, xlsx.FARM_SHEET, xlsx.FARM_HEADERS)
+            farm_after = None
             while farms := await db.reports.farm_export_page(
-                session, limit=PAGE_SIZE, offset=offset
+                session, limit=PAGE_SIZE, after=farm_after
             ):
-                writer.rows(xlsx.farm_row(f) for f in farms)
-                offset += PAGE_SIZE
+                await asyncio.to_thread(writer.rows, [xlsx.farm_row(f) for f in farms])
+                farm_after = farms[-1]
         else:
-            writer.sheet(xlsx.HARVEST_SHEET, xlsx.HARVEST_HEADERS)
-            offset = 0
+            await asyncio.to_thread(writer.sheet, xlsx.HARVEST_SHEET, xlsx.HARVEST_HEADERS)
+            harvest_after = None
             while harvests := await db.reports.harvest_export_page(
-                session, limit=PAGE_SIZE, offset=offset
+                session, limit=PAGE_SIZE, after=harvest_after
             ):
-                writer.rows(xlsx.harvest_row(h) for h in harvests)
-                offset += PAGE_SIZE
+                await asyncio.to_thread(writer.rows, [xlsx.harvest_row(h) for h in harvests])
+                harvest_after = harvests[-1]
     stamp = clock.bangkok_now().strftime("%Y%m%d_%H%M")
-    return Export(content=writer.finish(), filename=f"raw_data_{stamp}.xlsx")
+    content = await asyncio.to_thread(writer.finish)
+    return Export(content=content, filename=f"raw_data_{stamp}.xlsx")

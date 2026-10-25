@@ -2,9 +2,11 @@
 where Kotlin threw (a missing yes/no or number)."""
 
 import io
+import zipfile
 from datetime import date, datetime
 from decimal import Decimal
 
+import pytest
 from openpyxl import load_workbook
 
 from src.db.reports import FarmExportRow, HarvestExportRow
@@ -14,8 +16,27 @@ from src.reports import xlsx
 def test_java_datetime_drops_zero_seconds_like_localdatetime() -> None:
     assert xlsx.java_datetime(datetime(2026, 10, 12, 1, 0)) == "2026-10-12T01:00"
     assert xlsx.java_datetime(datetime(2026, 10, 12, 1, 0, 30)) == "2026-10-12T01:00:30"
-    assert xlsx.java_datetime(datetime(2026, 10, 12, 1, 0, 30, 500000)) == "2026-10-12T01:00:30.5"
     assert xlsx.java_datetime(None) == "-"
+
+
+@pytest.mark.parametrize(
+    ("micros", "java"),
+    [
+        (500000, ".500"),  # milliseconds: always three digits
+        (1000, ".001"),
+        (120000, ".120"),
+        (123456, ".123456"),  # microseconds: always six
+        (1, ".000001"),
+        (500100, ".500100"),
+    ],
+)
+def test_java_datetime_writes_fractions_in_groups_of_three(micros: int, java: str) -> None:
+    # What java.time.LocalDateTime.toString() prints for the same nanoseconds
+    # (checked against JDK 21), with and without whole seconds.
+    at_30s = datetime(2026, 10, 12, 1, 0, 30, micros)
+    at_0s = datetime(2026, 10, 12, 1, 0, 0, micros)
+    assert xlsx.java_datetime(at_30s) == f"2026-10-12T01:00:30{java}"
+    assert xlsx.java_datetime(at_0s) == f"2026-10-12T01:00:00{java}"
 
 
 def _farm(**over: object) -> FarmExportRow:
@@ -60,6 +81,21 @@ def test_harvest_row_writes_missing_yes_no_and_numbers_instead_of_failing() -> N
     assert xlsx.harvest_row(row) == [
         "2026-10-03T01:00", "สวน", "A", 0.0, 430.0, "Y", "-", "N", "Y", "-", "-",
     ]  # fmt: skip
+
+
+def test_text_that_looks_like_a_formula_stays_text() -> None:
+    farm_name = '=HYPERLINK("http://evil.example","open me")'
+    writer = xlsx.Writer()
+    writer.sheet(xlsx.FARM_SHEET, xlsx.FARM_HEADERS)
+    writer.rows([xlsx.farm_row(_farm(farm_name=farm_name, line="+66 81", facebook="-"))])
+
+    content = writer.finish()
+
+    with zipfile.ZipFile(io.BytesIO(content)) as z:
+        sheet = z.read("xl/worksheets/sheet1.xml").decode()
+    assert "<f>" not in sheet  # no cell is a formula
+    row = list(load_workbook(io.BytesIO(content)).active.iter_rows(values_only=True))[1]
+    assert (row[0], row[8], row[9]) == (farm_name, "+66 81", "-")  # the text, unchanged
 
 
 def test_writer_keeps_sheet_order_and_headers() -> None:
