@@ -8,12 +8,13 @@ the same harvest functions with an area.
 Kept from Kotlin: titles, units and labels; one series per grade A, B, C (or
 the one grade asked for), every month in the range, 0 for a month with
 nothing; "sum" is the running total; harvests are counted per graded part and
-users per role held. Changed: a missing or malformed month, a year outside 2000..2100,
-more than 120 months and an inconsistent place answer 422
-(Kotlin: 500 and 400).
+users per role held. Changed: a missing or malformed month, a year outside
+2000..2100, more than 120 months, an area that isn't a valid Polygon or
+MultiPolygon and an inconsistent place answer 422 (Kotlin: 500 and 400).
 """
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -161,15 +162,57 @@ async def _check_place(session: Session, place: Place) -> dict[str, Any]:
     return {k: (str(v) if v is not None else None) for k, v in got.items()}
 
 
+_BAD_AREA = "Send a GeoJSON Polygon or MultiPolygon in longitude/latitude"
+
+
+def _position(point: Any) -> bool:
+    """[longitude, latitude] (an altitude may follow), on the globe."""
+    return (
+        isinstance(point, list)
+        and 2 <= len(point) <= 3
+        and all(isinstance(n, int | float) and not isinstance(n, bool) for n in point)
+        and all(math.isfinite(n) for n in point)
+        and -180 <= point[0] <= 180
+        and -90 <= point[1] <= 90
+    )
+
+
+def _ring(ring: Any) -> bool:
+    """A closed line of at least four positions, as GeoJSON (RFC 7946) and
+    PostGIS require."""
+    return (
+        isinstance(ring, list)
+        and len(ring) >= 4
+        and all(_position(p) for p in ring)
+        and ring[0] == ring[-1]
+    )
+
+
+def _polygon(rings: Any) -> bool:
+    return isinstance(rings, list) and len(rings) >= 1 and all(_ring(r) for r in rings)
+
+
 def _area(geo_json: str | None) -> str | None:
+    """The drawn area, checked here so that nothing PostGIS can't read gets
+    to the query (it answered 500 for {"type": "Foo"} or an open ring). The
+    web map draws a Polygon; a MultiPolygon is the only other area shape."""
     if geo_json is None:
         return None
     try:
         parsed = json.loads(geo_json)
     except ValueError:
         parsed = None
-    if not isinstance(parsed, dict) or "type" not in parsed:
-        raise Invalid(fields={"geoJson": "Send a GeoJSON geometry, e.g. a Polygon"})
+    if not isinstance(parsed, dict):
+        raise Invalid(fields={"geoJson": _BAD_AREA})
+    kind, coordinates = parsed.get("type"), parsed.get("coordinates")
+    ok = (kind == "Polygon" and _polygon(coordinates)) or (
+        kind == "MultiPolygon"
+        and isinstance(coordinates, list)
+        and len(coordinates) >= 1
+        and all(_polygon(p) for p in coordinates)
+    )
+    if not ok:
+        raise Invalid(fields={"geoJson": _BAD_AREA})
     return geo_json
 
 

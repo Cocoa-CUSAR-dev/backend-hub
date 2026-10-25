@@ -2,6 +2,7 @@
 permissions. The SQL is in tests/db/test_reports.py, every route against
 Kotlin's answers in tests/contract/ (K-27..K-41)."""
 
+import json
 from datetime import date
 from typing import Any
 from unittest.mock import AsyncMock
@@ -165,7 +166,52 @@ async def test_area_view_is_spatial_without_place_metadata(fake_db: dict[str, As
     assert out.metadata == {"type": "spatial_selection"}
 
 
-@pytest.mark.parametrize("area", ["not json", '"a string"', '{"no": "type"}'])
+SQUARE = [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]
+HOLE = [[0.2, 0.2], [0.4, 0.2], [0.4, 0.4], [0.2, 0.2]]
+
+
+@pytest.mark.parametrize(
+    "area",
+    [
+        {"type": "Polygon", "coordinates": [SQUARE]},
+        {"type": "Polygon", "coordinates": [SQUARE, HOLE]},  # with a hole
+        {"type": "Polygon", "coordinates": [[[100.5, 13.7, 2.0], [100.6, 13.7, 2.0],
+                                             [100.6, 13.8, 2.0], [100.5, 13.7, 2.0]]]},
+        {"type": "MultiPolygon", "coordinates": [[SQUARE], [SQUARE]]},
+    ],
+)  # fmt: skip
+async def test_a_polygon_or_multipolygon_is_an_area(
+    fake_db: dict[str, AsyncMock], area: dict[str, Any]
+) -> None:
+    geo_json = json.dumps(area)
+    await service.harvest_series(
+        SESSION, RESEARCHER, "delta", from_="2026-08", to="2026-08", area=geo_json
+    )
+    assert fake_db["harvest_by_month"].await_args.args[2].area == geo_json
+
+
+@pytest.mark.parametrize(
+    "area",
+    [
+        "not json",
+        '"a string"',
+        '{"no": "type"}',
+        '{"type": "Foo"}',  # passed the old check, then PostGIS answered 500
+        '{"type": "Point", "coordinates": [0, 0]}',
+        '{"type": "Polygon"}',
+        '{"type": "Polygon", "coordinates": []}',
+        '{"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1]]]}',  # open ring
+        '{"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [0, 0]]]}',  # too few points
+        '{"type": "Polygon", "coordinates": [[[0, 0], [1, "x"], [1, 1], [0, 0]]]}',
+        '{"type": "Polygon", "coordinates": [[[0, 0], [true, 0], [1, 1], [0, 0]]]}',
+        '{"type": "Polygon", "coordinates": [[[0, 0], [181, 0], [1, 1], [0, 0]]]}',
+        '{"type": "Polygon", "coordinates": [[[0, 0], [0, 91], [1, 1], [0, 0]]]}',
+        '{"type": "Polygon", "coordinates": [[[0], [1, 0], [1, 1], [0]]]}',
+        '{"type": "MultiPolygon", "coordinates": []}',
+        '{"type": "MultiPolygon", "coordinates": [[[[0, 0], [1, 0], [1, 1], [0, 1]]]]}',
+        '{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": []}}',
+    ],
+)
 async def test_a_bad_area_is_invalid(fake_db: dict[str, AsyncMock], area: str) -> None:
     with pytest.raises(Invalid) as e:
         await service.harvest_series(
