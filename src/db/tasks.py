@@ -14,6 +14,7 @@ Other code calls the functions here.
 """
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -348,3 +349,119 @@ async def update_response(
         },
     )
     return updated.first() is not None
+
+
+# ---- a new task from the form builder (FORM-03) --------------------------------------
+
+# Two bind parameters per row; Postgres allows 32767 per statement.
+_ASSIGN_CHUNK = 5000
+
+
+async def insert_task(
+    session: AsyncSession,
+    *,
+    title: str,
+    description: str,
+    task_type: str,
+    open_at: datetime,
+    close_at: datetime,
+) -> UUID:
+    result = await session.execute(
+        text(
+            """
+            INSERT INTO form.task (title, description, task_type, open_at, close_at)
+            VALUES (:title, :description, :task_type, :open_at, :close_at)
+            RETURNING task_id
+            """
+        ),
+        {
+            "title": title,
+            "description": description,
+            "task_type": task_type,
+            "open_at": open_at,
+            "close_at": close_at,
+        },
+    )
+    task_id: UUID = result.scalar_one()
+    return task_id
+
+
+async def insert_recipients(
+    session: AsyncSession, task_id: UUID, recipients: Sequence[tuple[str, UUID]]
+) -> None:
+    """Who the task is aimed at, as rules ("ROLE", role_id) or ("USER", user_id),
+    not the people they resolve to. A repeated rule is saved once."""
+    for kind, recipient_id in dict.fromkeys(recipients):
+        await session.execute(
+            text(
+                """
+                INSERT INTO form.task_recipient (task_id, recipient_type, role_id, user_id)
+                VALUES (:task_id, :kind, :role_id, :user_id)
+                """
+            ),
+            {
+                "task_id": task_id,
+                "kind": kind,
+                "role_id": recipient_id if kind == "ROLE" else None,
+                "user_id": recipient_id if kind == "USER" else None,
+            },
+        )
+
+
+async def assign_users(session: AsyncSession, task_id: UUID, user_ids: Sequence[UUID]) -> None:
+    """One assignment per person; someone already assigned is left alone."""
+    people = list(dict.fromkeys(user_ids))
+    for start in range(0, len(people), _ASSIGN_CHUNK):
+        await session.execute(
+            text(
+                """
+                INSERT INTO form.assignment (task_id, user_id)
+                SELECT :task_id, unnest(CAST(:user_ids AS uuid[]))
+                ON CONFLICT DO NOTHING
+                """
+            ),
+            {"task_id": task_id, "user_ids": people[start : start + _ASSIGN_CHUNK]},
+        )
+
+
+async def insert_recurrence(
+    session: AsyncSession,
+    *,
+    template_task_id: UUID,
+    frequency: str,
+    weekdays: Sequence[int] | None,
+    start_date: date,
+    until_date: date | None,
+    created_by: UUID,
+) -> UUID:
+    """A repeating task whose first round is `template_task_id`, which is
+    pointed back at it for its first day: that is what keeps the round job
+    from copying it twice."""
+    result = await session.execute(
+        text(
+            """
+            INSERT INTO form.task_recurrence
+                (template_task_id, frequency, weekdays, start_date, until_date, created_by)
+            VALUES (:task_id, :frequency, CAST(:weekdays AS smallint[]), :start_date,
+                    :until_date, :created_by)
+            RETURNING recurrence_id
+            """
+        ),
+        {
+            "task_id": template_task_id,
+            "frequency": frequency,
+            "weekdays": list(weekdays) if weekdays is not None else None,
+            "start_date": start_date,
+            "until_date": until_date,
+            "created_by": created_by,
+        },
+    )
+    recurrence_id: UUID = result.scalar_one()
+    await session.execute(
+        text(
+            "UPDATE form.task SET recurrence_id = :recurrence_id, period_date = :start_date"
+            " WHERE task_id = :task_id"
+        ),
+        {"recurrence_id": recurrence_id, "start_date": start_date, "task_id": template_task_id},
+    )
+    return recurrence_id
