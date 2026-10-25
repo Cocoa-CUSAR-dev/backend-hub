@@ -261,6 +261,17 @@ async def line_linked_user_ids(session: AsyncSession) -> list[UUID]:
     return list(result.scalars())
 
 
+async def usernames(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUID, str]:
+    """user_id -> username."""
+    if not user_ids:
+        return {}
+    result = await session.execute(
+        text("SELECT user_id, username FROM auth.user_account WHERE user_id = ANY(:ids)"),
+        {"ids": list(user_ids)},
+    )
+    return {row.user_id: row.username for row in result}
+
+
 async def user_ids_with_any_role(session: AsyncSession, role_ids: Sequence[UUID]) -> set[UUID]:
     """Who holds at least one of these roles."""
     if not role_ids:
