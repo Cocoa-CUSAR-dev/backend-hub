@@ -14,6 +14,7 @@ Other code calls the functions here.
 """
 
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -672,3 +673,110 @@ async def set_question_flags(
             "is_mandatory": is_mandatory,
         },
     )
+
+
+# ---- a repeating task's new round gets its own copy of the form (JOB-03) ---------------
+
+_IDENTIFIER_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
+# (schema, table) -> its column names, for copying rows whole. Only changes by
+# migration plus restart, so it is cached for the life of the process.
+_copy_columns: dict[tuple[str, str], list[str]] = {}
+
+
+def _safe(name: str) -> str:
+    if not _IDENTIFIER_RE.match(name):
+        raise ValueError(f"not a safe SQL identifier: {name!r}")
+    return f'"{name}"'
+
+
+async def _copyable(session: AsyncSession, table: str, *skip: str) -> str:
+    schema, name = table.split(".")
+    if (schema, name) not in _copy_columns:
+        result = await session.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_schema = :schema AND table_name = :table ORDER BY ordinal_position"
+            ),
+            {"schema": schema, "table": name},
+        )
+        _copy_columns[(schema, name)] = list(result.scalars())
+    return ", ".join(_safe(c) for c in _copy_columns[(schema, name)] if c not in skip)
+
+
+async def copy_form(session: AsyncSession, template_task_id: UUID, new_task_id: UUID) -> UUID:
+    """Copy the template task's form, its sections, its questions and who may
+    see each question onto `new_task_id`, every column as it is (a new id
+    each, and the form's created_at now). Returns the new form's id."""
+    form_cols = await _copyable(session, "form.task_form", "form_id", "task_id", "created_at")
+    template = (
+        await session.execute(
+            text("SELECT form_id FROM form.task_form WHERE task_id = :t"), {"t": template_task_id}
+        )
+    ).scalar()
+    if template is None:
+        raise LookupError(f"template task {template_task_id} has no form to copy")
+    new_form: UUID = (
+        await session.execute(
+            text(
+                f"INSERT INTO form.task_form (task_id, {form_cols})"
+                f" SELECT :new_task, {form_cols} FROM form.task_form WHERE form_id = :form"
+                " RETURNING form_id"
+            ),
+            {"new_task": new_task_id, "form": template},
+        )
+    ).scalar_one()
+
+    section_cols = await _copyable(session, "form.section", "section_id", "form_id")
+    question_cols = await _copyable(session, "form.question", "question_id", "section_id")
+    visibility_cols = await _copyable(
+        session, "form.question_visibility", "visibility_id", "question_id"
+    )
+    sections = (
+        await session.execute(
+            text(
+                "SELECT section_id FROM form.section WHERE form_id = :form"
+                " ORDER BY sort_order, section_id"
+            ),
+            {"form": template},
+        )
+    ).scalars()
+    for section in list(sections):
+        new_section = (
+            await session.execute(
+                text(
+                    f"INSERT INTO form.section (form_id, {section_cols})"
+                    f" SELECT :new_form, {section_cols} FROM form.section WHERE section_id = :s"
+                    " RETURNING section_id"
+                ),
+                {"new_form": new_form, "s": section},
+            )
+        ).scalar_one()
+        questions = (
+            await session.execute(
+                text(
+                    "SELECT question_id FROM form.question WHERE section_id = :s"
+                    " ORDER BY sort_order, question_id"
+                ),
+                {"s": section},
+            )
+        ).scalars()
+        for question in list(questions):
+            new_question = (
+                await session.execute(
+                    text(
+                        f"INSERT INTO form.question (section_id, {question_cols})"
+                        f" SELECT :new_section, {question_cols} FROM form.question"
+                        " WHERE question_id = :q RETURNING question_id"
+                    ),
+                    {"new_section": new_section, "q": question},
+                )
+            ).scalar_one()
+            await session.execute(
+                text(
+                    f"INSERT INTO form.question_visibility (question_id, {visibility_cols})"
+                    f" SELECT :new_question, {visibility_cols} FROM form.question_visibility"
+                    " WHERE question_id = :q"
+                ),
+                {"new_question": new_question, "q": question},
+            )
+    return new_form
