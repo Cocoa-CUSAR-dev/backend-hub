@@ -472,6 +472,9 @@ ROUTES: list[Route] = [
                         | {"questions": [harvest_question("not_a_column", "ผิด", 0)]}
                     ]
                 },
+                # Refused for hub_id and farm_id, which are NOT NULL only in
+                # the migrations' collection.harvest.
+                hub={"requires": ["registry"]},
             ),
             C("unknown handler", "researcher", body=NEW_FORM | {"handler": "no_such_handler"}),
             forbidden(body=NEW_FORM),

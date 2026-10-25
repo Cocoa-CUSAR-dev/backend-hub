@@ -11,7 +11,7 @@ from httpx import AsyncClient
 
 from src.auth import tokens
 from src.exceptions import NotFound
-from src.forms import handlers, service
+from src.forms import builder, handlers, service
 from src.forms.schemas import CatalogOut, FormOut, FormSummaryOut, FormTaskOut
 
 USER_ID = uuid4()
@@ -151,3 +151,52 @@ async def test_handler_routes_are_not_read_as_a_form_id(
 
 def _empty_catalog() -> CatalogOut:
     return CatalogOut(handlers=[], dependencies=[], registration_tables=[], field_labels={})
+
+
+def _form() -> FormOut:
+    return FormOut(
+        form_id=uuid4(), title="t", description=None, is_multiple_submit=False, sections=[]
+    )
+
+
+NEW_FORM = {
+    "title": "t",
+    "openAt": "2026-11-01T00:00:00",
+    "closeAt": "2026-11-30T00:00:00",
+    "handler": "harvest",
+    "sections": [{"title": "s", "sortOrder": 0, "questions": []}],
+}
+
+
+async def test_builder_routes_reach_the_service(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    create, update, edit = (
+        AsyncMock(return_value=_form()),
+        AsyncMock(return_value=_form()),
+        AsyncMock(return_value=builder.EDITED),
+    )
+    monkeypatch.setattr(builder, "create_form", create)
+    monkeypatch.setattr(builder, "update_form", update)
+    monkeypatch.setattr(builder, "edit_form", edit)
+    form_id = uuid4()
+
+    created = await client.post("/api/v1/forms", json=NEW_FORM, headers=_auth())
+    updated = await client.put(f"/api/v1/forms/{form_id}", json={"sections": []}, headers=_auth())
+    edited = await client.put(f"/api/v1/forms/{form_id}/edit", json={}, headers=_auth())
+
+    assert (created.status_code, updated.status_code, edited.status_code) == (201, 200, 200)
+    assert create.await_args.args[2].handler == "harvest"
+    assert update.await_args.args[2] == form_id
+    assert edited.json() == "Successfully audited form"
+
+
+async def test_a_body_missing_what_kotlin_required_is_422(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    create = AsyncMock()
+    monkeypatch.setattr(builder, "create_form", create)
+    body = {k: v for k, v in NEW_FORM.items() if k != "openAt"}
+
+    assert (await client.post("/api/v1/forms", json=body, headers=_auth())).status_code == 422
+    create.assert_not_awaited()

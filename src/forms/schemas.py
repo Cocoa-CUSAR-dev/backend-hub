@@ -1,9 +1,17 @@
-from datetime import datetime
-from typing import Any
+from datetime import date, datetime, time
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, model_serializer
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+)
 from pydantic.alias_generators import to_camel
+
+from src import clock
 
 
 class FormDetail(BaseModel):
@@ -194,3 +202,136 @@ class CatalogOut(_CamelOut):
     dependencies: list[DependencyOut]
     registration_tables: list[RegistrationTableOut]
     field_labels: dict[str, str]
+
+
+# ---- the form builder's requests (FORM-03, FORM-04, FORM-05) --------------------------
+# The bodies web-backend's Form.Request.Create / Update / Edit took, same keys
+# and defaults. Times are Bangkok wall-clock with no zone, as Kotlin stored them.
+
+
+class _CamelIn(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+def _wall_clock(value: datetime) -> datetime:
+    """A time with a zone becomes Bangkok wall-clock: the columns have none."""
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(clock.BANGKOK).replace(tzinfo=None)
+
+
+WallClock = Annotated[datetime, AfterValidator(_wall_clock)]
+
+
+class RecipientIn(_CamelIn):
+    """ROLE = everyone holding that role (id is a role_id); USER = one person."""
+
+    type: Literal["ROLE", "USER"]
+    id: UUID
+
+
+class ReminderIn(_CamelIn):
+    """A daily reminder set up with the form; enabled=false means none."""
+
+    enabled: bool
+    time_of_day: time
+    recipients: list[RecipientIn] = []
+
+
+class RecurrenceIn(_CamelIn):
+    """The task being created is round one. weekdays are ISO (1 = Monday ...
+    7 = Sunday) and only mean something for WEEKLY; until_date is the last
+    day a round can be for, None for no end."""
+
+    frequency: Literal["DAILY", "WEEKLY"]
+    weekdays: list[int] | None = None
+    until_date: date | None = None
+
+
+class QuestionCreateIn(_CamelIn):
+    label: str
+    description: str | None = None
+    input_type: str
+    field_name: str | None = None
+    is_mandatory: bool = False
+    carry_forward: bool = False
+    sort_order: int
+    default_value: Any = None
+
+
+class SectionCreateIn(_CamelIn):
+    title: str
+    description: str | None = None
+    sort_order: int
+    questions: list[QuestionCreateIn]
+
+
+class FormCreateIn(_CamelIn):
+    title: str
+    description: str | None = None
+    task_type: str = "FORM"
+    open_at: WallClock
+    close_at: WallClock
+    handler: str
+    is_multiple_submit: bool = False
+    sections: list[SectionCreateIn]
+    reminder: ReminderIn | None = None
+    recurrence: RecurrenceIn | None = None
+    # Who the task is for. Empty = everyone, as before.
+    recipients: list[RecipientIn] = []
+
+
+class QuestionUpdateIn(_CamelIn):
+    """No question_id = a new question."""
+
+    question_id: UUID | None = None
+    label: str
+    description: str | None = None
+    input_type: str
+    field_name: str | None = None
+    is_mandatory: bool = False
+    is_active: bool = True
+    carry_forward: bool | None = None  # None = keep what is stored
+    sort_order: int
+    default_value: Any = None
+
+
+class SectionUpdateIn(_CamelIn):
+    """No section_id = a new section. A section left out is deleted."""
+
+    section_id: UUID | None = None
+    title: str
+    description: str | None = None
+    is_active: bool = True
+    sort_order: int
+    questions: list[QuestionUpdateIn]
+
+
+class FormUpdateIn(_CamelIn):
+    description: str | None = None
+    # None = keep it: a client that doesn't know the field can't switch it off.
+    is_multiple_submit: bool | None = None
+    sections: list[SectionUpdateIn]
+
+
+class QuestionEditIn(_CamelIn):
+    question_id: UUID
+    description: str | None = None
+    is_active: bool | None = None
+    is_mandatory: bool | None = None
+
+
+class SectionEditIn(_CamelIn):
+    section_id: UUID
+    description: str | None = None
+    is_active: bool
+    questions: list[QuestionEditIn] = []
+
+
+class FormEditIn(_CamelIn):
+    """Switch sections and questions on or off, and questions required or not;
+    nothing else changes (the descriptions are accepted and not written, as
+    in Kotlin)."""
+
+    description: str | None = None
+    sections: list[SectionEditIn] = []

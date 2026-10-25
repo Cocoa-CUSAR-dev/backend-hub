@@ -136,9 +136,10 @@ REQUIREMENTS = {
 }
 
 
-async def _missing_requirement(session: AsyncSession, fx: Fixture) -> str | None:
+async def _missing_requirement(session: AsyncSession, fx: Fixture, case: Case) -> str | None:
+    """A fixture's requirements, plus a single case's own."""
     assert fx.hub is not None
-    for need in fx.hub.get("requires", []):
+    for need in [*fx.hub.get("requires", []), *case.hub.get("requires", [])]:
         if not (await session.execute(text(REQUIREMENTS[need]))).scalar():
             return need
     return None
@@ -148,7 +149,7 @@ async def _missing_requirement(session: AsyncSession, fx: Fixture) -> str | None
 async def test_hub_answers_like_kotlin(fx: Fixture, case: Case, seeded: AsyncSession) -> None:
     assert fx.hub is not None
     session = seeded
-    if need := await _missing_requirement(session, fx):
+    if need := await _missing_requirement(session, fx, case):
         pytest.skip(f"{fx.kid} needs {need}, which tests/resources/schema.sql doesn't have")
     missing = [
         t
