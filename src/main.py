@@ -31,6 +31,7 @@ sentry_sdk.init(
 
 from src.admin.router import router as admin_router
 from src.agriculture.router import router as agriculture_router
+from src.analytics.router import router as analytics_router
 from src.auth.router import router as auth_router
 from src.chat.liff import router as liff_tasks_router
 from src.chat.router import router as line_router
@@ -118,6 +119,7 @@ app.include_router(admin_router)
 app.include_router(tasks_router)
 app.include_router(forms_router)
 app.include_router(reports_router)
+app.include_router(analytics_router)
 app.include_router(agriculture_router)
 app.include_router(collection_router)
 app.include_router(processing_router)

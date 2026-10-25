@@ -8,7 +8,13 @@
   },
   "hub": {
     "method": "POST",
-    "path": "/api/v1/analytics/harvest/spatial/time-series/frequency"
+    "path": "/api/v1/analytics/harvest/spatial/time-series/{mode}",
+    "params": {
+      "mode": "=frequency"
+    },
+    "requires": [
+      "postgis"
+    ]
   },
   "seeds": [
     "base",

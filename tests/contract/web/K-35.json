@@ -8,7 +8,10 @@
   },
   "hub": {
     "method": "GET",
-    "path": "/api/v1/analytics/users/summary/count"
+    "path": "/api/v1/analytics/users/summary/{mode}",
+    "params": {
+      "mode": "=count"
+    }
   },
   "seeds": [
     "base"

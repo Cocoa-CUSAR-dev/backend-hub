@@ -8,7 +8,13 @@
   },
   "hub": {
     "method": "POST",
-    "path": "/api/v1/analytics/harvest/spatial/time-series/average"
+    "path": "/api/v1/analytics/harvest/spatial/time-series/{mode}",
+    "params": {
+      "mode": "=average"
+    },
+    "requires": [
+      "postgis"
+    ]
   },
   "seeds": [
     "base",

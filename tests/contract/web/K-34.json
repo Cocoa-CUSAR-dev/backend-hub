@@ -8,7 +8,10 @@
   },
   "hub": {
     "method": "GET",
-    "path": "/api/v1/analytics/users/time-series/delta"
+    "path": "/api/v1/analytics/users/time-series/{mode}",
+    "params": {
+      "mode": "=delta"
+    }
   },
   "seeds": [
     "base"

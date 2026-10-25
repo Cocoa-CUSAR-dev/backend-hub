@@ -242,7 +242,10 @@ def analytics(
     kid: str, after: str, method: str, kotlin: str, hub: str, spatial: bool = False
 ) -> Route:
     body = {"geoJson": CHUMPHON} if spatial else None
-    hub_map = {"method": method, "path": hub}
+    hub_map = by_mode(method, hub)
+    if spatial:
+        # The drawn area is a PostGIS query; tests/resources/schema.sql has no PostGIS.
+        hub_map["requires"] = ["postgis"]
     if spatial:
         cases = [
             C("drawn area around Chumphon", "researcher", query=RANGE, body=body),
@@ -268,13 +271,20 @@ def analytics(
     return Route(kid, after, method, kotlin, hub_map, PLACE_SEEDS, cases)
 
 
+def by_mode(method: str, hub: str) -> dict[str, Any]:
+    """The hub serves one route per family with the mode in the path (CONVENTIONS §4):
+    .../time-series/sum -> .../time-series/{mode}, filled with "sum"."""
+    base, mode = hub.rsplit("/", 1)
+    return {"method": method, "path": f"{base}/{{mode}}", "params": {"mode": f"={mode}"}}
+
+
 def user_analytics(kid: str, after: str, kotlin: str, hub: str) -> Route:
     return Route(
         kid,
         after,
         "GET",
         kotlin,
-        {"method": "GET", "path": hub},
+        by_mode("GET", hub),
         ["base"],
         [
             C("all roles", "researcher", query={"from": "2026-07", "to": "2026-10"}),
