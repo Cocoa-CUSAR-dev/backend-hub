@@ -36,6 +36,7 @@ from src.chat.liff import router as liff_tasks_router
 from src.chat.router import router as line_router
 from src.collection.router import router as collection_router
 from src.exceptions import register_exception_handlers
+from src.forms.router import router as forms_router
 from src.jobs.router import router as internal_router
 from src.jobs.scheduler import configure_jobs, scheduler
 from src.logging_config import configure_logging
@@ -114,6 +115,7 @@ app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(admin_router)
 app.include_router(tasks_router)
+app.include_router(forms_router)
 app.include_router(agriculture_router)
 app.include_router(collection_router)
 app.include_router(processing_router)
