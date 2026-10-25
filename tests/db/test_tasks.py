@@ -245,3 +245,19 @@ async def test_task_info_has_the_type_and_dates(db_session: AsyncSession) -> Non
     assert info is not None
     assert (info.title, info.task_type, info.open_at) == ("Harvest", "FORM", datetime(2026, 9, 1))
     assert await db.tasks.task_info(db_session, uuid4()) is None
+
+
+async def test_response_counts_by_form(db_session: AsyncSession) -> None:
+    user = await _user(db_session)
+    task = await _task(db_session, "probe", datetime(2026, 10, 1))
+    form_a, form_b = uuid4(), uuid4()
+    for form in (form_a, form_a, form_b, None):
+        await insert(
+            db_session, "form.response", task_log_id=task, user_id=user,
+            task_form_id=form, answer="{}", status="SUBMITTED",
+        )  # fmt: skip
+
+    counts = await db.tasks.response_counts_by_form(db_session)
+
+    assert (counts[form_a], counts[form_b]) == (2, 1)
+    assert None not in counts

@@ -228,7 +228,8 @@ async def form_rows(session: AsyncSession, form_id: UUID) -> list[FormRow]:
 class HandlerRow:
     """One handler_registry row: which table a form's answers are written to.
     A child handler (parent_handler set) hangs off an existing row of its
-    parent, stored under parent_field on its own table."""
+    parent, stored under parent_field on its own table. The label, category
+    and the rest are what the form builder and the Data Map show."""
 
     handler: str
     schema_name: str
@@ -236,21 +237,38 @@ class HandlerRow:
     parent_handler: str | None
     parent_field: str | None
     is_active: bool
+    label_th: str = ""
+    description_th: str = ""
+    category: str = ""
+    frequency: str = ""
+    # Nullable columns the form must still ask (farm_economic_eval.farm_id).
+    extra_required_fields: tuple[str, ...] = ()
+    sort_order: int = 0
 
 
 async def handler_rows(session: AsyncSession) -> list[HandlerRow]:
-    """Every handler_registry row as stored, active or not. Not validated:
-    the caller drops rows with bad identifiers or a missing table."""
+    """Every handler_registry row as stored, active or not, in the registry's
+    own order (sort_order, then name). Not validated: the caller drops rows
+    with bad identifiers or a missing table."""
     result = await session.execute(
         text(
             """
-            SELECT handler, schema_name, table_name, parent_handler, parent_field, is_active
+            SELECT handler, schema_name, table_name, parent_handler, parent_field, is_active,
+                   COALESCE(label_th, '') AS label_th,
+                   COALESCE(description_th, '') AS description_th,
+                   COALESCE(category, '') AS category,
+                   COALESCE(frequency, '') AS frequency,
+                   COALESCE(extra_required_fields, '{}') AS extra_required_fields,
+                   COALESCE(sort_order, 0) AS sort_order
             FROM form.handler_registry
-            ORDER BY handler
+            ORDER BY sort_order, handler
             """
         )
     )
-    return [HandlerRow(**row._mapping) for row in result]
+    return [
+        HandlerRow(**{**row._mapping, "extra_required_fields": tuple(row.extra_required_fields)})
+        for row in result
+    ]
 
 
 async def field_dependencies(session: AsyncSession) -> list[FieldDependencyRow]:
@@ -268,6 +286,61 @@ async def field_dependencies(session: AsyncSession) -> list[FieldDependencyRow]:
     return [FieldDependencyRow(**row._mapping) for row in result]
 
 
+@dataclass(frozen=True, slots=True)
+class ColumnInfo:
+    """One column of a handler's table, as the form builder needs it."""
+
+    name: str
+    data_type: str  # information_schema's name: "character varying", "timestamp without ..."
+    udt_name: str  # Postgres' short name: "varchar", "timestamp", "int4"
+    not_null_without_default: bool  # an INSERT fails without it
+    references: str | None  # "schema.table" of its foreign key, if it has one
+
+
+async def table_columns(session: AsyncSession, schema: str, table: str) -> list[ColumnInfo]:
+    """A table's columns in column order, each with the table its foreign key
+    points at. Read from pg_catalog for the keys: information_schema only
+    shows constraints on tables the current role owns."""
+    result = await session.execute(
+        text(
+            """
+            SELECT c.column_name AS name, c.data_type, c.udt_name,
+                   (c.is_nullable = 'NO' AND c.column_default IS NULL) AS not_null_without_default,
+                   fk.target AS fk_target
+            FROM information_schema.columns c
+            LEFT JOIN LATERAL (
+                SELECT rn.nspname || '.' || rt.relname AS target
+                FROM pg_constraint k
+                JOIN pg_class t ON t.oid = k.conrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY (k.conkey)
+                JOIN pg_class rt ON rt.oid = k.confrelid
+                JOIN pg_namespace rn ON rn.oid = rt.relnamespace
+                WHERE k.contype = 'f'
+                  AND n.nspname = c.table_schema
+                  AND t.relname = c.table_name
+                  AND a.attname = c.column_name
+                ORDER BY k.conname
+                LIMIT 1
+            ) fk ON true
+            WHERE c.table_schema = :schema AND c.table_name = :table
+            ORDER BY c.ordinal_position
+            """
+        ),
+        {"schema": schema, "table": table},
+    )
+    return [
+        ColumnInfo(
+            name=row.name,
+            data_type=row.data_type,
+            udt_name=row.udt_name,
+            not_null_without_default=row.not_null_without_default,
+            references=row.fk_target,
+        )
+        for row in result
+    ]
+
+
 async def existing_tables(session: AsyncSession) -> set[str]:
     """Every base table in the database as "schema.table" -- one cheap query
     to check that registry rows point at tables that really exist."""
@@ -275,3 +348,66 @@ async def existing_tables(session: AsyncSession) -> set[str]:
         text("SELECT table_schema, table_name FROM information_schema.tables")
     )
     return {f"{row.table_schema}.{row.table_name}" for row in result}
+
+
+# ---- the Data Map's counts (GET /api/v1/forms/handlers/catalog) ----------------------
+
+
+@dataclass(frozen=True, slots=True)
+class HandlerForm:
+    """One form and the handler it writes to."""
+
+    handler: str
+    form_id: UUID
+    task_id: UUID
+
+
+async def handler_forms(session: AsyncSession) -> list[HandlerForm]:
+    """Every form that names a handler."""
+    result = await session.execute(
+        text("SELECT handler, form_id, task_id FROM form.task_form WHERE handler IS NOT NULL")
+    )
+    return [HandlerForm(**row._mapping) for row in result]
+
+
+async def handler_field_usage(session: AsyncSession) -> dict[str, dict[str, int]]:
+    """handler -> field_name -> how many of its forms ask that field, counting
+    only active sections and questions: what a farmer is actually asked."""
+    result = await session.execute(
+        text(
+            """
+            SELECT tf.handler, q.field_name, count(DISTINCT tf.form_id) AS forms
+            FROM form.task_form tf
+            JOIN form.section s ON s.form_id = tf.form_id AND COALESCE(s.is_active, true)
+            JOIN form.question q ON q.section_id = s.section_id AND COALESCE(q.is_active, true)
+            WHERE q.field_name IS NOT NULL AND tf.handler IS NOT NULL
+            GROUP BY tf.handler, q.field_name
+            """
+        )
+    )
+    usage: dict[str, dict[str, int]] = {}
+    for row in result:
+        usage.setdefault(row.handler, {})[row.field_name] = row.forms
+    return usage
+
+
+async def field_labels(session: AsyncSession) -> dict[str, str]:
+    """field_name -> the label researchers most often give it across active
+    questions, so the Data Map can say ฟาร์ม instead of farm_id. Ties go to
+    the alphabetically first label, so the page doesn't flicker."""
+    result = await session.execute(
+        text(
+            """
+            SELECT DISTINCT ON (field_name) field_name, label
+            FROM (
+                SELECT q.field_name, btrim(q.label) AS label, count(*) AS uses
+                FROM form.question q
+                WHERE q.field_name IS NOT NULL AND btrim(q.label) <> ''
+                  AND COALESCE(q.is_active, true)
+                GROUP BY q.field_name, btrim(q.label)
+            ) labels
+            ORDER BY field_name, uses DESC, label
+            """
+        )
+    )
+    return {row.field_name: row.label for row in result}

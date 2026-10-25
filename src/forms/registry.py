@@ -45,6 +45,12 @@ class Registry:
     parent_fields: frozenset[str]
     # child field -> its dependency.
     dependencies: dict[str, FieldDependencyRow]
+    # The active handlers whose table exists, in the registry's order
+    # (sort_order, then name): what the form builder offers.
+    handlers: tuple[HandlerRow, ...] = ()
+    # Every valid dependency, ordered by child then parent field: what the
+    # Data Map draws (`dependencies` keeps only the first per child).
+    dependency_list: tuple[FieldDependencyRow, ...] = ()
 
 
 _cache: tuple[float, Registry] | None = None
@@ -113,13 +119,19 @@ def _dependencies(
 async def _load(session: Session) -> Registry:
     existing = await db.forms.existing_tables(session)
     handlers = await db.forms.handler_rows(session)
+    tables = _handler_tables(handlers, existing)
+    dependency_rows = await db.forms.field_dependencies(session)
     return Registry(
-        tables=_handler_tables(handlers, existing),
+        tables=tables,
         parents={r.handler: r.parent_handler for r in handlers if r.parent_handler},
         parent_fields=frozenset(
             r.parent_field for r in handlers if r.parent_field and is_identifier(r.parent_field)
         ),
-        dependencies=_dependencies(await db.forms.field_dependencies(session), existing),
+        dependencies=_dependencies(dependency_rows, existing),
+        handlers=tuple(r for r in handlers if r.handler in tables),
+        dependency_list=tuple(
+            d for d in dependency_rows if _safe_dependency(d) and d.link_table in existing
+        ),
     )
 
 
