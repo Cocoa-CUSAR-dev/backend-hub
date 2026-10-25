@@ -8,8 +8,9 @@ the same harvest functions with an area.
 Kept from Kotlin: titles, units and labels; one series per grade A, B, C (or
 the one grade asked for), every month in the range, 0 for a month with
 nothing; "sum" is the running total; harvests are counted per graded part and
-users per role held. Changed: a missing or malformed month and an inconsistent
-place answer 422 (Kotlin: 500 and 400).
+users per role held. Changed: a missing or malformed month, a year outside 2000..2100,
+more than 120 months and an inconsistent place answer 422
+(Kotlin: 500 and 400).
 """
 
 import json
@@ -47,6 +48,11 @@ USER_SERIES = {
 USER_SUMMARY = {"count": "Total User"}
 
 _MONTH = re.compile(r"^(\d{4})-(\d{2})$")
+# The months a dashboard may ask about, and how many at once (ten years). Kotlin
+# had no limit: year 0 or 10000 was a 500, and 0001-01..9999-11 built ~120,000
+# months.
+FIRST_YEAR, LAST_YEAR = 2000, 2100
+MAX_MONTHS = 120
 _HIERARCHY = (
     "The geographic hierarchy provided (Province/District/Subdistrict/Farm) "
     "is inconsistent or invalid."
@@ -91,13 +97,19 @@ def _month(name: str, value: str | None) -> date:
     m = _MONTH.match(value or "")
     if not m or not 1 <= int(m.group(2)) <= 12:
         raise Invalid(fields={name: "Use a month like 2026-08"})
-    return date(int(m.group(1)), int(m.group(2)), 1)
+    year = int(m.group(1))
+    if not FIRST_YEAR <= year <= LAST_YEAR:
+        # Year 0 has no date, and the month after 9999-12 is year 10000.
+        raise Invalid(fields={name: f"Use a year from {FIRST_YEAR} to {LAST_YEAR}"})
+    return date(year, int(m.group(2)), 1)
 
 
 def month_range(from_: str | None, to: str | None) -> Range:
     first, last = _month("from", from_), _month("to", to)
     if first > last:
         raise Invalid(fields={"from": "'from' must not be after 'to'"})
+    if (last.year - first.year) * 12 + last.month - first.month + 1 > MAX_MONTHS:
+        raise Invalid(fields={"to": f"Ask for at most {MAX_MONTHS} months at a time"})
     months, current = [], first
     while current <= last:
         months.append(current)

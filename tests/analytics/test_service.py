@@ -69,12 +69,22 @@ def test_month_range_covers_every_month_and_crosses_a_year() -> None:
 @pytest.mark.parametrize(
     ("from_", "to", "field"),
     [(None, "2026-10", "from"), ("2026-13", "2026-10", "from"), ("2026-08", "Oct", "to"),
-     ("2026-10", "2026-08", "from")],
+     ("2026-10", "2026-08", "from"),
+     # years with no month after them, or before them: 422, not 500
+     ("0000-01", "2026-10", "from"), ("2026-01", "9999-12", "to"),
+     ("1999-12", "2026-10", "from"), ("2026-01", "2101-01", "to"),
+     # more than ten years at once
+     ("2000-01", "2010-01", "to"), ("0001-01", "9999-11", "from")],
 )  # fmt: skip
 def test_bad_months_are_invalid(from_: str | None, to: str, field: str) -> None:
     with pytest.raises(Invalid) as e:
         service.month_range(from_, to)
     assert field in e.value.fields
+
+
+def test_the_widest_range_is_ten_years_inside_2000_to_2100() -> None:
+    assert len(service.month_range("2000-01", "2009-12").months) == 120
+    assert service.month_range("2100-12", "2100-12").end.isoformat() == "2101-01-01T00:00:00"
 
 
 # ---- harvest series and totals ------------------------------------------------------------
