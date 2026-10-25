@@ -106,5 +106,6 @@ async def test_pages_until_an_empty_page(
 
     rows = _sheets(export.content)["Farm Registry"]
     assert [r[0] for r in rows[1:]] == ["a", "b", "c"]
-    offsets = [c.kwargs["offset"] for c in fake_db["farm_export_page"].await_args_list]
-    assert offsets == [0, 2, 4]
+    # Each page starts after the last row of the one before (keyset paging).
+    afters = [c.kwargs["after"] for c in fake_db["farm_export_page"].await_args_list]
+    assert [a.farm_name if a else None for a in afters] == [None, "b", "c"]
