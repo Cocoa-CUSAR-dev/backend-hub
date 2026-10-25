@@ -51,6 +51,10 @@ TAGS: list[dict[str, Any]] = [
         "the task view (task dates and type). `{form_id}` is always a form id.",
     },
     {
+        "name": "reports",
+        "description": "Researchers: the raw-data Excel download (farm registry and harvests).",
+    },
+    {
         "name": "agriculture",
         "description": "Farms, plots and farm photos: register them and list mine. Photos are "
         "private; lists carry a link to each farm's newest photo, valid for an hour.",

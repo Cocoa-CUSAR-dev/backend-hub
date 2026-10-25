@@ -6,6 +6,9 @@
 Rules (CONVENTIONS.md §12):
   sql-outside-db    sqlalchemy imported outside src/db/ and src/database.py
   table-owner       a "schema.table" string outside the src/db/ file that owns it
+                    (src/db/reports.py may read any table: it holds the read-only
+                    joins for analytics and the Excel export, CONVENTIONS.md §2)
+  reports-writes    INSERT / UPDATE / DELETE / TRUNCATE SQL in src/db/reports.py
   owner-conflict    two src/db/ files claim the same table
   lib-outside-client
                     linebot / litellm / boto3 / httpx imported outside their client file
@@ -30,6 +33,11 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 DB = SRC / "db"
 BASELINE = ROOT / "scripts" / "conventions_baseline.txt"
+# Owns no table; may read every table, never write (CONVENTIONS.md §2).
+REPORTS = "src/db/reports.py"
+_WRITE_SQL = re.compile(
+    r"\b(insert\s+into|update\s+[a-z_]+\.[a-z_]+\s+set|delete\s+from|truncate)\b", re.I
+)
 
 SCHEMAS = "auth|form|agriculture|collection|processing|research|storage|ref|chat|notify"
 TABLE_RE = re.compile(rf"\b({SCHEMAS})\.([a-z_][a-z0-9_]*)\b")
@@ -134,6 +142,10 @@ def check_file(f: Path, owned: dict[str, str]) -> set[str]:
         found.add(f"clock-outside|{path}|reads the clock")
     if not path.endswith("router.py") and "HTTPException" in text:
         found.add(f"http-exception|{path}|uses HTTPException")
+    if path == REPORTS:
+        if _WRITE_SQL.search(text):
+            found.add(f"reports-writes|{path}|writes SQL (reports.py only reads)")
+        return found
     for table in string_tables(text):
         owner = owner_of(table, owned)
         if owner != path:

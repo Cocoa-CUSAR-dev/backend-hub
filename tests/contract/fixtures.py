@@ -270,11 +270,19 @@ def xlsx_summary(content: bytes) -> dict[str, list[list[Any]]]:
     from openpyxl import load_workbook  # only the raw-data export needs it
 
     wb = load_workbook(io.BytesIO(content), read_only=True)
+
+    def cell(value: Any) -> str:
+        if value is None:
+            return ""
+        # A number is compared by value: Apache POI writes 4.0 as "4.0" and
+        # openpyxl as "4", which Excel shows the same.
+        if isinstance(value, int | float) and not isinstance(value, bool):
+            return str(float(value))
+        return str(value)
+
     out: dict[str, list[list[Any]]] = {}
     for ws in wb.worksheets:
-        out[ws.title] = [
-            ["" if c is None else str(c) for c in row] for row in ws.iter_rows(values_only=True)
-        ]
+        out[ws.title] = [[cell(c) for c in row] for row in ws.iter_rows(values_only=True)]
     return out
 
 

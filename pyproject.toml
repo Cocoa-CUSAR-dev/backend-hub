@@ -30,6 +30,8 @@ dependencies = [
     "boto3>=1.35",
     # FastAPI's UploadFile (multipart form) for the farm photo upload.
     "python-multipart>=0.0.12",
+    # src/reports/xlsx.py: the raw-data Excel download (write-only workbooks).
+    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]

@@ -81,7 +81,6 @@ CHUMPHON = (
     "[[[98.9,10.2],[99.5,10.2],[99.5,10.8],[98.9,10.8],[98.9,10.2]]]}"
 )
 RANGE = {"from": "2026-08", "to": "2026-10"}
-EXPORT_OK = {"status": 200, "compare": "status"}
 
 
 @dataclass
@@ -792,15 +791,18 @@ ROUTES: list[Route] = [
         {"method": "GET", "path": "/api/v1/reports/raw-data"},
         PLACE_SEEDS,
         [
-            # Kotlin pages the export 1000 rows at a time but PageRequest allows at most 500,
-            # so every export answers 400 today. The hub must answer the file.
-            C("every sheet", "researcher", hub=EXPORT_OK),
-            C("farms only", "researcher", query={"sheets": "FARM"}, hub=EXPORT_OK),
-            C("harvests only", "researcher", query={"sheets": "HARVEST"}, hub=EXPORT_OK),
+            C("every sheet", "researcher"),
+            C("farms only", "researcher", query={"sheets": "FARM"}),
+            C("harvests only", "researcher", query={"sheets": "HARVEST"}),
             C("unknown sheet", "researcher", query={"sheets": "NOPE"}),
             forbidden(),
             anon(),
         ],
+        note="web-backend dev answers 400 for every export: XlsxService pages 1000 rows but "
+        "PageRequest allows at most 500, and the harvest sheet throws on a null yes/no or number "
+        "(XlsxService.kt:101-108). Recorded from a local build with exactly those two fixed "
+        "(exportPageSize = 500; a null yes/no cell is '-', a null number 0.0, as the same file "
+        "does for null text and area): CONTRACT_KOTLIN_URL=<that build> record_web.py K-42.",
     ),
     # ---- admin: researchers (ADMIN-02..04) -----------------------------------------
     Route(
