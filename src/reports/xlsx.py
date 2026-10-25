@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
 
 from src.db.reports import FarmExportRow, HarvestExportRow
 
@@ -115,7 +116,17 @@ class Writer:
 
     def rows(self, rows: Iterable[list[object]]) -> None:
         for row in rows:
-            self._ws.append(row)
+            self._ws.append([self._cell(value) for value in row])
+
+    def _cell(self, value: object) -> object:
+        # openpyxl stores any text starting with "=" as a formula, so a farm
+        # named =HYPERLINK(...) would run when a researcher opens the file.
+        # Kotlin (POI setCellValue(String)) always wrote text as text; so do we.
+        if isinstance(value, str) and value.startswith("="):
+            cell = WriteOnlyCell(self._ws, value=value)
+            cell.data_type = "s"
+            return cell
+        return value
 
     def finish(self) -> bytes:
         out = io.BytesIO()

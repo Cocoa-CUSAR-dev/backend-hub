@@ -2,6 +2,7 @@
 where Kotlin threw (a missing yes/no or number)."""
 
 import io
+import zipfile
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -60,6 +61,21 @@ def test_harvest_row_writes_missing_yes_no_and_numbers_instead_of_failing() -> N
     assert xlsx.harvest_row(row) == [
         "2026-10-03T01:00", "สวน", "A", 0.0, 430.0, "Y", "-", "N", "Y", "-", "-",
     ]  # fmt: skip
+
+
+def test_text_that_looks_like_a_formula_stays_text() -> None:
+    farm_name = '=HYPERLINK("http://evil.example","open me")'
+    writer = xlsx.Writer()
+    writer.sheet(xlsx.FARM_SHEET, xlsx.FARM_HEADERS)
+    writer.rows([xlsx.farm_row(_farm(farm_name=farm_name, line="+66 81", facebook="-"))])
+
+    content = writer.finish()
+
+    with zipfile.ZipFile(io.BytesIO(content)) as z:
+        sheet = z.read("xl/worksheets/sheet1.xml").decode()
+    assert "<f>" not in sheet  # no cell is a formula
+    row = list(load_workbook(io.BytesIO(content)).active.iter_rows(values_only=True))[1]
+    assert (row[0], row[8], row[9]) == (farm_name, "+66 81", "-")  # the text, unchanged
 
 
 def test_writer_keeps_sheet_order_and_headers() -> None:
