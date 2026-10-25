@@ -11,7 +11,7 @@ from httpx import AsyncClient
 
 from src.auth import tokens
 from src.exceptions import NotFound
-from src.forms import service
+from src.forms import responses, service
 from src.forms.schemas import FormOut, FormSummaryOut, FormTaskOut
 
 USER_ID = uuid4()
@@ -121,3 +121,48 @@ async def test_get_not_found_is_404(client: AsyncClient, fake: dict[str, AsyncMo
 
     assert r.status_code == 404
     assert fake["get"].await_args.kwargs == {"include_stats": True}
+
+
+async def test_responses_routes_pick_the_view_and_pass_kotlins_query(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    by_question, review = AsyncMock(return_value=[]), AsyncMock(return_value=[])
+    monkeypatch.setattr(responses, "answers_by_question", by_question)
+    monkeypatch.setattr(responses, "review", review)
+    base = f"/api/v1/forms/{uuid4()}/responses"
+
+    assert (await client.get(f"{base}?page=1&size=5", headers=_auth())).status_code == 200
+    assert (await client.get(f"{base}?view=review&aiOnly=true", headers=_auth())).status_code == 200
+    assert (await client.get(f"{base}?view=other", headers=_auth())).status_code == 422
+
+    assert by_question.await_args.kwargs == {"page": 1, "size": 5}
+    assert review.await_args.kwargs == {"ai_only": True, "page": 0, "size": 50}
+
+
+async def test_a_correction_reaches_the_service_with_the_field(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.forms.schemas import ReviewFieldOut
+
+    correct = AsyncMock(
+        return_value=ReviewFieldOut(
+            field_name="note",
+            label="n",
+            input_type="VARCHAR",
+            value="x",
+            source=None,
+            editable=True,
+        )
+    )
+    monkeypatch.setattr(responses, "correct", correct)
+    form_id, response_id = uuid4(), uuid4()
+
+    r = await client.patch(
+        f"/api/v1/forms/{form_id}/responses/{response_id}/fields/note",
+        json={"value": "x", "reason": "typo"},
+        headers=_auth(),
+    )
+
+    assert (r.status_code, r.json()["fieldName"]) == (200, "note")
+    assert correct.await_args.args[2:5] == (form_id, response_id, "note")
+    assert correct.await_args.args[5].reason == "typo"

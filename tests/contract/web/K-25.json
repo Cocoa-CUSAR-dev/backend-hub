@@ -180,7 +180,10 @@
         "taskId": "5f000000-0000-4000-8000-000000000999"
       },
       "body": null,
-      "response": []
+      "response": [],
+      "hub": {
+        "status": 404
+      }
     },
     {
       "name": "forbidden",

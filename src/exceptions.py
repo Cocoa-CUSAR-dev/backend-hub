@@ -129,6 +129,10 @@ class FormNotFound(NotFound):
     detail = "Form not found"
 
 
+class ResponseNotFound(NotFound):
+    detail = "Response not found"
+
+
 class ReminderNotFound(NotFound):
     detail = "Reminder schedule not found"
 
