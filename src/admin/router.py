@@ -1,8 +1,9 @@
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Query, status
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from src.admin import service
 from src.auth.dependencies import CurrentActor, SessionDep
@@ -64,3 +65,57 @@ async def remove_role(
 ) -> UserRolesOut:
     roles = await service.remove_role(session, actor, user_id, role)
     return UserRolesOut(user_id=user_id, roles=roles)
+
+
+# ---- researchers (ADMIN-02..04) -------------------------------------------------------
+# web-backend's Researcher.Entity keys, which an admin screen would read.
+
+
+class ResearcherOut(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, from_attributes=True)
+
+    user_id: UUID
+    first_name: str | None
+    last_name: str | None
+    organization: str | None
+
+
+@router.get(
+    "/researchers",
+    summary="Researchers, filtered by exact name or organization (ADMIN-02)",
+    response_model=list[ResearcherOut],
+)
+async def researchers(
+    actor: CurrentActor,
+    session: SessionDep,
+    first_name: Annotated[str | None, Query(alias="firstName")] = None,
+    last_name: Annotated[str | None, Query(alias="lastName")] = None,
+    organization: str | None = None,
+    page: int = 0,
+    size: int = service.DEFAULT_PAGE_SIZE,
+) -> list[ResearcherOut]:
+    found = await service.researchers(
+        session,
+        actor,
+        first_name=first_name,
+        last_name=last_name,
+        organization=organization,
+        page=page,
+        size=size,
+    )
+    return [ResearcherOut.model_validate(r) for r in found]
+
+
+@router.get(
+    "/researchers/{user_id}", summary="One researcher (ADMIN-03)", response_model=ResearcherOut
+)
+async def researcher(user_id: UUID, actor: CurrentActor, session: SessionDep) -> ResearcherOut:
+    return ResearcherOut.model_validate(await service.researcher(session, actor, user_id))
+
+
+@router.delete(
+    "/researchers/{user_id}",
+    summary="Remove a researcher: their profile and role; signs them out (ADMIN-04)",
+)
+async def delete_researcher(user_id: UUID, actor: CurrentActor, session: SessionDep) -> str:
+    return await service.delete_researcher(session, actor, user_id)

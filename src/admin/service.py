@@ -1,4 +1,5 @@
-"""Admin-only account management: creating accounts, granting and removing roles."""
+"""Admin-only account management: creating accounts, granting and removing roles,
+and the researcher list (ADMIN-02..04)."""
 
 from uuid import UUID
 
@@ -6,7 +7,7 @@ from src import db
 from src.actor import Actor, require
 from src.auth import passwords
 from src.database import Session, transaction
-from src.exceptions import Conflict, Forbidden, NotFound
+from src.exceptions import Conflict, Forbidden, Invalid, NotFound
 
 # Roles that carry a full profile (farmer, hub_collector, processor) are added
 # by the person themselves, because only they can fill the profile in.
@@ -86,3 +87,61 @@ async def remove_role(session: Session, actor: Actor, user_id: UUID, role: str) 
         await db.auth.revoke_all_refresh_tokens(session, user_id)
         roles, _ = await db.auth.roles_and_permissions(session, user_id)
     return sorted(roles)
+
+
+# ---- researchers (ADMIN-02..04), ported from web-backend's ResearcherService -----------
+
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 500
+DELETED = "Successfully deleted researcher"
+
+
+async def researchers(
+    session: Session,
+    actor: Actor,
+    *,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    organization: str | None = None,
+    page: int = 0,
+    size: int = DEFAULT_PAGE_SIZE,
+) -> list[db.research.Researcher]:
+    """Every researcher, or those whose names / organization are exactly these."""
+    require(actor, "read:researcher:all")
+    errors = {}
+    if page < 0:
+        errors["page"] = "page must be 0 or more"
+    if not 1 <= size <= MAX_PAGE_SIZE:
+        errors["size"] = f"size must be between 1 and {MAX_PAGE_SIZE}"
+    if errors:
+        raise Invalid(fields=errors)
+    return await db.research.researchers(
+        session,
+        first_name=first_name,
+        last_name=last_name,
+        organization=organization,
+        limit=size,
+        offset=page * size,
+    )
+
+
+async def researcher(session: Session, actor: Actor, user_id: UUID) -> db.research.Researcher:
+    require(actor, "read:researcher:all")
+    found = await db.research.researcher(session, user_id)
+    if found is None:
+        raise NotFound("Researcher not found")
+    return found
+
+
+async def delete_researcher(session: Session, actor: Actor, user_id: UUID) -> str:
+    """Remove a researcher: their researcher profile and role, and sign them
+    out everywhere. Only that role: Kotlin removed every role the account
+    held, which with several roles per person would also take away their
+    farmer or processor role."""
+    require(actor, "delete:researcher:any")
+    async with transaction(session):
+        if not await db.research.delete_researcher_profile(session, user_id):
+            raise NotFound("Researcher not found or do not have access")
+        await db.auth.remove_role(session, user_id, "researcher")
+        await db.auth.revoke_all_refresh_tokens(session, user_id)
+    return DELETED
