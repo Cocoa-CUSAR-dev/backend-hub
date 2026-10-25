@@ -6,6 +6,7 @@ import zipfile
 from datetime import date, datetime
 from decimal import Decimal
 
+import pytest
 from openpyxl import load_workbook
 
 from src.db.reports import FarmExportRow, HarvestExportRow
@@ -15,8 +16,27 @@ from src.reports import xlsx
 def test_java_datetime_drops_zero_seconds_like_localdatetime() -> None:
     assert xlsx.java_datetime(datetime(2026, 10, 12, 1, 0)) == "2026-10-12T01:00"
     assert xlsx.java_datetime(datetime(2026, 10, 12, 1, 0, 30)) == "2026-10-12T01:00:30"
-    assert xlsx.java_datetime(datetime(2026, 10, 12, 1, 0, 30, 500000)) == "2026-10-12T01:00:30.5"
     assert xlsx.java_datetime(None) == "-"
+
+
+@pytest.mark.parametrize(
+    ("micros", "java"),
+    [
+        (500000, ".500"),  # milliseconds: always three digits
+        (1000, ".001"),
+        (120000, ".120"),
+        (123456, ".123456"),  # microseconds: always six
+        (1, ".000001"),
+        (500100, ".500100"),
+    ],
+)
+def test_java_datetime_writes_fractions_in_groups_of_three(micros: int, java: str) -> None:
+    # What java.time.LocalDateTime.toString() prints for the same nanoseconds
+    # (checked against JDK 21), with and without whole seconds.
+    at_30s = datetime(2026, 10, 12, 1, 0, 30, micros)
+    at_0s = datetime(2026, 10, 12, 1, 0, 0, micros)
+    assert xlsx.java_datetime(at_30s) == f"2026-10-12T01:00:30{java}"
+    assert xlsx.java_datetime(at_0s) == f"2026-10-12T01:00:00{java}"
 
 
 def _farm(**over: object) -> FarmExportRow:

@@ -49,14 +49,19 @@ MISSING = "-"
 
 def java_datetime(moment: datetime | None) -> str:
     """A time as Java's LocalDateTime.toString() wrote it in Kotlin's file:
-    seconds only when not zero, fractions only when there are some."""
+    seconds only when not zero, and a fraction only when there is one, in
+    groups of three digits: milliseconds when they say it all (.500), else
+    microseconds (.123456). Java's third group, nanoseconds, never comes up:
+    Postgres and Python stop at microseconds."""
     if moment is None:
         return MISSING
     text = moment.strftime("%Y-%m-%dT%H:%M")
     if moment.second or moment.microsecond:
         text += moment.strftime(":%S")
-    if moment.microsecond:
-        text += f".{moment.microsecond:06d}".rstrip("0")
+    if moment.microsecond % 1000 == 0 and moment.microsecond:
+        text += f".{moment.microsecond // 1000:03d}"
+    elif moment.microsecond:
+        text += f".{moment.microsecond:06d}"
     return text
 
 
