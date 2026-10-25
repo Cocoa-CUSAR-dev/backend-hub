@@ -4,7 +4,7 @@ import pytest
 from pydantic import BaseModel
 
 from src.exceptions import LLMUnavailable
-from src.llm.client import extract_slots, generate_follow_up
+from src.llm.client import complete, extract_slots, generate_follow_up
 
 
 class _FarmSlots(BaseModel):
@@ -67,3 +67,33 @@ async def test_generate_follow_up_raises_llm_unavailable_on_provider_failure() -
         pytest.raises(LLMUnavailable),
     ):
         await generate_follow_up("plot_id", context="ฉันใส่ปุ๋ยวันนี้")
+
+
+async def test_complete_returns_the_stripped_text_with_timeout_and_retries() -> None:
+    mock = AsyncMock(return_value=_mock_completion("  วันนี้ไปสวน \n"))
+    with patch("src.llm.client.litellm.acompletion", new=mock):
+        assert await complete("เกลา", timeout=20.0, retries=2) == "วันนี้ไปสวน"
+
+    kwargs = mock.await_args.kwargs
+    assert kwargs["messages"] == [{"role": "user", "content": "เกลา"}]
+    assert (kwargs["timeout"], kwargs["num_retries"]) == (20.0, 2)
+
+
+@pytest.mark.parametrize("content", ["", "   ", None])
+async def test_complete_treats_no_text_as_unavailable(content: str | None) -> None:
+    with (
+        patch(
+            "src.llm.client.litellm.acompletion",
+            new=AsyncMock(return_value=_mock_completion(content)),  # type: ignore[arg-type]
+        ),
+        pytest.raises(LLMUnavailable),
+    ):
+        await complete("เกลา", timeout=1.0)
+
+
+async def test_complete_turns_a_provider_error_into_unavailable() -> None:
+    with (
+        patch("src.llm.client.litellm.acompletion", new=AsyncMock(side_effect=RuntimeError)),
+        pytest.raises(LLMUnavailable),
+    ):
+        await complete("เกลา", timeout=1.0)

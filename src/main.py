@@ -36,6 +36,7 @@ from src.auth.router import router as auth_router
 from src.chat.liff import router as liff_tasks_router
 from src.chat.router import router as line_router
 from src.collection.router import router as collection_router
+from src.diary.router import router as diary_router
 from src.exceptions import register_exception_handlers
 from src.forms.router import router as forms_router
 from src.jobs.router import router as internal_router
@@ -115,6 +116,7 @@ async def health() -> dict[str, str]:
 
 app.include_router(auth_router)
 app.include_router(me_router)
+app.include_router(diary_router)
 app.include_router(admin_router)
 app.include_router(tasks_router)
 app.include_router(forms_router)
