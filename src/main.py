@@ -16,7 +16,7 @@ from src.sentry_scrub import scrub_sso_token  # stdlib-only: safe to import befo
 
 # X-2d: error tracking, initialized right after `settings` -- before any
 # other first-party import -- so an import-time crash in one of those
-# modules (e.g. the reminders router's own Pydantic/SQLAlchemy setup) is
+# modules (e.g. a router's own Pydantic/SQLAlchemy setup) is
 # still captured instead of crashing invisibly before Sentry exists. An
 # empty SENTRY_DSN (the default) disables the SDK entirely -- no error, no
 # events sent -- safe in local dev/CI.
@@ -44,7 +44,6 @@ from src.logging_config import configure_logging
 from src.me.router import router as me_router
 from src.notifications.router import router as notifications_router
 from src.processing.router import router as processing_router
-from src.reminders.router import router as reminders_router
 from src.reports.router import router as reports_router
 from src.request_id import request_id_middleware
 from src.tasks.router import router as tasks_router
@@ -126,7 +125,6 @@ app.include_router(processing_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
 app.include_router(notifications_router)
-app.include_router(reminders_router)
 app.include_router(internal_router)
 
 if not settings.ENVIRONMENT.is_deployed:

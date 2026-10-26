@@ -75,10 +75,6 @@ TAGS: list[dict[str, Any]] = [
     {"name": "line", "description": "LINE webhook: every chat event from the LINE OA."},
     {"name": "liff", "description": "Endpoints the LIFF pages call from inside LINE."},
     {
-        "name": "reminders",
-        "description": "Reminder schedules per task (service key; moving under /api/v1/forms).",
-    },
-    {
         "name": "notifications",
         "description": "Push a LINE message to users (service key; becomes an internal function).",
     },
