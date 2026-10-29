@@ -2,7 +2,8 @@
 from web-backend's FormResponseController and ResponseReviewController:
 
 - answers_by_question  GET /forms/{id}/responses: one row per question, every
-                       person's answer to it (paged by response)
+                       person's answer to it (paged by response), hub
+                       collectors' too
 - review               GET /forms/{id}/responses?view=review: one row per
                        submission, field by field, newest first, with where
                        the chatbot got each value
@@ -56,14 +57,15 @@ async def _form(session: Session, form_id: UUID) -> TaskForm:
     return form
 
 
-async def _names(session: Session, user_ids: list[UUID], *, username_too: bool) -> dict[UUID, str]:
-    """Who sent each answer: their farmer name, else their processor name
-    (else their username, for the review table), as Kotlin joined them."""
-    names = await db.processing.processor_names(session, user_ids)
+async def _names(session: Session, user_ids: list[UUID]) -> dict[UUID, str]:
+    """Who sent each answer, for both views: their farmer name, else their
+    processor name, else their hub collector name, else their username.
+    Kotlin's per-question view dropped anyone without a farmer or processor
+    profile; since hub collectors submit answers too (#17), it keeps everyone."""
+    names = await db.auth.usernames(session, user_ids)
+    names |= await db.processing.hub_collector_names(session, user_ids)
+    names |= await db.processing.processor_names(session, user_ids)
     names |= await db.agriculture.farmer_names(session, user_ids)  # a farmer's name first
-    if username_too:
-        usernames = await db.auth.usernames(session, user_ids)
-        names = usernames | names
     return names
 
 
@@ -79,7 +81,7 @@ async def answers_by_question(
     responses = await db.tasks.responses_of_task(session, form.task_id, limit=limit, offset=offset)
     if not responses:
         return []
-    names = await _names(session, list({r.user_id for r in responses}), username_too=False)
+    names = await _names(session, list({r.user_id for r in responses}))
     # One row per field, in question order; a field asked twice keeps its
     # first place and its last label, as Kotlin's map did.
     labels: dict[str | None, str] = {}
@@ -89,10 +91,11 @@ async def answers_by_question(
         QuestionAnswersOut(
             question_title=label,
             answers=[
-                AnswerOut(full_name=names[r.user_id], answer=coercion.as_text(r.answer[field]))
+                AnswerOut(
+                    full_name=names.get(r.user_id, ""), answer=coercion.as_text(r.answer[field])
+                )
                 for r in responses
-                if r.user_id in names
-                and field is not None
+                if field is not None
                 and isinstance(r.answer, dict)
                 and r.answer.get(field) is not None
             ],
@@ -181,7 +184,7 @@ async def review(
     all_questions = await db.forms.form_questions(session, form_id)
     questions = _review_questions(all_questions)
     sources = await _sources(session, form.task_id, responses, all_questions)
-    names = await _names(session, list({r.user_id for r in responses}), username_too=True)
+    names = await _names(session, list({r.user_id for r in responses}))
     return [
         SubmissionOut(
             response_id=r.response_id,

@@ -105,15 +105,24 @@ async def test_answers_by_question_in_question_order_with_names(
     db_session: AsyncSession,  # noqa: F811
     world: World,
 ) -> None:
+    collector = await _user(db_session, "c")
+    await insert(
+        db_session, "processing.hub_collector", user_id=collector, first_name="รวบ", last_name="รวม"
+    )
+    await _response(db_session, world, collector, datetime(2026, 10, 7), {"kg": 4})
+
     rows = await responses.answers_by_question(db_session, _actor(), world.form_id)
 
     by_title = {r.question_title: [(a.full_name, a.answer) for a in r.answers] for r in rows}
     assert [r.question_title for r in rows] == ["ฟาร์ม", "น้ำหนัก", "ข้อความ", "หมายเหตุ"]
-    # A farmer's name first; someone with no farmer or processor profile is
-    # left out; a null answer too; a number reads as Jackson's asText.
-    # (ordered by response id, as Kotlin paged them)
+    # A farmer's name first, then processor, then hub collector, then the
+    # username: everyone's answer shows (Kotlin dropped the last two). A null
+    # answer is left out; a number reads as Jackson's asText. (Ordered by
+    # response id, as Kotlin paged them.)
     assert sorted(by_title["ฟาร์ม"]) == sorted([("สมชาย ใจดี", "f-1"), ("แปร รูป", "f-2")])
-    assert sorted(by_title["น้ำหนัก"]) == sorted([("สมชาย ใจดี", "12.5"), ("แปร รูป", "3")])
+    weights = dict(by_title["น้ำหนัก"])
+    nameless = next(name for name in weights if name.startswith("x-"))  # no profile: username
+    assert weights == {"สมชาย ใจดี": "12.5", "แปร รูป": "3", "รวบ รวม": "4", nameless: "1"}
     assert by_title["หมายเหตุ"] == [("สมชาย ใจดี", "เช้า")]
     assert by_title["ข้อความ"] == []  # a question with no field holds no answers
 

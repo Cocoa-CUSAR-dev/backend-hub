@@ -371,3 +371,18 @@ async def processor_names(session: AsyncSession, user_ids: Sequence[UUID]) -> di
         {"ids": list(user_ids)},
     )
     return {row.user_id: row.name for row in result}
+
+
+async def hub_collector_names(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUID, str]:
+    """user_id -> "first last" of their hub collector profile, for the people
+    who have one with both names."""
+    if not user_ids:
+        return {}
+    result = await session.execute(
+        text(
+            "SELECT user_id, first_name || ' ' || last_name AS name FROM processing.hub_collector"
+            " WHERE user_id = ANY(:ids) AND first_name IS NOT NULL AND last_name IS NOT NULL"
+        ),
+        {"ids": list(user_ids)},
+    )
+    return {row.user_id: row.name for row in result}
