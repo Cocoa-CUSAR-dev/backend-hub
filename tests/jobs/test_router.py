@@ -44,3 +44,30 @@ async def test_correct_secret_runs_the_pause_idle_job(client: AsyncClient) -> No
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
     run_pause.assert_awaited_once()
+
+
+async def test_the_recurrence_job_answers_its_counts_and_500_when_a_round_failed(
+    client: AsyncClient,
+) -> None:
+    from src.tasks.recurrence import RunResult
+
+    auth = {"Authorization": f"Bearer {_SECRET}"}
+    with patch(
+        "src.jobs.router.open_due_rounds", new=AsyncMock(return_value=RunResult(created=2))
+    ) as run:
+        ok = await client.post("/internal/cron/recurrence", headers=auth)
+        by_get = await client.get("/internal/cron/recurrence", headers=auth)
+    with patch("src.jobs.router.open_due_rounds", new=AsyncMock(return_value=RunResult(failed=1))):
+        failed = await client.post("/internal/cron/recurrence", headers=auth)
+
+    assert (ok.status_code, by_get.status_code, failed.status_code) == (200, 200, 500)
+    assert ok.json() == {
+        "created": 2,
+        "alreadyExisted": 0,
+        "skippedClosed": 0,
+        "skippedNoRecipients": 0,
+        "failed": 0,
+    }
+    assert failed.json()["failed"] == 1
+    assert run.await_count == 2
+    assert (await client.post("/internal/cron/recurrence")).status_code == 401

@@ -14,6 +14,7 @@ Other code calls the functions here.
 """
 
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -465,3 +466,135 @@ async def insert_recurrence(
         {"recurrence_id": recurrence_id, "start_date": start_date, "task_id": template_task_id},
     )
     return recurrence_id
+
+
+# ---- the round job of repeating tasks (JOB-03) --------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class RunningRecurrence:
+    """A repeating task, with its first round's (the template's) times."""
+
+    recurrence_id: UUID
+    template_task_id: UUID
+    frequency: str
+    weekdays: list[int]
+    start_date: date
+    until_date: date | None
+    created_by: UUID
+    template_open_at: datetime | None
+    template_close_at: datetime | None
+
+
+async def running_recurrences(session: AsyncSession, window_start: date) -> list[RunningRecurrence]:
+    """Active repeating tasks that haven't ended before `window_start`, oldest first."""
+    result = await session.execute(
+        text(
+            """
+            SELECT r.recurrence_id, r.template_task_id, r.frequency,
+                   COALESCE(r.weekdays, '{}') AS weekdays, r.start_date, r.until_date,
+                   r.created_by, t.open_at AS template_open_at, t.close_at AS template_close_at
+            FROM form.task_recurrence r
+            JOIN form.task t ON t.task_id = r.template_task_id
+            WHERE r.is_active AND (r.until_date IS NULL OR r.until_date >= :window_start)
+            ORDER BY r.created_at, r.recurrence_id
+            """
+        ),
+        {"window_start": window_start},
+    )
+    return [
+        RunningRecurrence(**{**row._mapping, "weekdays": [int(d) for d in row.weekdays]})
+        for row in result
+    ]
+
+
+async def task_recipients(session: AsyncSession, task_id: UUID) -> list[tuple[str, UUID]]:
+    """The ("ROLE", role_id) / ("USER", user_id) rules a task is aimed at, in
+    the order they were added."""
+    result = await session.execute(
+        text(
+            "SELECT recipient_type, role_id, user_id FROM form.task_recipient"
+            " WHERE task_id = :task_id ORDER BY created_at, recipient_id"
+        ),
+        {"task_id": task_id},
+    )
+    return [
+        (row.recipient_type, row.role_id if row.recipient_type == "ROLE" else row.user_id)
+        for row in result
+    ]
+
+
+async def existing_rounds(
+    session: AsyncSession, recurrence_id: UUID, days: Sequence[date]
+) -> set[date]:
+    """Which of these days already have a round."""
+    result = await session.execute(
+        text(
+            "SELECT period_date FROM form.task"
+            " WHERE recurrence_id = :recurrence_id AND period_date = ANY(:days)"
+        ),
+        {"recurrence_id": recurrence_id, "days": list(days)},
+    )
+    return set(result.scalars())
+
+
+async def insert_round(
+    session: AsyncSession,
+    *,
+    template_task_id: UUID,
+    recurrence_id: UUID,
+    period_date: date,
+    open_at: datetime,
+    close_at: datetime,
+) -> UUID | None:
+    """A copy of the template task, every column of it, as the round for
+    `period_date`; None when that round already exists (another run got
+    there first: one round per recurrence and day, a unique index)."""
+    kept = [
+        c
+        for c in await _columns(session, "form", "task")
+        if c not in ("task_id", "open_at", "close_at", "recurrence_id", "period_date")
+    ]
+    names = ", ".join(_quoted(c) for c in kept)
+    result = await session.execute(
+        text(
+            f"INSERT INTO form.task ({names}, open_at, close_at, recurrence_id, period_date)"
+            f" SELECT {names}, :open_at, :close_at, :recurrence_id, :period_date"
+            " FROM form.task WHERE task_id = :template"
+            " ON CONFLICT DO NOTHING RETURNING task_id"
+        ),
+        {
+            "template": template_task_id,
+            "open_at": open_at,
+            "close_at": close_at,
+            "recurrence_id": recurrence_id,
+            "period_date": period_date,
+        },
+    )
+    return result.scalar()
+
+
+_IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
+# (schema, table) -> its column names, for copying a row whole. Only changes
+# by migration plus restart, so it is cached for the life of the process.
+_table_columns: dict[tuple[str, str], list[str]] = {}
+
+
+def _quoted(name: str) -> str:
+    if not _IDENTIFIER.match(name):
+        raise ValueError(f"not a safe SQL identifier: {name!r}")
+    return f'"{name}"'
+
+
+async def _columns(session: AsyncSession, schema: str, table: str) -> list[str]:
+    key = (schema, table)
+    if key not in _table_columns:
+        result = await session.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_schema = :schema AND table_name = :table ORDER BY ordinal_position"
+            ),
+            {"schema": schema, "table": table},
+        )
+        _table_columns[key] = list(result.scalars())
+    return _table_columns[key]
