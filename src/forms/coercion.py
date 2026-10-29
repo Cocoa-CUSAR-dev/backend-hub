@@ -4,7 +4,8 @@
 Two rules keep a correction from quietly corrupting the record: the text
 must be valid for the question's input type (the same answer feeds the
 diary and the handler tables), and the JSON kind already stored is kept
-(some submissions store "5", others 5). OPTION and GEODATA can't be
+(some submissions store "5", others 5); a field never answered gets a real
+number or boolean, as submit stores it (Kotlin stored it as text). OPTION and GEODATA can't be
 corrected here: their value is an id or a structure that a text box can't
 produce. Pure functions.
 """
@@ -44,20 +45,22 @@ def coerce(input_type: str, raw: str, existing: Any) -> Any:
     text = raw.strip()
     if not text:
         raise _refuse("Corrected value must not be blank")
-    stored_number = isinstance(existing, int | float) and not isinstance(existing, bool)
+    # Text stays text; a number or yes/no that was stored as one, or a field
+    # never answered, is stored as a real JSON number / boolean, as submit does.
+    stored_as_text = isinstance(existing, str)
     if kind == "INT":
         if not _WHOLE.fullmatch(text) or not _LONG_MIN <= int(text) <= _LONG_MAX:
             raise _refuse("Value must be a whole number")
-        return int(text) if stored_number else str(int(text))
+        return str(int(text)) if stored_as_text else int(text)
     if kind == "FLOAT":
         if not _DECIMAL.fullmatch(text) or not math.isfinite(float(text)):
             raise _refuse("Value must be a number")
-        return float(text) if stored_number else text
+        return text if stored_as_text else float(text)
     if kind == "BOOLEAN":
         if text.lower() not in ("true", "false"):
             raise _refuse("Value must be true or false")
         flag = text.lower() == "true"
-        return flag if isinstance(existing, bool) else str(flag).lower()
+        return str(flag).lower() if stored_as_text else flag
     if kind == "DATE":
         try:
             if not _DATE.fullmatch(text):

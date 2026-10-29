@@ -14,7 +14,11 @@ from src.forms import coercion
         ("INT", "+42", "5", "42"),  # text stays text
         ("FLOAT", "12.50", 3.5, 12.5),
         ("FLOAT", "12.50", "3.5", "12.50"),  # text keeps what was typed
-        ("FLOAT", ".5", None, ".5"),
+        # A field never answered gets a real number / boolean, as submit stores it.
+        ("FLOAT", ".5", None, 0.5),
+        ("INT", "7", None, 7),
+        ("BOOLEAN", "true", None, True),
+        ("FLOAT", "2.5", 3, 2.5),  # an int stored: a number again
         ("BOOLEAN", "TRUE", False, True),
         ("BOOLEAN", "false", "true", "false"),
         ("DATE", "2026-10-07", "2026-10-06", "2026-10-07"),
