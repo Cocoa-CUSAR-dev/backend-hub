@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     # A farmer is waiting in LINE for the reply, so a slow provider is treated
     # the same as an unavailable one (LLMUnavailable) rather than waited on.
     LLM_TIMEOUT_SECONDS: float = 6.0
+    # The daily diary's polish is pushed to LINE after the farmer's reply, so it
+    # may take longer; past this (with two retries) the plain template is used.
+    DIARY_LLM_TIMEOUT_SECONDS: float = 20.0
     # US2-11 kill switch: False makes intent.classify return UNKNOWN without
     # calling the provider, reverting free text to the fixed hint message.
     INTENT_ROUTING_ENABLED: bool = True

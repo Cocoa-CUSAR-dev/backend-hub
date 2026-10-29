@@ -247,6 +247,60 @@ async def test_task_info_has_the_type_and_dates(db_session: AsyncSession) -> Non
     assert await db.tasks.task_info(db_session, uuid4()) is None
 
 
+# --- history and diary (ME-03..05) -------------------------------------------
+
+
+async def test_submission_days_are_bangkok_days_newest_first_paged(
+    db_session: AsyncSession,
+) -> None:
+    user = await _user(db_session)
+    task = await _task(db_session, "probe", datetime(2026, 10, 1))
+    # UTC times: 17:30 UTC on the 4th is already the 5th in Bangkok (+7).
+    for moment in (
+        datetime(2026, 10, 4, 17, 30),
+        datetime(2026, 10, 5, 2, 0),
+        datetime(2026, 10, 4, 16, 59),
+        datetime(2026, 10, 12, 3, 0),
+    ):
+        await _answer(db_session, task, user, moment)
+
+    days = await db.tasks.submission_days(db_session, user, limit=50, offset=0)
+    first = await db.tasks.submission_days(db_session, user, limit=1, offset=0)
+    second = await db.tasks.submission_days(db_session, user, limit=1, offset=1)
+
+    assert days == [date(2026, 10, 12), date(2026, 10, 5), date(2026, 10, 4)]
+    assert (first, second) == ([date(2026, 10, 12)], [date(2026, 10, 5)])
+
+
+async def test_answers_between_are_mine_and_oldest_first(db_session: AsyncSession) -> None:
+    me, other = await _user(db_session), await _user(db_session)
+    task = await _task(db_session, "probe", datetime(2026, 10, 1))
+    await _answer(db_session, task, me, datetime(2026, 10, 5, 3), n=2)
+    await _answer(db_session, task, me, datetime(2026, 10, 5, 1), n=1)
+    await _answer(db_session, task, other, datetime(2026, 10, 5, 2), n=9)
+    await _answer(db_session, task, me, datetime(2026, 10, 6, 1), n=3)
+
+    rows = await db.tasks.answers_between(
+        db_session, me, datetime(2026, 10, 5), datetime(2026, 10, 6)
+    )
+
+    assert [r.answer for r in rows] == [{"n": 1}, {"n": 2}]
+
+
+async def test_diary_entry_is_written_once_per_day_and_replaced(db_session: AsyncSession) -> None:
+    user = await _user(db_session)
+    day = date(2026, 10, 5)
+    assert await db.tasks.diary_entry(db_session, user, day) is None
+
+    await db.tasks.save_diary_entry(db_session, user, day, "เช้า", datetime(2026, 10, 5, 1))
+    await db.tasks.save_diary_entry(db_session, user, day, "เย็น", datetime(2026, 10, 5, 9))
+
+    entry = await db.tasks.diary_entry(db_session, user, day)
+    assert entry is not None
+    assert (entry.diary_text, entry.updated_at) == ("เย็น", datetime(2026, 10, 5, 9))
+    assert await db.tasks.diary_entry(db_session, user, date(2026, 10, 6)) is None
+
+
 async def test_response_counts_by_form(db_session: AsyncSession) -> None:
     user = await _user(db_session)
     task = await _task(db_session, "probe", datetime(2026, 10, 1))

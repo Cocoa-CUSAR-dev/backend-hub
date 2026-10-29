@@ -344,7 +344,9 @@ ROUTES: list[Route] = [
         {"method": "GET", "path": "/api/v1/me/history/{date}"},
         ANSWER_SEEDS,
         [
-            C("one day", "farmer_1", {"date": "2026-10-05"}),
+            # Kotlin listed a day's fields in its HashMap's order; the hub lists
+            # them in the order the answers were sent, then by question.
+            C("one day", "farmer_1", {"date": "2026-10-05"}, hub={"unordered": True}),
             C("an empty day", "farmer_1", {"date": "2026-10-20"}),
             C("only my own answers", "farmer_2", {"date": "2026-10-05"}),
             forbidden("researcher", params={"date": "2026-10-05"}),

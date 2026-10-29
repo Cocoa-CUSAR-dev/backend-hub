@@ -15,7 +15,7 @@ from src.chat.ui.schemas import QuickReplyOption
 from src.config import settings
 from src.database import Session, async_session_maker
 from src.db.models import Conversation
-from src.diary.client import generate_diary
+from src.diary import service as diary_service
 from src.exceptions import ConversationNotFound, Forbidden, UpstreamServiceError
 from src.forms.client import get_form
 from src.line import parent_picker, temp_task_picker
@@ -48,6 +48,14 @@ router = APIRouter(prefix="/line", tags=["line"])
 logger = logging.getLogger(__name__)
 
 _QUICK_REPLY_LIMIT = 13  # LINE's own cap on Quick Reply items per message
+
+
+async def generate_diary(user_id: str) -> str:
+    """Today's diary for this farmer, written in-process as the farmer
+    (docs-and-plan#277); Kotlin's POST /service/diaries/generate is gone."""
+    async with async_session_maker() as session:
+        actor = await load_actor(session, UUID(user_id), "line")
+        return await diary_service.generate_for(session, actor)
 
 
 async def _generate_and_push_diary(user_id: str, line_user_id: str) -> None:

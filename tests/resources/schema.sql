@@ -711,6 +711,41 @@ CREATE TABLE collection.harvest_collection (
     CONSTRAINT pk_harvest_collection PRIMARY KEY (collection_id)
 );
 
+-- docs-and-plan#277 (the farmer's daily diary): as in the database repo's V22.
+CREATE TABLE form.diary_entry (
+    diary_entry_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    entry_date date NOT NULL,
+    diary_text text NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_diary_entry PRIMARY KEY (diary_entry_id),
+    CONSTRAINT uq_diary_entry_user_date UNIQUE (user_id, entry_date),
+    CONSTRAINT fk_diary_entry_user FOREIGN KEY (user_id) REFERENCES auth.user_account (user_id)
+);
+
+-- The contract seed's answers.sql writes it, and the researcher's corrections
+-- (docs-and-plan#275) append to it: as in the database repo's V29.
+CREATE TABLE form.response_correction_log (
+    correction_log_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    response_id uuid NOT NULL,
+    field_name character varying NOT NULL,
+    old_value text,
+    new_value text,
+    corrected_by uuid NOT NULL,
+    reason text,
+    corrected_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pk_response_correction_log PRIMARY KEY (correction_log_id),
+    CONSTRAINT fk_response_correction_log_response FOREIGN KEY (response_id) REFERENCES form.response (response_id),
+    CONSTRAINT fk_response_correction_log_user FOREIGN KEY (corrected_by) REFERENCES auth.user_account (user_id)
+);
+-- ...and chat.conversation's timestamps, which the review table uses to tell
+-- which conversation sent an answer (V1 baseline; the ORM model maps neither).
+ALTER TABLE chat.conversation
+    ADD COLUMN IF NOT EXISTS created_at timestamp without time zone DEFAULT now() NOT NULL,
+    ADD COLUMN IF NOT EXISTS updated_at timestamp without time zone DEFAULT now() NOT NULL;
+
+
 -- docs-and-plan#272 (the form builder's handler pickers and the Data Map):
 -- the registry's display columns from the database repo's V30, with defaults
 -- so the bare rows inserted above, and the tests' own, still load.

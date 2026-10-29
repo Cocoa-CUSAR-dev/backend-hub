@@ -1,6 +1,5 @@
 # Legacy code written before CONVENTIONS.md. This list may only shrink.
 # Fix an item -> run `python scripts/check_conventions.py --prune`.
 # Never add lines by hand: new code must follow the conventions.
-lib-outside-client|src/diary/client.py|imports httpx
 lib-outside-client|src/forms/client.py|imports httpx
 lib-outside-client|src/tasks/client.py|imports httpx

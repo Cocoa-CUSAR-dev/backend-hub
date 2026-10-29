@@ -352,6 +352,98 @@ async def update_response(
     return updated.first() is not None
 
 
+# ---- the farmer's own history and daily diary (ME-03, ME-04, ME-05) ----------------
+
+# A farmer's day is their calendar day in Bangkok; submitted_at is stored in UTC.
+_BANGKOK_DAY = "((submitted_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Bangkok')::date"
+
+
+async def submission_days(
+    session: AsyncSession, user_id: UUID, *, limit: int, offset: int
+) -> list[date]:
+    """The Bangkok days this user submitted anything on, newest first. A page
+    counts days, not responses: many answers on one day are one row."""
+    result = await session.execute(
+        text(
+            f"""
+            SELECT DISTINCT {_BANGKOK_DAY} AS day
+            FROM form.response
+            WHERE user_id = :user_id AND submitted_at IS NOT NULL
+            ORDER BY day DESC
+            LIMIT :limit OFFSET :offset
+            """
+        ),
+        {"user_id": user_id, "limit": limit, "offset": offset},
+    )
+    return list(result.scalars())
+
+
+@dataclass(frozen=True, slots=True)
+class DayAnswer:
+    """One response submitted on a day, with the form it was filled in."""
+
+    task_form_id: UUID | None
+    answer: dict[str, Any] | None
+
+
+async def answers_between(
+    session: AsyncSession, user_id: UUID, start: datetime, end: datetime
+) -> list[DayAnswer]:
+    """This user's responses submitted at or after `start` and before `end`
+    (both UTC), oldest first: the order the farmer did things in."""
+    result = await session.execute(
+        text(
+            """
+            SELECT task_form_id, answer
+            FROM form.response
+            WHERE user_id = :user_id AND submitted_at >= :start AND submitted_at < :end
+            ORDER BY submitted_at, response_id
+            """
+        ),
+        {"user_id": user_id, "start": start, "end": end},
+    )
+    return [DayAnswer(task_form_id=row.task_form_id, answer=row.answer) for row in result]
+
+
+@dataclass(frozen=True, slots=True)
+class DiaryEntry:
+    user_id: UUID
+    entry_date: date
+    diary_text: str
+    updated_at: datetime
+
+
+async def diary_entry(session: AsyncSession, user_id: UUID, day: date) -> DiaryEntry | None:
+    result = await session.execute(
+        text(
+            "SELECT user_id, entry_date, diary_text, updated_at FROM form.diary_entry"
+            " WHERE user_id = :user_id AND entry_date = :day"
+        ),
+        {"user_id": user_id, "day": day},
+    )
+    row = result.first()
+    return DiaryEntry(**row._mapping) if row else None
+
+
+async def save_diary_entry(
+    session: AsyncSession, user_id: UUID, day: date, diary_text: str, now: datetime
+) -> None:
+    """Write the day's diary, replacing the one written earlier that day: it is
+    always regenerated from every answer of the day, not appended to."""
+    await session.execute(
+        text(
+            """
+            INSERT INTO form.diary_entry
+                (diary_entry_id, user_id, entry_date, diary_text, created_at, updated_at)
+            VALUES (gen_random_uuid(), :user_id, :day, :diary_text, :now, :now)
+            ON CONFLICT (user_id, entry_date)
+            DO UPDATE SET diary_text = EXCLUDED.diary_text, updated_at = EXCLUDED.updated_at
+            """
+        ),
+        {"user_id": user_id, "day": day, "diary_text": diary_text, "now": now},
+    )
+
+
 # ---- a new task from the form builder (FORM-03) --------------------------------------
 
 # Two bind parameters per row; Postgres allows 32767 per statement.
