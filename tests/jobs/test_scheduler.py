@@ -25,6 +25,16 @@ def test_configure_jobs_registers_the_daily_pause_sweep_at_22_00_bangkok_time() 
     assert str(job.trigger.timezone) == "Asia/Bangkok"
 
 
+def test_configure_jobs_registers_the_daily_round_of_repeating_tasks_just_after_midnight() -> None:
+    configure_jobs()
+
+    job = scheduler.get_job("open_due_rounds")
+    assert job is not None
+    assert isinstance(job.trigger, CronTrigger)
+    assert str(job.trigger.timezone) == "Asia/Bangkok"
+    assert {f.name: str(f) for f in job.trigger.fields}["hour"] == "0"
+
+
 async def test_configure_jobs_is_idempotent_once_the_scheduler_is_running() -> None:
     # replace_existing=True -- matches main.py's lifespan, which always calls
     # configure_jobs() then scheduler.start() in that order. Verified only
@@ -37,7 +47,7 @@ async def test_configure_jobs_is_idempotent_once_the_scheduler_is_running() -> N
     scheduler.start()
     try:
         configure_jobs()
-        assert len(scheduler.get_jobs()) == 2
+        assert len(scheduler.get_jobs()) == 3
     finally:
         scheduler.shutdown(wait=False)
 

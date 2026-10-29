@@ -299,3 +299,19 @@ async def test_diary_entry_is_written_once_per_day_and_replaced(db_session: Asyn
     assert entry is not None
     assert (entry.diary_text, entry.updated_at) == ("เย็น", datetime(2026, 10, 5, 9))
     assert await db.tasks.diary_entry(db_session, user, date(2026, 10, 6)) is None
+
+
+async def test_response_counts_by_form(db_session: AsyncSession) -> None:
+    user = await _user(db_session)
+    task = await _task(db_session, "probe", datetime(2026, 10, 1))
+    form_a, form_b = uuid4(), uuid4()
+    for form in (form_a, form_a, form_b, None):
+        await insert(
+            db_session, "form.response", task_log_id=task, user_id=user,
+            task_form_id=form, answer="{}", status="SUBMITTED",
+        )  # fmt: skip
+
+    counts = await db.tasks.response_counts_by_form(db_session)
+
+    assert (counts[form_a], counts[form_b]) == (2, 1)
+    assert None not in counts

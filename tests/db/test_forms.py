@@ -245,6 +245,122 @@ async def test_registry_keeps_valid_dependencies_and_drops_broken_ones(
     assert "missing table" in caplog.text and "invalid identifier" in caplog.text
 
 
+async def test_registry_lists_valid_active_handlers_in_sort_order(
+    db_session: AsyncSession,
+) -> None:
+    await db_session.execute(text("CREATE TABLE agriculture.probe_a (probe_id uuid)"))
+    await db_session.execute(text("CREATE TABLE agriculture.probe_b (probe_id uuid)"))
+    await db_session.execute(
+        text(
+            "INSERT INTO form.handler_registry"
+            " (handler, schema_name, table_name, is_active, sort_order, label_th,"
+            "  extra_required_fields)"
+            " VALUES ('probe_z', 'agriculture', 'probe_a', true, -2, 'ซี', '{farm_id}'),"
+            "        ('probe_y', 'agriculture', 'probe_b', true, -1, 'วาย', '{}'),"
+            "        ('probe_x', 'agriculture', 'probe_gone', true, -3, 'เอ็กซ์', '{}')"
+        )
+    )
+
+    reg = await registry.current(db_session)
+
+    names = [h.handler for h in reg.handlers]
+    assert names[:2] == ["probe_z", "probe_y"]  # sort_order first, then the name
+    assert "probe_x" not in names  # its table doesn't exist
+    z = reg.handlers[0]
+    assert (z.label_th, z.extra_required_fields) == ("ซี", ("farm_id",))
+
+
+async def test_registry_lists_every_valid_dependency_for_the_data_map(
+    db_session: AsyncSession,
+) -> None:
+    for parent in ("farm_id", "hub_id"):  # two rows for one child: the map draws both
+        await insert(
+            db_session, "form.field_dependency", child_field="plot_id", parent_field=parent,
+            link_table="agriculture.plot", link_column=parent, label_th="แปลง",
+        )  # fmt: skip
+
+    reg = await registry.current(db_session)
+
+    assert [(d.child_field, d.parent_field) for d in reg.dependency_list] == [
+        ("plot_id", "farm_id"),
+        ("plot_id", "hub_id"),
+    ]
+    assert reg.dependencies["plot_id"].parent_field == "farm_id"  # the first wins here
+
+
+async def test_table_columns_in_order_with_not_null_and_foreign_keys(
+    db_session: AsyncSession,
+) -> None:
+    await db_session.execute(
+        text("CREATE TABLE agriculture.probe_parent (parent_id uuid PRIMARY KEY)")
+    )
+    await db_session.execute(
+        text(
+            "CREATE TABLE agriculture.probe_cols ("
+            " probe_id uuid DEFAULT gen_random_uuid() PRIMARY KEY,"
+            " parent_id uuid NOT NULL REFERENCES agriculture.probe_parent (parent_id),"
+            " amount numeric, picked_at timestamp, note varchar(20) NOT NULL DEFAULT '',"
+            " visits integer NOT NULL, is_dry boolean)"
+        )
+    )
+
+    cols = await db.forms.table_columns(db_session, "agriculture", "probe_cols")
+
+    assert [c.name for c in cols] == [
+        "probe_id", "parent_id", "amount", "picked_at", "note", "visits", "is_dry",
+    ]  # fmt: skip
+    by_name = {c.name: c for c in cols}
+    assert by_name["parent_id"].references == "agriculture.probe_parent"
+    assert by_name["amount"].references is None
+    assert [c.name for c in cols if c.not_null_without_default] == ["parent_id", "visits"]
+    assert (by_name["note"].data_type, by_name["note"].udt_name) == ("character varying", "varchar")
+    assert (by_name["visits"].udt_name, by_name["is_dry"].udt_name) == ("int4", "bool")
+    assert by_name["picked_at"].data_type == "timestamp without time zone"
+    assert await db.forms.table_columns(db_session, "agriculture", "no_such_table") == []
+
+
+async def test_handler_forms_field_usage_and_labels(db_session: AsyncSession) -> None:
+    task = await insert(db_session, "form.task", title="probe")
+    form = await insert(
+        db_session, "form.task_form", task_id=task, handler="probe_handler", version=1
+    )
+    section = await insert(db_session, "form.section", form_id=form, title="s", sort_order=0)
+    off = await insert(
+        db_session, "form.section", form_id=form, title="off", sort_order=1, is_active=False
+    )
+    for sec, field, label in (
+        (section, "probe_field", " สวนของฉัน "),
+        (section, "probe_field", "สวน"),
+        (section, "probe_other", "อื่น"),
+        (off, "probe_hidden", "ซ่อน"),
+    ):
+        await insert(
+            db_session, "form.question", section_id=sec, label=label, field_name=field,
+            input_type="VARCHAR", sort_order=0,
+        )  # fmt: skip
+    await insert(
+        db_session, "form.question", section_id=section, label="สวน", field_name="probe_tie",
+        input_type="VARCHAR", sort_order=0,
+    )  # fmt: skip
+    await insert(
+        db_session, "form.question", section_id=section, label="ก่อน", field_name="probe_tie",
+        input_type="VARCHAR", sort_order=0,
+    )  # fmt: skip
+
+    forms = [f for f in await db.forms.handler_forms(db_session) if f.handler == "probe_handler"]
+    usage = (await db.forms.handler_field_usage(db_session))["probe_handler"]
+    labels = await db.forms.field_labels(db_session)
+
+    assert [(f.form_id, f.task_id) for f in forms] == [(form, task)]
+    # The inactive section's question isn't asked, so it isn't counted.
+    assert usage == {"probe_field": 1, "probe_other": 1, "probe_tie": 1}
+    # One use each: trimmed, and a tie goes to the first label alphabetically.
+    assert labels["probe_field"] == min("สวนของฉัน", "สวน")
+    assert labels["probe_tie"] == "ก่อน"
+    # Labels only skip inactive questions, as Kotlin's did, not inactive sections.
+    assert labels["probe_hidden"] == "ซ่อน"
+
+
 async def test_registry_is_cached(db_session: AsyncSession) -> None:
     assert await registry.dependencies(db_session) == {}
     await insert(
