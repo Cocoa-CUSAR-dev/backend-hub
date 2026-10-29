@@ -324,6 +324,11 @@
       },
       "response": {
         "error": "ตาราง collection.harvest บังคับฟิลด์ hub_id, farm_id แต่ฟอร์มยังไม่มีคำถามสำหรับฟิลด์นี้"
+      },
+      "hub": {
+        "requires": [
+          "registry"
+        ]
       }
     },
     {

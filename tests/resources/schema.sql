@@ -710,3 +710,28 @@ CREATE TABLE collection.harvest_collection (
     batch_id uuid NOT NULL,
     CONSTRAINT pk_harvest_collection PRIMARY KEY (collection_id)
 );
+
+-- docs-and-plan#272 (the form builder's handler pickers and the Data Map):
+-- the registry's display columns from the database repo's V30, with defaults
+-- so the bare rows inserted above, and the tests' own, still load.
+ALTER TABLE form.handler_registry
+    ADD COLUMN IF NOT EXISTS label_th character varying NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS description_th character varying NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS category character varying NOT NULL DEFAULT 'garden',
+    ADD COLUMN IF NOT EXISTS frequency character varying NOT NULL DEFAULT 'on_demand',
+    ADD COLUMN IF NOT EXISTS extra_required_fields character varying[] NOT NULL DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0;
+
+-- docs-and-plan#276 (the round job of repeating tasks): who may see each
+-- question, which a new round copies, and one round per recurrence and day,
+-- as in the database repo's V1 baseline and V31.
+CREATE TABLE form.question_visibility (
+    visibility_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    question_id uuid NOT NULL,
+    role character varying,
+    province_id uuid,
+    CONSTRAINT pk_question_visibility PRIMARY KEY (visibility_id),
+    CONSTRAINT fk_question_visibility_question FOREIGN KEY (question_id) REFERENCES form.question (question_id)
+);
+CREATE UNIQUE INDEX uq_task_recurrence_period ON form.task (recurrence_id, period_date)
+    WHERE recurrence_id IS NOT NULL;

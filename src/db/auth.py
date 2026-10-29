@@ -272,6 +272,27 @@ async def usernames(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUI
     return {row.user_id: row.username for row in result}
 
 
+async def existing_role_ids(session: AsyncSession, role_ids: Sequence[UUID]) -> set[UUID]:
+    """Which of these role ids exist."""
+    if not role_ids:
+        return set()
+    result = await session.execute(
+        text("SELECT role_id FROM auth.role WHERE role_id = ANY(:ids)"), {"ids": list(role_ids)}
+    )
+    return set(result.scalars())
+
+
+async def existing_user_ids(session: AsyncSession, user_ids: Sequence[UUID]) -> set[UUID]:
+    """Which of these user ids exist."""
+    if not user_ids:
+        return set()
+    result = await session.execute(
+        text("SELECT user_id FROM auth.user_account WHERE user_id = ANY(:ids)"),
+        {"ids": list(user_ids)},
+    )
+    return set(result.scalars())
+
+
 async def user_ids_with_any_role(session: AsyncSession, role_ids: Sequence[UUID]) -> set[UUID]:
     """Who holds at least one of these roles."""
     if not role_ids:

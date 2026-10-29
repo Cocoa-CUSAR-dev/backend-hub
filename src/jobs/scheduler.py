@@ -1,7 +1,8 @@
 """One AsyncIOScheduler instance for every job this service needs
 (ADR 0003/0006): the reminder push check, the LLM-retry cron (src/llm's
-late-extraction pass, ADR 0004), and the daily conversation auto-pause
-sweep (US2-3). Started/stopped from main.py's lifespan.
+late-extraction pass, ADR 0004), the daily conversation auto-pause
+sweep (US2-3), and the daily round of repeating tasks (docs-and-plan#276).
+Started/stopped from main.py's lifespan.
 """
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -9,6 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from src.chat.jobs import pause_idle_conversations
 from src.reminders.jobs import check_and_send_reminders
+from src.tasks.recurrence import open_due_rounds
 
 scheduler = AsyncIOScheduler()
 
@@ -19,6 +21,12 @@ def configure_jobs() -> None:
         trigger="interval",
         minutes=2,
         id="check_and_send_reminders",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        open_due_rounds,
+        trigger=CronTrigger(hour=0, minute=5, timezone="Asia/Bangkok"),
+        id="open_due_rounds",
         replace_existing=True,
     )
     scheduler.add_job(

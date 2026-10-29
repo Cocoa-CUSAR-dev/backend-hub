@@ -472,6 +472,9 @@ ROUTES: list[Route] = [
                         | {"questions": [harvest_question("not_a_column", "ผิด", 0)]}
                     ]
                 },
+                # Refused for hub_id and farm_id, which are NOT NULL only in
+                # the migrations' collection.harvest.
+                hub={"requires": ["registry"]},
             ),
             C("unknown handler", "researcher", body=NEW_FORM | {"handler": "no_such_handler"}),
             forbidden(body=NEW_FORM),
@@ -521,7 +524,7 @@ ROUTES: list[Route] = [
         "FORM-06",
         "GET",
         f"{F}/handlers",
-        {"method": "GET", "path": f"{F}/handlers"},
+        {"method": "GET", "path": f"{F}/handlers", "requires": ["registry"]},
         FORM_SEEDS,
         [
             C("researcher", "researcher"),
@@ -535,7 +538,7 @@ ROUTES: list[Route] = [
         "FORM-07",
         "GET",
         f"{F}/handlers/{{handler}}/fields",
-        {"method": "GET", "path": f"{F}/handlers/{{handler}}/fields"},
+        {"method": "GET", "path": f"{F}/handlers/{{handler}}/fields", "requires": ["registry"]},
         FORM_SEEDS,
         [
             C("harvest", "researcher", {"handler": "harvest"}),
@@ -549,7 +552,7 @@ ROUTES: list[Route] = [
         "FORM-CATALOG",
         "GET",
         f"{F}/handlers/catalog",
-        {"method": "GET", "path": f"{F}/handlers/catalog"},
+        {"method": "GET", "path": f"{F}/handlers/catalog", "requires": ["registry"]},
         ANSWER_SEEDS,
         [C("researcher", "researcher"), forbidden(), anon()],
         note="Not on the Before sheet (added to Kotlin after 2026-10-14).",
