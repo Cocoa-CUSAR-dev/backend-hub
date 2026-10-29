@@ -120,17 +120,36 @@ async def seeded() -> AsyncGenerator[AsyncSession, None]:
             await outer.rollback()
 
 
+# What a case can need from the database beyond its seed, and how to tell the
+# database has it. tests/resources/schema.sql has neither: these cases only
+# replay against a database built from the migrations.
+REQUIREMENTS = {
+    # The drawn-area analytics (K-36..K-41).
+    "postgis": "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis')",
+    # The handler pickers and the Data Map (K-15, K-16, K-CAT) answer with the
+    # handler tables' own columns, so every active handler's table must be
+    # there with its real columns, as recorded.
+    "registry": (
+        "SELECT bool_and(to_regclass(schema_name || '.' || table_name) IS NOT NULL)"
+        " AND count(*) > 10 FROM form.handler_registry WHERE is_active"
+    ),
+}
+
+
+async def _missing_requirement(session: AsyncSession, fx: Fixture) -> str | None:
+    assert fx.hub is not None
+    for need in fx.hub.get("requires", []):
+        if not (await session.execute(text(REQUIREMENTS[need]))).scalar():
+            return need
+    return None
+
+
 @pytest.mark.parametrize(("fx", "case"), _cases())
 async def test_hub_answers_like_kotlin(fx: Fixture, case: Case, seeded: AsyncSession) -> None:
     assert fx.hub is not None
     session = seeded
-    if (
-        "postgis" in fx.hub.get("requires", [])
-        and not (
-            await session.execute(text("SELECT 1 FROM pg_extension WHERE extname = 'postgis'"))
-        ).scalar()
-    ):
-        pytest.skip(f"{fx.kid} needs PostGIS, which tests/resources/schema.sql doesn't have")
+    if need := await _missing_requirement(session, fx):
+        pytest.skip(f"{fx.kid} needs {need}, which tests/resources/schema.sql doesn't have")
     missing = [
         t
         for t in seed_tables(fx.seeds)

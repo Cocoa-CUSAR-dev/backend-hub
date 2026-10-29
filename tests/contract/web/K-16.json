@@ -8,7 +8,10 @@
   },
   "hub": {
     "method": "GET",
-    "path": "/api/v1/forms/handlers/{handler}/fields"
+    "path": "/api/v1/forms/handlers/{handler}/fields",
+    "requires": [
+      "registry"
+    ]
   },
   "seeds": [
     "base",

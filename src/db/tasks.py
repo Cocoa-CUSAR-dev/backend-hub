@@ -154,6 +154,18 @@ async def task_briefs(session: AsyncSession, task_ids: list[UUID]) -> dict[UUID,
     return {row.task_id: TaskBrief(title=row.title, open_at=row.open_at) for row in rows}
 
 
+async def response_counts_by_form(session: AsyncSession) -> dict[UUID, int]:
+    """form_id -> how many answers were saved with it. Every response carries
+    task_form_id (database V25 backfilled the old ones)."""
+    result = await session.execute(
+        text(
+            "SELECT task_form_id, count(*) AS n FROM form.response"
+            " WHERE task_form_id IS NOT NULL GROUP BY task_form_id"
+        )
+    )
+    return {row.task_form_id: row.n for row in result}
+
+
 async def task_visible_to(session: AsyncSession, user_id: UUID, task_id: UUID) -> bool:
     """Whether the task exists and this user may see it (same rule as the
     task list)."""

@@ -11,8 +11,8 @@ from httpx import AsyncClient
 
 from src.auth import tokens
 from src.exceptions import NotFound
-from src.forms import service
-from src.forms.schemas import FormOut, FormSummaryOut, FormTaskOut
+from src.forms import handlers, service
+from src.forms.schemas import CatalogOut, FormOut, FormSummaryOut, FormTaskOut
 
 USER_ID = uuid4()
 
@@ -121,3 +121,33 @@ async def test_get_not_found_is_404(client: AsyncClient, fake: dict[str, AsyncMo
 
     assert r.status_code == 404
     assert fake["get"].await_args.kwargs == {"include_stats": True}
+
+
+@pytest.mark.parametrize(
+    ("path", "name", "args"),
+    [
+        ("/api/v1/forms/handlers", "handler_names", ()),
+        ("/api/v1/forms/handlers/catalog", "catalog", ()),
+        ("/api/v1/forms/handlers/harvest/fields", "handler_fields", ("harvest",)),
+    ],
+)
+async def test_handler_routes_are_not_read_as_a_form_id(
+    client: AsyncClient,
+    fake: dict[str, AsyncMock],
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    name: str,
+    args: tuple[str, ...],
+) -> None:
+    called = AsyncMock(return_value=[] if name != "catalog" else _empty_catalog())
+    monkeypatch.setattr(handlers, name, called)
+
+    response = await client.get(path, headers=_auth())
+
+    assert response.status_code == 200
+    assert called.await_args.args[2:] == args
+    fake["get"].assert_not_awaited()
+
+
+def _empty_catalog() -> CatalogOut:
+    return CatalogOut(handlers=[], dependencies=[], registration_tables=[], field_labels={})

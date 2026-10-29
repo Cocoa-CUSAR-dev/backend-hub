@@ -133,3 +133,64 @@ class FormTaskOut(_CamelOut):
     task_type: str | None
     open_at: datetime | None
     close_at: datetime | None
+
+
+# ---- the form builder's handler pickers and the Data Map (FORM-06, FORM-07) ----------
+# Same keys as web-backend's Handler.Field and Handler.Catalog.
+
+
+class HandlerFieldOut(_CamelOut):
+    """One column of a handler's table, as the form builder sees it."""
+
+    name: str
+    data_type: str
+    required: bool  # the INSERT fails without it
+    references: str | None  # "schema.table" of its foreign key
+    depends_on: str | None  # the field its choices are filtered by
+    allowed_input_types: list[str]  # first one is the builder's default
+
+
+class CatalogFieldOut(HandlerFieldOut):
+    used_by_forms: int  # how many of the handler's forms ask it
+
+
+class HandlerFormsOut(_CamelOut):
+    count: int
+    latest_title: str | None
+    latest_open_at: datetime | None
+
+
+class CatalogEntryOut(_CamelOut):
+    handler: str
+    label_th: str
+    description_th: str
+    category: str
+    frequency: str
+    table: str
+    parent_handler: str | None
+    parent_field: str | None
+    fields: list[CatalogFieldOut]
+    forms: HandlerFormsOut
+    response_count: int
+
+
+class DependencyOut(_CamelOut):
+    child_field: str
+    parent_field: str
+    link_table: str
+    link_column: str
+    label_th: str
+
+
+class RegistrationTableOut(_CamelOut):
+    table: str
+    label_th: str
+
+
+class CatalogOut(_CamelOut):
+    """Everything the Data Map page shows."""
+
+    handlers: list[CatalogEntryOut]
+    dependencies: list[DependencyOut]
+    registration_tables: list[RegistrationTableOut]
+    field_labels: dict[str, str]

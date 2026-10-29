@@ -75,6 +75,10 @@ for the routes where several Kotlin routes became one with the mode in the path 
 `"requires": ["postgis"]` skips the case when the database has no PostGIS, as
 `tests/resources/schema.sql` doesn't: the drawn-area analytics (K-36..K-41) only replay
 against a database built from the migrations.
+`"requires": ["registry"]` skips the case unless every active handler's table is there, as
+`tests/resources/schema.sql` doesn't have them: the handler pickers and the Data Map
+(K-15, K-16, K-CAT) answer with those tables' own columns, so they only replay against a
+database built from the migrations.
 
 ## Kotlin bugs found while recording
 
