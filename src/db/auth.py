@@ -261,6 +261,17 @@ async def line_linked_user_ids(session: AsyncSession) -> list[UUID]:
     return list(result.scalars())
 
 
+async def usernames(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUID, str]:
+    """user_id -> username."""
+    if not user_ids:
+        return {}
+    result = await session.execute(
+        text("SELECT user_id, username FROM auth.user_account WHERE user_id = ANY(:ids)"),
+        {"ids": list(user_ids)},
+    )
+    return {row.user_id: row.username for row in result}
+
+
 async def existing_role_ids(session: AsyncSession, role_ids: Sequence[UUID]) -> set[UUID]:
     """Which of these role ids exist."""
     if not role_ids:
@@ -324,3 +335,66 @@ async def claim_sso_token(session: AsyncSession, jti: UUID, expires_at: datetime
         )
     ).first()
     return inserted is not None
+
+
+# ---- the reminder recipient pickers (FORM-10, FORM-11) -------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class RoleOption:
+    role_id: UUID
+    role_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class UserOption:
+    user_id: UUID
+    username: str
+    roles: list[str]
+
+
+async def role_options(session: AsyncSession) -> list[RoleOption]:
+    """Every role, by name."""
+    result = await session.execute(
+        text("SELECT role_id, role_name FROM auth.role ORDER BY role_name")
+    )
+    return [RoleOption(**row._mapping) for row in result]
+
+
+async def role_names(session: AsyncSession, role_ids: Sequence[UUID]) -> dict[UUID, str]:
+    if not role_ids:
+        return {}
+    result = await session.execute(
+        text("SELECT role_id, role_name FROM auth.role WHERE role_id = ANY(:ids)"),
+        {"ids": list(role_ids)},
+    )
+    return {row.role_id: row.role_name for row in result}
+
+
+def _like_escaped(text_: str) -> str:
+    return text_.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+
+
+async def user_options(session: AsyncSession, query: str, *, limit: int) -> list[UserOption]:
+    """People whose username contains `query` (any case; everyone when it is
+    blank), by username, each with their role names."""
+    result = await session.execute(
+        text(
+            """
+            SELECT u.user_id, u.username,
+                   array_remove(array_agg(DISTINCT r.role_name), NULL) AS roles
+            FROM auth.user_account u
+            LEFT JOIN auth.user_role ur ON ur.user_id = u.user_id
+            LEFT JOIN auth.role r ON r.role_id = ur.role_id
+            WHERE :query = '' OR lower(u.username) LIKE '%' || lower(:pattern) || '%' ESCAPE '!'
+            GROUP BY u.user_id, u.username
+            ORDER BY u.username
+            LIMIT :limit
+            """
+        ),
+        {"query": query.strip(), "pattern": _like_escaped(query.strip()), "limit": limit},
+    )
+    return [
+        UserOption(user_id=row.user_id, username=row.username, roles=list(row.roles))
+        for row in result
+    ]

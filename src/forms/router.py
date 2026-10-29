@@ -6,7 +6,8 @@ Replaces web-backend's GET /forms, /forms/{formId}, /tasks and /tasks/{taskId}
 builder's handler pickers and the Data Map catalog are under /handlers
 (FORM-06, FORM-07, docs-and-plan#272); creating, rewriting and switching a
 form are POST /forms, PUT /forms/{id} and PUT /forms/{id}/edit (FORM-03..05,
-docs-and-plan#273).
+docs-and-plan#273). A form's daily reminder and the recipient pickers are
+/{id}/reminder and /reminder-recipients (FORM-08..11, docs-and-plan#274).
 """
 
 from typing import Annotated, Literal
@@ -26,6 +27,8 @@ from src.forms.schemas import (
     FormUpdateIn,
     HandlerFieldOut,
 )
+from src.reminders import settings as reminder_settings
+from src.reminders.schemas import FormReminderIn, FormReminderOut, RoleOptionOut, UserOptionOut
 
 router = APIRouter(prefix="/api/v1/forms", tags=["forms"])
 
@@ -52,8 +55,9 @@ async def list_for(
     )
 
 
-# The /handlers routes come before /{form_id}: FastAPI matches in order, and
-# "handlers" would otherwise be read (and refused) as a form id.
+# The /handlers and /reminder-recipients routes come before /{form_id}: FastAPI
+# matches in order, and "handlers" or "reminder-recipients" would otherwise be
+# read (and refused) as a form id.
 
 
 @router.get("/handlers", summary="The handlers a form can write to (FORM-06)")
@@ -82,6 +86,26 @@ async def handler_fields(
 
 
 @router.get(
+    "/reminder-recipients/roles",
+    summary="Every role a reminder can be aimed at (FORM-10)",
+    response_model=list[RoleOptionOut],
+)
+async def reminder_role_options(actor: CurrentActor, session: SessionDep) -> list[RoleOptionOut]:
+    return await reminder_settings.role_options(session, actor)
+
+
+@router.get(
+    "/reminder-recipients/users",
+    summary="People a reminder can be aimed at, by username (FORM-11)",
+    response_model=list[UserOptionOut],
+)
+async def reminder_user_options(
+    actor: CurrentActor, session: SessionDep, q: str = ""
+) -> list[UserOptionOut]:
+    return await reminder_settings.user_options(session, actor, q)
+
+
+@router.get(
     "/{form_id}",
     summary="One form's definition; with include=stats its task instead",
     response_model=FormOut | FormTaskOut,
@@ -90,6 +114,26 @@ async def get(
     form_id: UUID, actor: CurrentActor, session: SessionDep, include: Include = None
 ) -> FormOut | FormTaskOut:
     return await service.get(session, actor, form_id, include_stats=include == "stats")
+
+
+@router.get(
+    "/{form_id}/reminder",
+    summary="A form's daily reminder: on or off, its time and who it's for (FORM-08)",
+    response_model=FormReminderOut,
+)
+async def form_reminder(form_id: UUID, actor: CurrentActor, session: SessionDep) -> FormReminderOut:
+    return await reminder_settings.form_reminder(session, actor, form_id)
+
+
+@router.put(
+    "/{form_id}/reminder",
+    summary="Turn a form's daily reminder on or off (FORM-09)",
+    response_model=FormReminderOut,
+)
+async def save_form_reminder(
+    form_id: UUID, body: FormReminderIn, actor: CurrentActor, session: SessionDep
+) -> FormReminderOut:
+    return await reminder_settings.save_form_reminder(session, actor, form_id, body)
 
 
 @router.post(
