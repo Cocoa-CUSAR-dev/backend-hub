@@ -33,11 +33,16 @@ paid plan; either way still points at these same two endpoints, so nothing
 here would need to change.
 """
 
+from dataclasses import asdict
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
+from pydantic.alias_generators import to_camel
 
 from src.chat.jobs import pause_idle_conversations
 from src.jobs.dependencies import require_cron_secret
 from src.reminders.jobs import check_and_send_reminders
+from src.tasks.recurrence import open_due_rounds
 
 router = APIRouter(
     prefix="/internal/cron",
@@ -67,3 +72,21 @@ async def run_pause_idle_conversations() -> dict[str, str]:
     """
     await pause_idle_conversations()
     return {"status": "ok"}
+
+
+@router.post("/recurrence")
+async def run_recurrence() -> JSONResponse:
+    """Opens the due rounds of every repeating task. Wire to fire once a day
+    shortly after midnight Bangkok time (00:05 Asia/Bangkok = 17:05 UTC), so
+    a round opens at the start of its day; more often is harmless. Answers
+    the counts, Kotlin's keys; 500 (with the counts) when any round failed,
+    so the scheduler's alert fires."""
+    result = await open_due_rounds()
+    body = {to_camel(k): v for k, v in asdict(result).items()}
+    return JSONResponse(body, status_code=500 if result.failed else 200)
+
+
+@router.get("/recurrence")
+async def run_recurrence_by_get() -> JSONResponse:
+    """The same, for a scheduler set up like the other cron jobs here (GET)."""
+    return await run_recurrence()

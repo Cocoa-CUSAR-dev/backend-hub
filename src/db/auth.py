@@ -261,6 +261,27 @@ async def line_linked_user_ids(session: AsyncSession) -> list[UUID]:
     return list(result.scalars())
 
 
+async def existing_role_ids(session: AsyncSession, role_ids: Sequence[UUID]) -> set[UUID]:
+    """Which of these role ids exist."""
+    if not role_ids:
+        return set()
+    result = await session.execute(
+        text("SELECT role_id FROM auth.role WHERE role_id = ANY(:ids)"), {"ids": list(role_ids)}
+    )
+    return set(result.scalars())
+
+
+async def existing_user_ids(session: AsyncSession, user_ids: Sequence[UUID]) -> set[UUID]:
+    """Which of these user ids exist."""
+    if not user_ids:
+        return set()
+    result = await session.execute(
+        text("SELECT user_id FROM auth.user_account WHERE user_id = ANY(:ids)"),
+        {"ids": list(user_ids)},
+    )
+    return set(result.scalars())
+
+
 async def usernames(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUID, str]:
     """user_id -> username."""
     if not user_ids:
