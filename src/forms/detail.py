@@ -84,6 +84,19 @@ async def _choices_for(
     )
 
 
+async def ref_label(session: Session, field_name: str, value: str) -> str | None:
+    """The name an OPTION answer stands for (a farm id -> its farm name), from
+    the same ref table its choices come from; None when it can't be found.
+    grade_code already stores the grade's name."""
+    if field_name == "grade_code":
+        return value
+    try:
+        table, id_column, name_column = await _choice_source(session, field_name)
+    except LookupError:
+        return None
+    return await db.ref.choice_name(session, table, id_column, name_column, value)
+
+
 async def _all_choices(
     session: Session, rows: Iterable[FormRow], dependencies: dict[str, FieldDependencyRow]
 ) -> dict[str, list[ChoiceOut]]:

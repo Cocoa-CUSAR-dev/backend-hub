@@ -13,6 +13,7 @@ from src.auth import tokens
 from src.exceptions import NotFound
 from src.forms import builder, handlers, responses, service
 from src.forms.schemas import CatalogOut, FormOut, FormSummaryOut, FormTaskOut
+from src.reminders import settings as reminder_settings
 
 USER_ID = uuid4()
 
@@ -147,6 +148,52 @@ async def test_handler_routes_are_not_read_as_a_form_id(
     assert response.status_code == 200
     assert called.await_args.args[2:] == args
     fake["get"].assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("path", "name", "args"),
+    [
+        ("/api/v1/forms/reminder-recipients/roles", "role_options", ()),
+        ("/api/v1/forms/reminder-recipients/users?q=som", "user_options", ("som",)),
+    ],
+)
+async def test_recipient_pickers_are_not_read_as_a_form_id(
+    client: AsyncClient,
+    fake: dict[str, AsyncMock],
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    name: str,
+    args: tuple[str, ...],
+) -> None:
+    called = AsyncMock(return_value=[])
+    monkeypatch.setattr(reminder_settings, name, called)
+
+    assert (await client.get(path, headers=_auth())).status_code == 200
+    assert called.await_args.args[2:] == args
+    fake["get"].assert_not_awaited()
+
+
+async def test_form_reminder_routes_reach_the_settings(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.reminders.schemas import FormReminderOut
+
+    off = FormReminderOut(schedule_id=None, enabled=False, time_of_day=None, recipients=[])
+    read, save = AsyncMock(return_value=off), AsyncMock(return_value=off)
+    monkeypatch.setattr(reminder_settings, "form_reminder", read)
+    monkeypatch.setattr(reminder_settings, "save_form_reminder", save)
+    form_id = uuid4()
+
+    got = await client.get(f"/api/v1/forms/{form_id}/reminder", headers=_auth())
+    put = await client.put(
+        f"/api/v1/forms/{form_id}/reminder",
+        json={"enabled": True, "timeOfDay": "07:30:00"},
+        headers=_auth(),
+    )
+
+    assert (got.status_code, put.status_code) == (200, 200)
+    assert got.json() == {"scheduleId": None, "enabled": False, "timeOfDay": None, "recipients": []}
+    assert save.await_args.args[3].time_of_day.isoformat() == "07:30:00"
 
 
 def _empty_catalog() -> CatalogOut:

@@ -63,6 +63,19 @@ async def choices(
     return [Choice(id=row.id, name=row.name) for row in result]
 
 
+async def choice_name(
+    session: AsyncSession, table: str, id_column: str, name_column: str, choice_id: str
+) -> str | None:
+    """The name of one row of a ref table, found by its id as text; None when
+    no row has that id (deleted since it was answered, or never existed)."""
+    sql = (
+        f"SELECT {_quoted(name_column)}::text FROM ref.{_quoted(table)} "
+        f"WHERE {_quoted(id_column)}::text = :choice_id LIMIT 1"
+    )
+    result = await session.execute(text(sql), {"choice_id": choice_id})
+    return result.scalar()
+
+
 async def choices_with_parent(
     session: AsyncSession,
     table: str,
