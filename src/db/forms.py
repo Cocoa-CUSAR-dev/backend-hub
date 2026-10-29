@@ -13,6 +13,7 @@ All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2
 Other code calls the functions here.
 """
 
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -411,3 +412,263 @@ async def field_labels(session: AsyncSession) -> dict[str, str]:
         )
     )
     return {row.field_name: row.label for row in result}
+
+
+# ---- the form builder's writes (FORM-03, FORM-04, FORM-05) ---------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class QuestionWrite:
+    """What a question is saved with, new or rewritten."""
+
+    label: str
+    description: str | None
+    input_type: str
+    field_name: str | None
+    is_mandatory: bool
+    is_active: bool
+    # None on a rewrite = keep what is stored, so a client that doesn't know
+    # the field yet can't switch it off.
+    carry_forward: bool | None
+    sort_order: int
+    default_value: Any
+
+
+async def insert_task_form(
+    session: AsyncSession,
+    *,
+    task_id: UUID,
+    title: str,
+    description: str | None,
+    handler: str,
+    is_multiple_submit: bool,
+) -> UUID:
+    result = await session.execute(
+        text(
+            """
+            INSERT INTO form.task_form (task_id, title, description, handler, is_multiple_submit)
+            VALUES (:task_id, :title, :description, :handler, :is_multiple_submit)
+            RETURNING form_id
+            """
+        ),
+        {
+            "task_id": task_id,
+            "title": title,
+            "description": description,
+            "handler": handler,
+            "is_multiple_submit": is_multiple_submit,
+        },
+    )
+    form_id: UUID = result.scalar_one()
+    return form_id
+
+
+async def update_task_form(
+    session: AsyncSession,
+    form_id: UUID,
+    *,
+    description: str | None,
+    is_multiple_submit: bool | None,
+) -> None:
+    """The description is always written (null clears it); is_multiple_submit
+    only when given."""
+    await session.execute(
+        text(
+            """
+            UPDATE form.task_form
+            SET description = :description,
+                is_multiple_submit = COALESCE(CAST(:is_multiple_submit AS boolean),
+                                              is_multiple_submit)
+            WHERE form_id = :form_id
+            """
+        ),
+        {"form_id": form_id, "description": description, "is_multiple_submit": is_multiple_submit},
+    )
+
+
+async def insert_section(
+    session: AsyncSession,
+    *,
+    form_id: UUID,
+    title: str,
+    description: str | None,
+    sort_order: int,
+    is_active: bool = True,
+) -> UUID:
+    result = await session.execute(
+        text(
+            """
+            INSERT INTO form.section (form_id, title, description, sort_order, is_active)
+            VALUES (:form_id, :title, :description, :sort_order, :is_active)
+            RETURNING section_id
+            """
+        ),
+        {
+            "form_id": form_id,
+            "title": title,
+            "description": description,
+            "sort_order": sort_order,
+            "is_active": is_active,
+        },
+    )
+    section_id: UUID = result.scalar_one()
+    return section_id
+
+
+async def update_section(
+    session: AsyncSession,
+    section_id: UUID,
+    *,
+    title: str,
+    description: str | None,
+    sort_order: int,
+    is_active: bool,
+) -> None:
+    await session.execute(
+        text(
+            """
+            UPDATE form.section
+            SET title = :title, description = :description, sort_order = :sort_order,
+                is_active = :is_active
+            WHERE section_id = :section_id
+            """
+        ),
+        {
+            "section_id": section_id,
+            "title": title,
+            "description": description,
+            "sort_order": sort_order,
+            "is_active": is_active,
+        },
+    )
+
+
+def _question_params(question: QuestionWrite) -> dict[str, Any]:
+    return {
+        "label": question.label,
+        "description": question.description,
+        "input_type": question.input_type,
+        "field_name": question.field_name,
+        "is_mandatory": question.is_mandatory,
+        "is_active": question.is_active,
+        "carry_forward": question.carry_forward,
+        "sort_order": question.sort_order,
+        "default_value": None
+        if question.default_value is None
+        else json.dumps(question.default_value, ensure_ascii=False),
+    }
+
+
+async def insert_question(session: AsyncSession, section_id: UUID, question: QuestionWrite) -> UUID:
+    result = await session.execute(
+        text(
+            """
+            INSERT INTO form.question
+                (section_id, label, description, input_type, field_name, is_mandatory,
+                 is_active, carry_forward, sort_order, default_value)
+            VALUES (:section_id, :label, :description, :input_type, :field_name, :is_mandatory,
+                    :is_active, COALESCE(CAST(:carry_forward AS boolean), false), :sort_order,
+                    CAST(:default_value AS jsonb))
+            RETURNING question_id
+            """
+        ),
+        {"section_id": section_id, **_question_params(question)},
+    )
+    question_id: UUID = result.scalar_one()
+    return question_id
+
+
+async def update_question(
+    session: AsyncSession, question_id: UUID, question: QuestionWrite
+) -> None:
+    await session.execute(
+        text(
+            """
+            UPDATE form.question
+            SET label = :label, description = :description, input_type = :input_type,
+                field_name = :field_name, is_mandatory = :is_mandatory, is_active = :is_active,
+                carry_forward = COALESCE(CAST(:carry_forward AS boolean), carry_forward),
+                sort_order = :sort_order, default_value = CAST(:default_value AS jsonb)
+            WHERE question_id = :question_id
+            """
+        ),
+        {"question_id": question_id, **_question_params(question)},
+    )
+
+
+async def section_ids_of(session: AsyncSession, form_id: UUID) -> set[UUID]:
+    result = await session.execute(
+        text("SELECT section_id FROM form.section WHERE form_id = :form_id"), {"form_id": form_id}
+    )
+    return set(result.scalars())
+
+
+async def question_ids_of(session: AsyncSession, section_id: UUID) -> set[UUID]:
+    result = await session.execute(
+        text("SELECT question_id FROM form.question WHERE section_id = :section_id"),
+        {"section_id": section_id},
+    )
+    return set(result.scalars())
+
+
+async def delete_questions_except(
+    session: AsyncSession, section_id: UUID, keep: Sequence[UUID]
+) -> None:
+    await session.execute(
+        text(
+            "DELETE FROM form.question WHERE section_id = :section_id"
+            " AND NOT (question_id = ANY(:keep))"
+        ),
+        {"section_id": section_id, "keep": list(keep)},
+    )
+
+
+async def delete_sections(session: AsyncSession, section_ids: Sequence[UUID]) -> None:
+    """The sections and their questions."""
+    if not section_ids:
+        return
+    ids = {"ids": list(section_ids)}
+    await session.execute(text("DELETE FROM form.question WHERE section_id = ANY(:ids)"), ids)
+    await session.execute(text("DELETE FROM form.section WHERE section_id = ANY(:ids)"), ids)
+
+
+async def set_section_active(
+    session: AsyncSession, form_id: UUID, section_id: UUID, is_active: bool
+) -> None:
+    """Only a section of this form."""
+    await session.execute(
+        text(
+            "UPDATE form.section SET is_active = :is_active"
+            " WHERE section_id = :section_id AND form_id = :form_id"
+        ),
+        {"form_id": form_id, "section_id": section_id, "is_active": is_active},
+    )
+
+
+async def set_question_flags(
+    session: AsyncSession,
+    form_id: UUID,
+    question_id: UUID,
+    *,
+    is_active: bool | None,
+    is_mandatory: bool | None,
+) -> None:
+    """Switch a question of this form on or off, required or not; None keeps it."""
+    await session.execute(
+        text(
+            """
+            UPDATE form.question q
+            SET is_active = COALESCE(CAST(:is_active AS boolean), q.is_active),
+                is_mandatory = COALESCE(CAST(:is_mandatory AS boolean), q.is_mandatory)
+            FROM form.section s
+            WHERE q.question_id = :question_id AND s.section_id = q.section_id
+              AND s.form_id = :form_id
+            """
+        ),
+        {
+            "form_id": form_id,
+            "question_id": question_id,
+            "is_active": is_active,
+            "is_mandatory": is_mandatory,
+        },
+    )

@@ -110,7 +110,8 @@ def _field(reg: Registry, handler: HandlerRow, column: ColumnInfo) -> HandlerFie
     )
 
 
-async def _fields(session: Session, reg: Registry, handler: HandlerRow) -> list[HandlerFieldOut]:
+async def fields_of(session: Session, reg: Registry, handler: HandlerRow) -> list[HandlerFieldOut]:
+    """A handler's columns in table order, as the builder (and its save check) sees them."""
     columns = await db.forms.table_columns(session, handler.schema_name, handler.table_name)
     return [_field(reg, handler, column) for column in columns]
 
@@ -129,7 +130,7 @@ async def handler_fields(session: Session, actor: Actor, handler: str) -> list[H
     found = next((h for h in reg.handlers if h.handler == handler), None)
     if found is None:
         raise Invalid(f"Unknown handler: {handler}", fields={"handler": "No such handler"})
-    return await _fields(session, reg, found)
+    return await fields_of(session, reg, found)
 
 
 async def catalog(session: Session, actor: Actor) -> CatalogOut:
@@ -180,7 +181,7 @@ async def _build_catalog(session: Session) -> CatalogOut:
                 parent_field=handler.parent_field,
                 fields=[
                     CatalogFieldOut(**f.model_dump(), used_by_forms=asked.get(f.name, 0))
-                    for f in await _fields(session, reg, handler)
+                    for f in await fields_of(session, reg, handler)
                 ],
                 forms=HandlerFormsOut(
                     count=len(mine),

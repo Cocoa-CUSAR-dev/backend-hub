@@ -4,17 +4,28 @@ Replaces web-backend's GET /forms, /forms/{formId}, /tasks and /tasks/{taskId}
 (FORM-01, FORM-02 in the API migration map). `?include=stats` gives the old
 /tasks views; `{id}` is always a form id (docs-and-plan#271). The form
 builder's handler pickers and the Data Map catalog are under /handlers
-(FORM-06, FORM-07, docs-and-plan#272).
+(FORM-06, FORM-07, docs-and-plan#272); creating, rewriting and switching a
+form are POST /forms, PUT /forms/{id} and PUT /forms/{id}/edit (FORM-03..05,
+docs-and-plan#273).
 """
 
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 
 from src.auth.dependencies import CurrentActor, SessionDep
-from src.forms import handlers, service
-from src.forms.schemas import CatalogOut, FormOut, FormSummaryOut, FormTaskOut, HandlerFieldOut
+from src.forms import builder, handlers, service
+from src.forms.schemas import (
+    CatalogOut,
+    FormCreateIn,
+    FormEditIn,
+    FormOut,
+    FormSummaryOut,
+    FormTaskOut,
+    FormUpdateIn,
+    HandlerFieldOut,
+)
 
 router = APIRouter(prefix="/api/v1/forms", tags=["forms"])
 
@@ -79,3 +90,34 @@ async def get(
     form_id: UUID, actor: CurrentActor, session: SessionDep, include: Include = None
 ) -> FormOut | FormTaskOut:
     return await service.get(session, actor, form_id, include_stats=include == "stats")
+
+
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a form and its task, with who it's for, its repeat and reminder (FORM-03)",
+    response_model=FormOut,
+)
+async def create_form(body: FormCreateIn, actor: CurrentActor, session: SessionDep) -> FormOut:
+    return await builder.create_form(session, actor, body)
+
+
+@router.put(
+    "/{form_id}",
+    summary="Rewrite a form's sections and questions (FORM-04)",
+    response_model=FormOut,
+)
+async def update_form(
+    form_id: UUID, body: FormUpdateIn, actor: CurrentActor, session: SessionDep
+) -> FormOut:
+    return await builder.update_form(session, actor, form_id, body)
+
+
+@router.put(
+    "/{form_id}/edit",
+    summary="Switch a form's sections and questions on or off (FORM-05)",
+)
+async def edit_form(
+    form_id: UUID, body: FormEditIn, actor: CurrentActor, session: SessionDep
+) -> str:
+    return await builder.edit_form(session, actor, form_id, body)
