@@ -106,7 +106,8 @@ async def researchers(
     page: int = 0,
     size: int = DEFAULT_PAGE_SIZE,
 ) -> list[db.research.Researcher]:
-    """Every researcher, or those whose names / organization are exactly these."""
+    """Every current researcher (holds the role), or those whose names /
+    organization are exactly these."""
     require(actor, "read:researcher:all")
     errors = {}
     if page < 0:
@@ -117,6 +118,7 @@ async def researchers(
         raise Invalid(fields=errors)
     return await db.research.researchers(
         session,
+        among=list(await db.auth.user_ids_with_role(session, "researcher")),
         first_name=first_name,
         last_name=last_name,
         organization=organization,
@@ -128,20 +130,19 @@ async def researchers(
 async def researcher(session: Session, actor: Actor, user_id: UUID) -> db.research.Researcher:
     require(actor, "read:researcher:all")
     found = await db.research.researcher(session, user_id)
-    if found is None:
+    if found is None or user_id not in await db.auth.user_ids_with_role(session, "researcher"):
         raise NotFound("Researcher not found")
     return found
 
 
 async def delete_researcher(session: Session, actor: Actor, user_id: UUID) -> str:
-    """Remove a researcher: their researcher profile and role, and sign them
-    out everywhere. Only that role: Kotlin removed every role the account
-    held, which with several roles per person would also take away their
-    farmer or processor role."""
+    """Remove a researcher: take away the researcher role and sign them out
+    everywhere -- the same rule as remove_role. The profile row is kept, as
+    remove_role keeps it (Kotlin deleted it, and every other role too). Works
+    for a researcher with no profile row as well."""
     require(actor, "delete:researcher:any")
     async with transaction(session):
-        if not await db.research.delete_researcher_profile(session, user_id):
+        if not await db.auth.remove_role(session, user_id, "researcher"):
             raise NotFound("Researcher not found or do not have access")
-        await db.auth.remove_role(session, user_id, "researcher")
         await db.auth.revoke_all_refresh_tokens(session, user_id)
     return DELETED

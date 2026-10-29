@@ -87,8 +87,41 @@ async def test_delete_takes_only_the_researcher_role(
         {"u": two},
     )
     assert list(roles.scalars()) == ["farmer"]  # Kotlin removed this one too
+    profile = await db_session.execute(
+        text("SELECT organization FROM research.researcher WHERE user_id = :u"), {"u": two}
+    )
+    assert profile.scalar() == "CU Intania"  # kept, as remove_role keeps it
+    # No longer a researcher: gone from the list and from a read.
+    listed = (await client.get(ADMIN, headers=admin)).json()
+    assert str(two) not in {r["userId"] for r in listed}
     assert (await client.get(f"{ADMIN}/{two}", headers=admin)).status_code == 404
     assert (await client.delete(f"{ADMIN}/{two}", headers=admin)).status_code == 404
+
+
+async def test_a_role_removed_elsewhere_drops_out_and_a_role_alone_can_be_removed(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    one, _two = await _setup(db_session)
+    no_profile = await seed_user(
+        db_session, "res-3", "pass-1234", roles={"researcher": ["read:form:all"]}
+    )
+    admin = await _login(client, "admin-r", "admin-pass")
+    # The role taken away the other way (#6's remove_role): the profile stays.
+    await db_session.execute(
+        text(
+            "DELETE FROM auth.user_role ur USING auth.role r"
+            " WHERE ur.role_id = r.role_id AND ur.user_id = :u AND r.role_name = 'researcher'"
+        ),
+        {"u": one},
+    )
+    await db_session.commit()
+
+    listed = {r["userId"] for r in (await client.get(ADMIN, headers=admin)).json()}
+    removed = await client.delete(f"{ADMIN}/{no_profile}", headers=admin)
+
+    assert str(one) not in listed
+    assert (await client.get(f"{ADMIN}/{one}", headers=admin)).status_code == 404
+    assert removed.status_code == 200  # a researcher with no profile row
 
 
 async def test_researchers_are_for_admins(client: AsyncClient, db_session: AsyncSession) -> None:

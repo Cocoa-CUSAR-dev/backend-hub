@@ -7,6 +7,7 @@ All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2
 Other code calls the functions here.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -57,16 +58,18 @@ _RESEARCHER = "SELECT user_id, first_name, last_name, organization FROM research
 async def researchers(
     session: AsyncSession,
     *,
+    among: Sequence[UUID],
     first_name: str | None,
     last_name: str | None,
     organization: str | None,
     limit: int,
     offset: int,
 ) -> list[Researcher]:
-    """Researchers matching every filter given (exactly), by last name, first
-    name, then id, so a page never repeats or skips one."""
-    where: list[str] = []
-    params: dict[str, object] = {"limit": limit, "offset": offset}
+    """The profiles of the users in `among` (the role's holders) matching every
+    filter given (exactly), by last name, first name, then id, so a page never
+    repeats or skips one."""
+    where: list[str] = ["user_id = ANY(:among)"]
+    params: dict[str, object] = {"limit": limit, "offset": offset, "among": list(among)}
     for column, value in (
         ("first_name", first_name),
         ("last_name", last_name),
@@ -75,7 +78,7 @@ async def researchers(
         if value is not None:
             where.append(f"{column} = :{column}")
             params[column] = value
-    clause = f" WHERE {' AND '.join(where)}" if where else ""
+    clause = f" WHERE {' AND '.join(where)}"
     result = await session.execute(
         text(
             f"{_RESEARCHER}{clause}"
@@ -90,12 +93,3 @@ async def researcher(session: AsyncSession, user_id: UUID) -> Researcher | None:
     result = await session.execute(text(f"{_RESEARCHER} WHERE user_id = :u"), {"u": user_id})
     row = result.first()
     return Researcher(**row._mapping) if row else None
-
-
-async def delete_researcher_profile(session: AsyncSession, user_id: UUID) -> bool:
-    """False when this user has no researcher profile."""
-    result = await session.execute(
-        text("DELETE FROM research.researcher WHERE user_id = :u RETURNING user_id"),
-        {"u": user_id},
-    )
-    return result.first() is not None

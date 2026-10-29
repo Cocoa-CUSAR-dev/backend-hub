@@ -115,7 +115,7 @@ async def researcher(user_id: UUID, actor: CurrentActor, session: SessionDep) ->
 
 @router.delete(
     "/researchers/{user_id}",
-    summary="Remove a researcher: their profile and role; signs them out (ADMIN-04)",
+    summary="Remove the researcher role (profile kept); signs them out (ADMIN-04)",
 )
 async def delete_researcher(user_id: UUID, actor: CurrentActor, session: SessionDep) -> str:
     return await service.delete_researcher(session, actor, user_id)
