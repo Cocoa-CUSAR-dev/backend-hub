@@ -1,8 +1,8 @@
 """Build one form's full definition: sections, questions, choices and rules.
 
 The one place every caller gets a form from -- the mobile app's task form
-(tasks.service.get_form) today, and the researcher form view and the chatbot
-as they move in -- so the app, the web and LINE can't drift apart on what a
+(tasks.service.get_form), the researcher form view and the chatbot
+(`load_chat_form`) -- so the app, the web and LINE can't drift apart on what a
 form looks like. Only reads; permission checks belong to the service that
 calls `load_form`.
 
@@ -19,15 +19,18 @@ Ported from web-backend's FormRepository.fetchForm, choice rules included:
 """
 
 import logging
+import re
 from collections.abc import Iterable
+from typing import Any
 from uuid import UUID
 
 from src import db
 from src.database import Session
 from src.db.forms import FieldDependencyRow, FormRow
 from src.db.ref import Choice
+from src.exceptions import FormNotFound
 from src.forms import registry
-from src.forms.schemas import ChoiceOut, FormOut, QuestionOut, SectionOut
+from src.forms.schemas import ChoiceOut, FormDetail, FormOut, QuestionOut, SectionOut
 
 logger = logging.getLogger(__name__)
 
@@ -180,3 +183,41 @@ async def load_form(session: Session, form_id: UUID) -> FormOut | None:
         is_multiple_submit=first.is_multiple_submit,
         sections=list(sections.values()),
     )
+
+
+_CAMEL_BOUNDARY = re.compile(r"(?<!^)(?=[A-Z])")
+
+
+def _camel_to_snake(key: str) -> str:
+    return _CAMEL_BOUNDARY.sub("_", key).lower()
+
+
+def snake_keys(value: Any) -> Any:
+    """Recursively turns camelCase dict keys into snake_case -- needed for the
+    nested sections[].questions[] structure and for a question's
+    validation_rule (stored with camelCase keys such as maxLength).
+    """
+    if isinstance(value, dict):
+        return {_camel_to_snake(k): snake_keys(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [snake_keys(item) for item in value]
+    return value
+
+
+async def load_chat_form(session: Session, form_id: UUID | str) -> FormDetail:
+    """The form as the chatbot reads it: the same definition as `load_form`
+    (what web-backend's GET /service/forms/{formId} used to hand the chatbot
+    over HTTP), with snake_case keys and the id named `task_form_id`, the way
+    chat.conversation calls it. FormNotFound if there is no such form, also
+    when `form_id` is not even an id.
+    """
+    try:
+        wanted = form_id if isinstance(form_id, UUID) else UUID(form_id)
+    except ValueError:
+        raise FormNotFound(f"Form {form_id} not found") from None
+    form = await load_form(session, wanted)
+    if form is None:
+        raise FormNotFound(f"Form {form_id} not found")
+    value = snake_keys(form.model_dump(mode="json", by_alias=True))
+    value["task_form_id"] = value.pop("form_id")
+    return FormDetail.model_validate(value)

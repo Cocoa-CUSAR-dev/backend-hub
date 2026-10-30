@@ -24,7 +24,7 @@ from src import db
 from src.chat.schemas import FormSummary
 from src.database import Session
 from src.exceptions import ConversationNotFound, FormNotFound
-from src.forms.client import _convert_keys
+from src.forms.detail import snake_keys
 from src.forms.schemas import FormDetail
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ async def _load_choices(session: Session, field_name: str) -> list[dict[str, str
 
 
 async def load_form_detail(session: Session, task_form_id: UUID) -> FormDetail:
-    """Direct-query counterpart to forms.client.get_form() -- builds the same
+    """Direct-query counterpart to forms.detail.load_chat_form() -- builds the same
     FormDetail shape service.py expects, from the local `form.*` tables
     instead of a real Kotlin call. OPTION-type questions get a real
     `choices` list attached, same shape Kotlin's own response uses; every
@@ -140,7 +140,7 @@ async def load_form_detail(session: Session, task_form_id: UUID) -> FormDetail:
             if isinstance(raw_rule, str):
                 raw_rule = json.loads(raw_rule)
             # The jsonb column itself stores camelCase keys (errorMessage,
-            # maxLength, ...) -- forms/client.py's get_form() normally does
+            # maxLength, ...) -- forms.detail.load_chat_form() normally does
             # this same camelCase -> snake_case conversion for the real
             # Kotlin response before service.py/validation.py ever see it.
             # This dev-only path reads the column directly, bypassing that
@@ -148,7 +148,7 @@ async def load_form_detail(session: Session, task_form_id: UUID) -> FormDetail:
             # this, every _valid_* helper's rule.get("max_length") etc. would
             # silently miss (still spelled maxLength) and every answer would
             # pass unvalidated, exactly what happened testing this locally.
-            question["validation_rule"] = _convert_keys(raw_rule)
+            question["validation_rule"] = snake_keys(raw_rule)
 
     return FormDetail(task_form_id=str(task_form_id), sections=[{"questions": questions}])
 

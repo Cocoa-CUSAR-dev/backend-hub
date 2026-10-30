@@ -11,10 +11,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
-os.environ.setdefault("KOTLIN_BACKEND_URL", "http://localhost:3001/api/v1")
 os.environ.setdefault("GO_BACKEND_URL", "http://localhost:8080")
 os.environ.setdefault("GO_SERVICE_KEY", "test-service-key")
-os.environ.setdefault("KOTLIN_SERVICE_KEY", "test-service-key")
 os.environ.setdefault("CHATBOT_SERVICE_KEY", "test-service-key")
 os.environ.setdefault("CRON_SECRET", "test-cron-secret")
 os.environ.setdefault("JWT_KEY", "test-jwt-key-that-is-at-least-32-bytes-long")

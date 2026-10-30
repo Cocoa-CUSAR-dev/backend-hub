@@ -31,7 +31,7 @@ from src.exceptions import (
     Unauthorized,
     UpstreamServiceError,
 )
-from src.forms.client import get_form
+from src.forms.detail import load_chat_form
 from src.line import liff, parent_picker
 from src.line.service import push_autofill_offer, push_confirm_prompt, push_text
 from src.tasks import service as tasks_service
@@ -151,12 +151,12 @@ async def start_task(
 
     existing = await service.find_resumable_conversation(session, user_id=user_id, task_id=task_id)
     if existing is not None:
-        form = await get_form(str(existing.task_form_id))
+        form = await load_chat_form(session, str(existing.task_form_id))
         reply = await service.resume_conversation(session, conversation=existing, form=form)
         await _push(to, reply)
         return StartTaskResponse(pushed=True)
 
-    form = await get_form(str(body.task_form_id))
+    form = await load_chat_form(session, str(body.task_form_id))
     parent_kind = await parent_picker.kind_for_handler(session, body.handler)
     parent_choices = None
     if parent_kind is not None:

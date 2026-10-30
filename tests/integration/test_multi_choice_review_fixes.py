@@ -21,12 +21,12 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
-from tests.integration.helpers import build_postback_event, sign_signature
+from tests.integration.helpers import build_postback_event, serve_form, sign_signature
 from tests.integration.test_multi_choice_flow import (
     _Fixture,
     _seed,
@@ -70,9 +70,7 @@ async def _park_at_confirmation(
 
 
 def _mock_form(fixture: _Fixture) -> None:
-    respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}").mock(
-        return_value=Response(200, json=fixture.form_response)
-    )
+    serve_form(fixture.task_form_id, fixture.form_response)
 
 
 async def _status(db_session: AsyncSession, conversation_id: uuid.UUID) -> str:

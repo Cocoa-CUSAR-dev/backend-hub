@@ -16,7 +16,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,10 +30,11 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
-# The V16 rule exactly as Kotlin sends it (camelCase); get_form() snake_cases
+# The V16 rule as the database stores it (camelCase); load_chat_form() snake_cases
 # it on the way in, which is the path this test exercises.
 _GIS_RULE = {"type": "GEODATA", "validLatLng": True, "errorMessage": "พิกัดไม่ถูกต้อง"}
 
@@ -181,9 +182,7 @@ class TestLocationAnswersTheGeodataQuestion:
 
         submit_task = AsyncMock()
         with respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             summary = await _post(
                 client,
                 _build_location_event(
@@ -232,9 +231,7 @@ class TestLocationAnswersTheGeodataQuestion:
         )
 
         with respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             await _post(
                 client,
                 _build_location_event(
@@ -260,9 +257,7 @@ class TestLocationAnswersTheGeodataQuestion:
         )
 
         with respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _post(
                 client,
                 _build_location_event(
@@ -294,9 +289,7 @@ class TestLocationThatIsNotTheAnswerIsNeverStored:
         )
 
         with respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _post(
                 client,
                 _build_location_event(

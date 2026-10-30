@@ -275,7 +275,7 @@ async def test_start_task_resumes_an_existing_conversation(client: AsyncClient) 
             "src.chat.liff.service.find_resumable_conversation",
             AsyncMock(return_value=conversation),
         ),
-        patch("src.chat.liff.get_form", AsyncMock(return_value=MagicMock())),
+        patch("src.chat.liff.load_chat_form", AsyncMock(return_value=MagicMock())),
         patch(
             "src.chat.liff.service.resume_conversation", AsyncMock(return_value=reply)
         ) as resume_mock,
@@ -306,7 +306,7 @@ async def test_start_task_starts_fresh_when_no_resumable_conversation(client: As
             "src.chat.liff.service.find_resumable_conversation",
             AsyncMock(return_value=None),
         ),
-        patch("src.chat.liff.get_form", AsyncMock(return_value=MagicMock())),
+        patch("src.chat.liff.load_chat_form", AsyncMock(return_value=MagicMock())),
         patch("src.chat.liff.parent_picker.kind_for_handler", return_value=None),
         patch("src.chat.liff.fetch_last_answer", AsyncMock(return_value=None)),
         patch(
@@ -335,7 +335,7 @@ async def test_start_task_offers_autofill_instead_of_starting_blind(client: Asyn
             "src.chat.liff.service.find_resumable_conversation",
             AsyncMock(return_value=None),
         ),
-        patch("src.chat.liff.get_form", AsyncMock(return_value=MagicMock(sections=[]))),
+        patch("src.chat.liff.load_chat_form", AsyncMock(return_value=MagicMock(sections=[]))),
         patch("src.chat.liff.parent_picker.kind_for_handler", return_value=None),
         patch("src.chat.liff.fetch_last_answer", AsyncMock(return_value={"note": "old"})),
         patch("src.chat.liff.reuse.sanitize_for_autofill", AsyncMock(return_value={})),
@@ -364,7 +364,7 @@ async def test_start_task_tells_farmer_when_parent_choices_are_empty(client: Asy
             "src.chat.liff.service.find_resumable_conversation",
             AsyncMock(return_value=None),
         ),
-        patch("src.chat.liff.get_form", AsyncMock(return_value=MagicMock())),
+        patch("src.chat.liff.load_chat_form", AsyncMock(return_value=MagicMock())),
         patch(
             "src.chat.liff.parent_picker.kind_for_handler",
             AsyncMock(return_value="farm_activity"),
@@ -400,7 +400,7 @@ async def test_start_task_treats_fetch_last_answer_failure_as_no_offer(client: A
             "src.chat.liff.service.find_resumable_conversation",
             AsyncMock(return_value=None),
         ),
-        patch("src.chat.liff.get_form", AsyncMock(return_value=MagicMock())),
+        patch("src.chat.liff.load_chat_form", AsyncMock(return_value=MagicMock())),
         patch("src.chat.liff.parent_picker.kind_for_handler", return_value=None),
         patch(
             "src.chat.liff.fetch_last_answer",

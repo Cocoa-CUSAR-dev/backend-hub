@@ -1,10 +1,10 @@
-"""src/tasks/client.py's read-side Go calls, through real httpx with respx
-(docs-and-plan#247): the to-do list, the last answer, and the autofill
-sanitizer. test_client.py covers submit_task.
+"""src/tasks/client.py's Go calls, through real httpx with respx
+(docs-and-plan#247): the last answer and the autofill sanitizer, the two the
+chatbot still asks Go for. Saving an answer and the task list are in-process
+(tests/chat/test_submit.py, tasks.service.list_for).
 """
 
 import json
-import uuid
 
 import pytest
 import respx
@@ -12,42 +12,9 @@ from httpx import Response
 
 from src.config import settings
 from src.exceptions import UpstreamServiceError
-from src.tasks.client import fetch_last_answer, fetch_pending_tasks, fetch_sanitized_autofill
+from src.tasks.client import fetch_last_answer, fetch_sanitized_autofill
 
 _GO = settings.GO_BACKEND_URL
-
-
-@respx.mock
-async def test_pending_tasks_parses_every_row_and_asks_for_one_big_page() -> None:
-    task_id, task_form_id = uuid.uuid4(), uuid.uuid4()
-    route = respx.get(f"{_GO}/service/tasks").mock(
-        return_value=Response(
-            200,
-            json=[
-                {
-                    "task_id": str(task_id),
-                    "task_form_id": str(task_form_id),
-                    "title": "จดกิจกรรมในสวน",
-                    "handler": "farm_activity",
-                    "status": "NOT_STARTED",
-                }
-            ],
-        )
-    )
-
-    [task] = await fetch_pending_tasks(user_id="u-1")
-
-    assert (task.task_id, task.task_form_id, task.status) == (task_id, task_form_id, "NOT_STARTED")
-    request = route.calls.last.request
-    assert (request.url.params["user_id"], request.url.params["page_size"]) == ("u-1", "100")
-    assert request.headers["X-Service-Key"] == settings.GO_SERVICE_KEY
-
-
-@respx.mock
-async def test_pending_tasks_error_carries_gos_reason() -> None:
-    respx.get(f"{_GO}/service/tasks").mock(return_value=Response(500, json={"error": "db down"}))
-    with pytest.raises(UpstreamServiceError, match="db down"):
-        await fetch_pending_tasks(user_id="u-1")
 
 
 @respx.mock

@@ -17,7 +17,7 @@ from src.database import Session, async_session_maker
 from src.db.models import Conversation
 from src.diary import service as diary_service
 from src.exceptions import ConversationNotFound, Forbidden, UpstreamServiceError
-from src.forms.client import get_form
+from src.forms.detail import load_chat_form
 from src.line import parent_picker, temp_task_picker
 from src.line.client import (
     Event,
@@ -222,7 +222,7 @@ async def _confirm_and_reply(reply_token: str, line_user_id: str, conversation_i
         if conversation is None:
             await reply_text(reply_token, "ไม่พบบทสนทนานี้แล้ว")
             return
-        form = await get_form(str(conversation.task_form_id))
+        form = await load_chat_form(session, str(conversation.task_form_id))
         reply = await service.confirm_conversation(
             session, conversation_id=conversation.conversation_id, form=form
         )
@@ -291,7 +291,7 @@ async def _edit_and_reply(reply_token: str, conversation_id: UUID) -> None:
         if blocked is not None:
             await reply_confirm_prompt(reply_token, blocked, conversation.conversation_id)
             return
-        form = await get_form(str(conversation.task_form_id))
+        form = await load_chat_form(session, str(conversation.task_form_id))
         questions = await service.editable_questions(
             session, conversation_id=conversation.conversation_id, form=form
         )
@@ -336,7 +336,7 @@ async def _handle_confirmation_step_text(
         if conversation is None:
             await reply_text(event.reply_token, "ไม่พบบทสนทนานี้แล้ว")
             return
-        form = await get_form(str(conversation.task_form_id))
+        form = await load_chat_form(session, str(conversation.task_form_id))
         reply = await service.confirmation_prompt(
             session, conversation_id=conversation_id, form=form
         )
@@ -533,7 +533,7 @@ async def _handle_location_message(event: MessageEvent, message: LocationMessage
             )
             return
 
-        form = await get_form(str(conversation.task_form_id))
+        form = await load_chat_form(session, str(conversation.task_form_id))
         try:
             reply = await service.handle_location(
                 session,
@@ -614,7 +614,7 @@ async def _handle_message(event: MessageEvent) -> None:
                 )
                 return
 
-            form = await get_form(str(conversation.task_form_id))
+            form = await load_chat_form(session, str(conversation.task_form_id))
             try:
                 reply = await service.handle_answer(
                     session,
@@ -659,18 +659,18 @@ async def _handle_postback(event: PostbackEvent) -> None:
             # US2-3/resume-conversation logic: this task might already have
             # a paused (or still-active) conversation -- resume it instead
             # of starting a duplicate one from scratch. Checked before
-            # touching get_form/parent_picker at all, since a resumed
+            # touching load_chat_form/parent_picker at all, since a resumed
             # conversation doesn't need either of those precomputed again.
             existing = await service.find_resumable_conversation(
                 session, user_id=user_id, task_id=UUID(task_id)
             )
             if existing is not None:
-                form = await get_form(str(existing.task_form_id))
+                form = await load_chat_form(session, str(existing.task_form_id))
                 reply = await service.resume_conversation(session, conversation=existing, form=form)
                 await _reply(event.reply_token, reply)
                 return
 
-            form = await get_form(task_form_id)
+            form = await load_chat_form(session, task_form_id)
             parent_kind = await parent_picker.kind_for_handler(session, handler)
             parent_choices = None
             if parent_kind is not None:
@@ -747,8 +747,8 @@ async def _handle_postback(event: PostbackEvent) -> None:
             await reply_text(event.reply_token, messages.NOT_LINKED)
             return
 
-        form = await get_form(task_form_id)
         async with async_session_maker() as session:
+            form = await load_chat_form(session, task_form_id)
             # Same double-tap/race guard as the "start" branch above --
             # this offer can only have been sent for a task with no
             # resumable conversation at the time, but time has passed
@@ -758,7 +758,7 @@ async def _handle_postback(event: PostbackEvent) -> None:
                 session, user_id=user_id, task_id=UUID(task_id)
             )
             if existing is not None:
-                resume_form = await get_form(str(existing.task_form_id))
+                resume_form = await load_chat_form(session, str(existing.task_form_id))
                 reply = await service.resume_conversation(
                     session, conversation=existing, form=resume_form
                 )
@@ -832,7 +832,7 @@ async def _handle_postback(event: PostbackEvent) -> None:
             if conversation is None:
                 await reply_text(event.reply_token, "ไม่พบบทสนทนานี้แล้ว")
                 return
-            form = await get_form(str(conversation.task_form_id))
+            form = await load_chat_form(session, str(conversation.task_form_id))
             try:
                 reply = await service.start_next_submission(
                     session, conversation_id=conversation.conversation_id, form=form
@@ -867,7 +867,7 @@ async def _handle_postback(event: PostbackEvent) -> None:
             if conversation is None:
                 await reply_text(event.reply_token, "ไม่พบบทสนทนานี้แล้ว")
                 return
-            form = await get_form(str(conversation.task_form_id))
+            form = await load_chat_form(session, str(conversation.task_form_id))
             try:
                 if action == "multi_toggle":
                     reply = await service.toggle_choice(
@@ -898,7 +898,7 @@ async def _handle_postback(event: PostbackEvent) -> None:
             if conversation is None:
                 await reply_text(event.reply_token, "ไม่พบบทสนทนานี้แล้ว")
                 return
-            form = await get_form(str(conversation.task_form_id))
+            form = await load_chat_form(session, str(conversation.task_form_id))
             try:
                 reply = await service.begin_edit(
                     session,

@@ -57,12 +57,11 @@ class Settings(BaseSettings):
     RESEARCHER_SIGNUP_CODE: str = ""
 
     # ---- old backends (until the merge is finished) ---------------------
-    KOTLIN_BACKEND_URL: str
+    # Only Go is left: the chatbot's "use last answer" reads (src/tasks/
+    # client.py) until tasks.service.autofill exists (docs-and-plan#264).
     GO_BACKEND_URL: str
-    # Outbound keys this service presents to Kotlin / Go. Must match each
-    # backend's own CHATBOT_SERVICE_KEY -- see web-backend's ServiceKeyFilter
-    # and mobile-backend's service_auth_middleware.go.
-    KOTLIN_SERVICE_KEY: str
+    # Outbound key this service presents to Go. Must match its own
+    # CHATBOT_SERVICE_KEY -- see mobile-backend's service_auth_middleware.go.
     GO_SERVICE_KEY: str
     # Inbound key: first-party callers (web-backend) present this as the
     # X-Service-Key header on /service/* routes here.

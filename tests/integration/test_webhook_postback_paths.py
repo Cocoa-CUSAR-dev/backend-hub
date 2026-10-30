@@ -29,6 +29,7 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
@@ -91,9 +92,7 @@ async def _seed_one_question_task(
 
 
 def _mock_form(task_form_id: uuid.UUID, form: dict) -> None:
-    respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-        return_value=Response(200, json=form)
-    )
+    serve_form(task_form_id, form)
 
 
 class TestStartATask:

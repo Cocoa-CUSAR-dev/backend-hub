@@ -29,7 +29,7 @@
 
 - **No Alembic or any other migration tool.** Schema changes are Flyway migrations in the `database` repo (ADR 0005).
 - **Don't add lines to `scripts/conventions_baseline.txt`.** It lists legacy code and may only shrink (`--prune` after fixing one).
-- **Don't add new HTTP calls to Kotlin or Go.** The few that remain (`src/forms`, `src/tasks`, `src/diary`, `src/sso` clients) are being replaced by direct service calls as each backend is merged in.
+- **Don't add new HTTP calls to Kotlin or Go.** The one that remains (`src/tasks/client.py`, Go's "use last answer") is replaced by a direct service call when `tasks.service.autofill` exists.
 - **Don't treat "some required slots still missing" as a trigger for `GuidedFlow`.** Only a genuine LLM failure or timeout (`LLMUnavailable`) does. The switch is two-way and can happen mid-conversation (`on_llm_recovered`).
 - **Don't use `BackgroundTasks` for anything where a silently lost task would hurt.** That belongs in the scheduler.
 - **Don't hand-roll LINE webhook signature verification.** `src/line/client.py`'s `parse_events` uses `WebhookParser`.

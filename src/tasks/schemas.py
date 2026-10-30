@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -8,33 +7,10 @@ from src.forms.schemas import FormOut
 from src.go_json import GoTime
 
 
-class TaskListItem(BaseModel):
-    """One row of Go's GET /service/tasks response (queryTasksForUser,
-    mobile-backend#176) -- the service-key twin of GetTasks used by the
-    chatbot's LIFF to-do list (docs-and-plan#176). `status` is one of
-    NOT_STARTED / IN_PROGRESS / OVERDUE / COMPLETED, computed by Go from
-    close_at and whether the user has answered -- see that endpoint's
-    own docstring for the exact ladder (multi-submit forms never reach
-    COMPLETED there, by design).
-    """
-
-    task_id: UUID
-    task_form_id: UUID
-    title: str
-    description: str | None = None
-    open_at: datetime | None = None
-    close_at: datetime | None = None
-    handler: str
-    is_multiple_submit: bool = False
-    status: str
-
-
 class TaskSubmission(BaseModel):
-    """Matches Go's POST /service/tasks (ADR 0001's write side, via the
-    chatbot's own service-account credential -- see tasks/client.py).
-    user_id is explicit here because there's no farmer session for Go to
-    derive it from on this path; Go independently verifies a matching
-    conversation exists before trusting it.
+    """What the chatbot hands over to save: whose answer, to which task, and
+    the answer keyed by field name. src/chat/submit.py turns it into a
+    `tasks.answers.submit` call.
 
     Also reused as the LLM's structured-output schema for extraction
     (ADR 0004) -- one schema definition, two consumers, per ADR 0003's
@@ -54,9 +30,7 @@ class TaskSubmission(BaseModel):
 
 class TaskOut(BaseModel):
     """One task in the farmer's task list, with its status for that farmer.
-
-    Will replace TaskListItem above once the chatbot calls tasks.service
-    directly instead of Go over HTTP (docs-and-plan#259).
+    The app, the LINE picker and LIFF all read the list through this shape.
     """
 
     task_id: UUID
