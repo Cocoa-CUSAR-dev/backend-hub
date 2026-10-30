@@ -817,3 +817,29 @@ async def copy_form(session: AsyncSession, template_task_id: UUID, new_task_id: 
                 {"new_question": new_question, "q": question},
             )
     return new_form
+
+
+@dataclass(frozen=True, slots=True)
+class FormQuestion:
+    question_id: UUID
+    field_name: str | None
+    label: str | None
+    input_type: str | None
+
+
+async def form_questions(session: AsyncSession, form_id: UUID) -> list[FormQuestion]:
+    """Every question of a form, active or not, in the order the farmer is
+    asked (section, then question)."""
+    result = await session.execute(
+        text(
+            """
+            SELECT q.question_id, q.field_name, q.label, q.input_type
+            FROM form.question q
+            JOIN form.section s ON s.section_id = q.section_id
+            WHERE s.form_id = :form_id
+            ORDER BY s.sort_order NULLS LAST, q.sort_order NULLS LAST, q.question_id
+            """
+        ),
+        {"form_id": form_id},
+    )
+    return [FormQuestion(**row._mapping) for row in result]
