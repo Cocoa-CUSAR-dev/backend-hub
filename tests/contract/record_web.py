@@ -691,7 +691,8 @@ ROUTES: list[Route] = [
         [
             C("task 1", "researcher", {"taskId": TASK[1]}),
             C("page of one", "researcher", {"taskId": TASK[1]}, query={"page": "0", "size": "1"}),
-            C("unknown task", "researcher", {"taskId": UNKNOWN}),
+            # An unknown form is 404, as on every other /forms/{id} route (Kotlin: 200 []).
+            C("unknown task", "researcher", {"taskId": UNKNOWN}, hub={"status": 404}),
             forbidden(params={"taskId": TASK[1]}),
         ],
     ),

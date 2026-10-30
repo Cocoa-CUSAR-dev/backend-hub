@@ -15,6 +15,7 @@ All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2
 Other code calls the functions here.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -354,3 +355,34 @@ async def batches_of_processor(
         {"processor_id": processor_id, "limit": limit},
     )
     return [BatchRow(**row._mapping) for row in result]
+
+
+async def processor_names(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUID, str]:
+    """user_id -> "first last" of their processor profile, for the people who have
+    one with both names (a missing part means no name, as web-backend joined
+    them)."""
+    if not user_ids:
+        return {}
+    result = await session.execute(
+        text(
+            "SELECT user_id, first_name || ' ' || last_name AS name FROM processing.processor"
+            " WHERE user_id = ANY(:ids) AND first_name IS NOT NULL AND last_name IS NOT NULL"
+        ),
+        {"ids": list(user_ids)},
+    )
+    return {row.user_id: row.name for row in result}
+
+
+async def hub_collector_names(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUID, str]:
+    """user_id -> "first last" of their hub collector profile, for the people
+    who have one with both names."""
+    if not user_ids:
+        return {}
+    result = await session.execute(
+        text(
+            "SELECT user_id, first_name || ' ' || last_name AS name FROM processing.hub_collector"
+            " WHERE user_id = ANY(:ids) AND first_name IS NOT NULL AND last_name IS NOT NULL"
+        ),
+        {"ids": list(user_ids)},
+    )
+    return {row.user_id: row.name for row in result}

@@ -335,3 +335,57 @@ class FormEditIn(_CamelIn):
 
     description: str | None = None
     sections: list[SectionEditIn] = []
+
+
+# ---- a researcher's view of a form's answers (FORM-12, FORM-13, FORM-14) ------------
+# Same keys as web-backend's FormResponse and ResponseReview models.
+
+
+class AnswerOut(_CamelOut):
+    full_name: str
+    answer: str
+
+
+class QuestionAnswersOut(_CamelOut):
+    """One question and every answer to it, a person each."""
+
+    question_title: str
+    answers: list[AnswerOut]
+
+
+class ReviewFieldOut(_CamelOut):
+    """One question's answer inside a submission. `source` is how the chatbot
+    got it ("llm_extracted" or "guided_flow"); None when it didn't come
+    through the chatbot. `editable`: whether a correction can handle its type."""
+
+    field_name: str
+    label: str
+    input_type: str
+    value: str | None
+    source: str | None
+    editable: bool
+
+
+class SubmissionOut(_CamelOut):
+    response_id: UUID
+    submitter: str
+    submitted_at: datetime | None
+    fields: list[ReviewFieldOut]
+
+
+class ResponseOut(_CamelOut):
+    """One answer as stored."""
+
+    response_id: UUID
+    form_id: UUID
+    user_id: UUID
+    submitted_at: datetime | None
+    answer: Any
+    status: str | None
+
+
+class CorrectionIn(_CamelOut):  # same camelCase config, for a body
+    """`reason` is free text for whoever audits corrections later."""
+
+    value: str
+    reason: str | None = None

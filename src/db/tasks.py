@@ -690,3 +690,109 @@ async def _columns(session: AsyncSession, schema: str, table: str) -> list[str]:
         )
         _table_columns[key] = list(result.scalars())
     return _table_columns[key]
+
+
+# ---- a researcher's view of a task's answers (FORM-12, FORM-13, FORM-14) ------------
+
+
+@dataclass(frozen=True, slots=True)
+class TaskResponse:
+    """One answer sent to a task, with who sent it."""
+
+    response_id: UUID
+    task_form_id: UUID | None
+    user_id: UUID
+    submitted_at: datetime | None
+    answer: Any
+    status: str | None
+
+
+_TASK_RESPONSE_COLUMNS = "response_id, task_form_id, user_id, submitted_at, answer, status"
+
+
+async def responses_of_task(
+    session: AsyncSession,
+    task_id: UUID,
+    *,
+    limit: int,
+    offset: int,
+    newest_first: bool = False,
+    only_users: Sequence[UUID] | None = None,
+) -> list[TaskResponse]:
+    """A page of the task's answers: by response id (the per-question view),
+    or newest first, unsent ones last (the review table). `only_users`
+    keeps those people's answers only."""
+    order = "submitted_at DESC NULLS LAST, response_id" if newest_first else "response_id"
+    users = "" if only_users is None else " AND user_id = ANY(:only_users)"
+    result = await session.execute(
+        text(
+            f"SELECT {_TASK_RESPONSE_COLUMNS} FROM form.response"
+            f" WHERE task_log_id = :task_id{users} ORDER BY {order} LIMIT :limit OFFSET :offset"
+        ),
+        {
+            "task_id": task_id,
+            "limit": limit,
+            "offset": offset,
+            "only_users": list(only_users or []),
+        },
+    )
+    return [TaskResponse(**row._mapping) for row in result]
+
+
+async def response_of_task(
+    session: AsyncSession, task_id: UUID, response_id: UUID, *, lock: bool = False
+) -> TaskResponse | None:
+    """One answer of this task (None for another task's or no such answer).
+    `lock` holds the row until the transaction ends, so two corrections of
+    one answer can't overwrite each other with a stale copy."""
+    result = await session.execute(
+        text(
+            f"SELECT {_TASK_RESPONSE_COLUMNS} FROM form.response"
+            " WHERE response_id = :response_id AND task_log_id = :task_id"
+            + (" FOR UPDATE" if lock else "")
+        ),
+        {"task_id": task_id, "response_id": response_id},
+    )
+    row = result.first()
+    return TaskResponse(**row._mapping) if row else None
+
+
+async def set_answer(session: AsyncSession, response_id: UUID, answer: dict[str, Any]) -> None:
+    """Replace a response's answer JSON (a correction: submitted_at stays)."""
+    await session.execute(
+        text("UPDATE form.response SET answer = CAST(:answer AS jsonb) WHERE response_id = :r"),
+        {"r": response_id, "answer": json.dumps(answer, ensure_ascii=False)},
+    )
+
+
+async def log_correction(
+    session: AsyncSession,
+    *,
+    response_id: UUID,
+    field_name: str,
+    old_value: str | None,
+    new_value: str | None,
+    corrected_by: UUID,
+    reason: str | None,
+    corrected_at: datetime,
+) -> None:
+    """The audit row of one corrected field (docs-and-plan#173)."""
+    await session.execute(
+        text(
+            """
+            INSERT INTO form.response_correction_log
+                (response_id, field_name, old_value, new_value, corrected_by, reason, corrected_at)
+            VALUES (:response_id, :field_name, :old_value, :new_value, :corrected_by, :reason,
+                    :corrected_at)
+            """
+        ),
+        {
+            "response_id": response_id,
+            "field_name": field_name,
+            "old_value": old_value,
+            "new_value": new_value,
+            "corrected_by": corrected_by,
+            "reason": reason,
+            "corrected_at": corrected_at,
+        },
+    )

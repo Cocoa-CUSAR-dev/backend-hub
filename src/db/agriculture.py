@@ -17,6 +17,7 @@ All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2
 Other code calls the functions here.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -333,3 +334,19 @@ async def farm_names(session: AsyncSession, farm_ids: list[UUID]) -> dict[UUID, 
         {"ids": farm_ids},
     )
     return {row.farm_id: row.farm_name for row in result}
+
+
+async def farmer_names(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[UUID, str]:
+    """user_id -> "first last" of their farmer profile, for the people who have
+    one with both names (a missing part means no name, as web-backend joined
+    them)."""
+    if not user_ids:
+        return {}
+    result = await session.execute(
+        text(
+            "SELECT user_id, first_name || ' ' || last_name AS name FROM agriculture.farmer"
+            " WHERE user_id = ANY(:ids) AND first_name IS NOT NULL AND last_name IS NOT NULL"
+        ),
+        {"ids": list(user_ids)},
+    )
+    return {row.user_id: row.name for row in result}
