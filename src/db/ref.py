@@ -12,7 +12,9 @@ strict identifier pattern and quoted before use.
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
@@ -143,3 +145,51 @@ async def province_of_district(session: AsyncSession, district_id: UUID) -> UUID
     )
     province: UUID | None = found.scalar()
     return province
+
+
+async def constant_rows(
+    session: AsyncSession,
+    table: str,
+    columns: Sequence[str],
+    *,
+    where: tuple[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """`columns` of every row of one ref table, ordered by the first column.
+    `where` = (column, value) keeps the rows whose column, as text, equals value."""
+    sql = f"SELECT {', '.join(_quoted(c) for c in columns)} FROM ref.{_quoted(table)}"
+    params: dict[str, Any] = {}
+    if where is not None:
+        sql += f" WHERE {_quoted(where[0])}::text = :value"
+        params["value"] = where[1]
+    result = await session.execute(text(sql + " ORDER BY 1"), params)
+    return [dict(row._mapping) for row in result]
+
+
+async def locations(
+    session: AsyncSession, *, zip_code: str | None, subdistrict_id: str | None
+) -> list[dict[str, Any]]:
+    """Subdistricts by zip code and/or id, each with its district, province
+    and a "ต.… อ.… จ.… <zip>" full name, ordered by subdistrict name."""
+    result = await session.execute(
+        text(
+            """
+            SELECT sd.subdistrict_id, sd.subdistrict_name_th AS subdistrict_name,
+                   dt.district_name_th AS district_name, pv.province_name_th AS province_name,
+                   sd.zipcode AS zip_code,
+                   TRIM(
+                       COALESCE('ต.' || sd.subdistrict_name_th, '')
+                       || COALESCE(' อ.' || dt.district_name_th, '')
+                       || COALESCE(' จ.' || pv.province_name_th, '')
+                       || COALESCE(' ' || sd.zipcode, '')
+                   ) AS full_name
+            FROM ref.subdistrict_constant sd
+            LEFT JOIN ref.district_constant dt ON dt.district_id = sd.district_id
+            LEFT JOIN ref.province_constant pv ON pv.province_id = dt.province_id
+            WHERE (CAST(:sub_id AS text) IS NULL OR sd.subdistrict_id::text = :sub_id)
+              AND (CAST(:zip_code AS text) IS NULL OR sd.zipcode = :zip_code)
+            ORDER BY sd.subdistrict_name_th
+            """
+        ),
+        {"zip_code": zip_code, "sub_id": subdistrict_id},
+    )
+    return [dict(row._mapping) for row in result]

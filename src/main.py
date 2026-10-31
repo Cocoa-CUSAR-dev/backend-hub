@@ -45,6 +45,7 @@ from src.logging_config import configure_logging
 from src.me.router import router as me_router
 from src.notifications.router import router as notifications_router
 from src.processing.router import router as processing_router
+from src.ref.router import router as ref_router
 from src.reports.router import router as reports_router
 from src.request_id import request_id_middleware
 from src.tasks.router import router as tasks_router
@@ -124,6 +125,7 @@ app.include_router(analytics_router)
 app.include_router(agriculture_router)
 app.include_router(collection_router)
 app.include_router(processing_router)
+app.include_router(ref_router)
 app.include_router(line_router)
 app.include_router(liff_tasks_router)
 app.include_router(notifications_router)
