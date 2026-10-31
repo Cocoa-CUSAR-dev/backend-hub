@@ -97,7 +97,13 @@ def test_status_of_a_task_without_form_or_close_time() -> None:
 # --- list_for ------------------------------------------------------------------
 
 
-async def test_list_for_joins_each_task_with_its_form(fake_db: dict[str, AsyncMock]) -> None:
+async def test_list_for_joins_each_task_with_its_form(
+    fake_db: dict[str, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src import clock
+
+    # Before the tasks close (2026-10-31 17:00), whatever today is.
+    monkeypatch.setattr(clock, "bangkok_now", lambda: clock.to_bangkok(datetime(2026, 10, 15, 3)))
     with_form = _task(answered=True)
     without_form = _task()
     form = _task_form(with_form.task_id, multiple=True)
