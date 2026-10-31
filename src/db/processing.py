@@ -386,3 +386,63 @@ async def hub_collector_names(session: AsyncSession, user_ids: Sequence[UUID]) -
         {"ids": list(user_ids)},
     )
     return {row.user_id: row.name for row in result}
+
+
+async def hub_choices(session: AsyncSession, user_id: UUID) -> list[tuple[UUID, str | None]]:
+    """(hub_id, hub_name) of the hubs this user collects for, by name."""
+    result = await session.execute(
+        text(
+            """
+            SELECT h.hub_id, h.hub_name
+            FROM processing.hub h
+            JOIN processing.hub_collector hc ON hc.hub_id = h.hub_id
+            WHERE hc.user_id = :user_id
+            ORDER BY h.hub_name, h.hub_id
+            """
+        ),
+        {"user_id": user_id},
+    )
+    return [(row.hub_id, row.hub_name) for row in result]
+
+
+async def station_choices(
+    session: AsyncSession, processor_id: UUID
+) -> list[tuple[UUID, str | None]]:
+    """(processing_station_id, processing_station_name) of this processor's
+    stations, by name."""
+    result = await session.execute(
+        text(
+            """
+            SELECT ps.processing_station_id, ps.processing_station_name
+            FROM processing.processing_station ps
+            JOIN processing.processor_processing_station pps
+              ON pps.processing_station_id = ps.processing_station_id
+            WHERE pps.processor_id = :processor_id
+            ORDER BY ps.processing_station_name, ps.processing_station_id
+            """
+        ),
+        {"processor_id": processor_id},
+    )
+    return [(row.processing_station_id, row.processing_station_name) for row in result]
+
+
+async def batch_choices(
+    session: AsyncSession, processor_id: UUID, station_id: str | None = None
+) -> list[tuple[UUID, str | None, datetime]]:
+    """(batch_id, origin, created_at) of the batches at this processor's
+    stations, newest first; only `station_id`'s (compared as text) when given."""
+    result = await session.execute(
+        text(
+            """
+            SELECT b.batch_id, b.origin, b.created_at
+            FROM processing.batch b
+            JOIN processing.processor_processing_station pps
+              ON pps.processing_station_id = b.processing_station_id
+            WHERE pps.processor_id = :processor_id
+              AND (CAST(:station_id AS text) IS NULL OR b.processing_station_id::text = :station_id)
+            ORDER BY b.created_at DESC, b.batch_id
+            """
+        ),
+        {"processor_id": processor_id, "station_id": station_id},
+    )
+    return [(row.batch_id, row.origin, row.created_at) for row in result]

@@ -113,3 +113,25 @@ async def harvests(
         },
     )
     return [HarvestGradeRow(**row._mapping) for row in result]
+
+
+async def harvest_choices(
+    session: AsyncSession, hub_ids: list[UUID], hub_id: str | None = None
+) -> list[tuple[UUID, UUID | None, datetime | None]]:
+    """(harvest_id, farm_id, harvest_date) of the harvests at these hubs,
+    newest first; only `hub_id`'s (compared as text) when given."""
+    if not hub_ids:
+        return []
+    result = await session.execute(
+        text(
+            """
+            SELECT harvest_id, farm_id, harvest_date
+            FROM collection.harvest
+            WHERE hub_id = ANY(:hub_ids)
+              AND (CAST(:hub_id AS text) IS NULL OR hub_id::text = :hub_id)
+            ORDER BY harvest_date DESC NULLS LAST, harvest_id
+            """
+        ),
+        {"hub_ids": hub_ids, "hub_id": hub_id},
+    )
+    return [(row.harvest_id, row.farm_id, row.harvest_date) for row in result]

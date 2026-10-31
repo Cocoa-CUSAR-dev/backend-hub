@@ -770,3 +770,115 @@ CREATE TABLE form.question_visibility (
 );
 CREATE UNIQUE INDEX uq_task_recurrence_period ON form.task (recurrence_id, period_date)
     WHERE recurrence_id IS NOT NULL;
+
+-- docs-and-plan#295 (REF-01): the rest of the ref.*_constant tables the
+-- mobile dropdowns read (GET /api/v1/ref/constants/{key}), copied from the
+-- database repo's V1 baseline.
+CREATE TABLE ref.air_exposure_type_constant (
+    air_exposure_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    air_exposure_type_name character varying,
+    CONSTRAINT pk_air_exposure_type PRIMARY KEY (air_exposure_type_id)
+);
+
+CREATE TABLE ref.breed_constant (
+    breed_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    breed_name character varying,
+    CONSTRAINT pk_breed PRIMARY KEY (breed_id)
+);
+
+CREATE TABLE ref.chem_bio_constant (
+    chem_bio_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    chem_bio_name character varying,
+    description character varying DEFAULT ''::character varying,
+    CONSTRAINT pk_chem_bio PRIMARY KEY (chem_bio_id)
+);
+
+CREATE TABLE ref.drying_facility_constant (
+    drying_facility_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    drying_facility_type_name character varying,
+    CONSTRAINT pk_drying_facility PRIMARY KEY (drying_facility_type_id)
+);
+
+CREATE TABLE ref.fertilizer_application_stage_constant (
+    fertilizer_application_stage_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    fertilizer_application_stage_name_th character varying(255),
+    fertilizer_application_stage_name_en character varying(255),
+    fertilizer_application_stage_description character varying DEFAULT ''::character varying,
+    CONSTRAINT pk_fertilizer_application_stage PRIMARY KEY (fertilizer_application_stage_id)
+);
+
+CREATE TABLE ref.fertilizer_constant (
+    fertilizer_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    fertilizer_name character varying,
+    description character varying DEFAULT ''::character varying,
+    is_organic boolean DEFAULT false,
+    CONSTRAINT pk_fertilizer PRIMARY KEY (fertilizer_id)
+);
+
+CREATE TABLE ref.hole_filler_material_constant (
+    hole_filler_material_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    hole_filler_material_name character varying,
+    CONSTRAINT pk_hole_filler_material PRIMARY KEY (hole_filler_material_id)
+);
+
+CREATE TABLE ref.land_type_constant (
+    land_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    land_type_name character varying,
+    CONSTRAINT pk_land_type PRIMARY KEY (land_type_id)
+);
+
+CREATE TABLE ref.location_type_constant (
+    location_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    location_type_name character varying,
+    CONSTRAINT pk_location_type PRIMARY KEY (location_type_id)
+);
+
+CREATE TABLE ref.pest_disease_constant (
+    pest_disease_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    pest_disease_name character varying,
+    type character varying,
+    description character varying DEFAULT ''::character varying,
+    CONSTRAINT pk_pest_disease PRIMARY KEY (pest_disease_id)
+);
+
+CREATE TABLE ref.processing_activity_type_constant (
+    processing_activity_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processing_activity_type_name character varying,
+    CONSTRAINT pk_processing_activity_type PRIMARY KEY (processing_activity_type_id)
+);
+
+CREATE TABLE ref.processing_defect_constant (
+    processing_defect_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    processing_defect_name character varying,
+    CONSTRAINT pk_processing_defect PRIMARY KEY (processing_defect_id)
+);
+
+CREATE TABLE ref.soil_type_constant (
+    soil_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    soil_type_name character varying,
+    CONSTRAINT pk_soil_type PRIMARY KEY (soil_type_id)
+);
+
+CREATE TABLE ref.tank_material_constant (
+    tank_material_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tank_material_name character varying,
+    CONSTRAINT pk_tank_material PRIMARY KEY (tank_material_id)
+);
+
+CREATE TABLE ref.water_source_constant (
+    water_source_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    water_source_name character varying,
+    CONSTRAINT pk_water_source PRIMARY KEY (water_source_id)
+);
+
+CREATE TABLE ref.watering_system_constant (
+    watering_system_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    watering_system_name character varying,
+    CONSTRAINT pk_watering_system PRIMARY KEY (watering_system_id)
+);
+
+CREATE TABLE ref.weather_condition_constant (
+    weather_condition_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    weather_condition_name character varying,
+    CONSTRAINT pk_weather_condition PRIMARY KEY (weather_condition_id)
+);
