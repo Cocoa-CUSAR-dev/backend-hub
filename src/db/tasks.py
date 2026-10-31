@@ -251,6 +251,38 @@ async def latest_answer(
     return answer
 
 
+@dataclass(frozen=True, slots=True)
+class CompletedAnswer:
+    submitted_at: datetime
+    answer: dict[str, Any]
+
+
+async def last_completed_answer(
+    session: AsyncSession, user_id: UUID, task_ids: Sequence[UUID]
+) -> CompletedAnswer | None:
+    """The user's most recent COMPLETED answer to any of these tasks (from
+    any channel), or None. An answer that is not a JSON object counts as none."""
+    if not task_ids:
+        return None
+    row = (
+        await session.execute(
+            text(
+                """
+                SELECT submitted_at, answer FROM form.response
+                WHERE user_id = :user_id AND task_log_id = ANY(:task_ids)
+                  AND status = 'COMPLETED' AND submitted_at IS NOT NULL
+                ORDER BY submitted_at DESC
+                LIMIT 1
+                """
+            ),
+            {"user_id": user_id, "task_ids": list(task_ids)},
+        )
+    ).first()
+    if row is None or not isinstance(row.answer, dict):
+        return None
+    return CompletedAnswer(submitted_at=row.submitted_at, answer=row.answer)
+
+
 async def responses_of_user(
     session: AsyncSession, user_id: UUID, task_id: UUID
 ) -> list[ResponseRow]:

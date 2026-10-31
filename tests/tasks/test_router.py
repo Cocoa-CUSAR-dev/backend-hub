@@ -258,3 +258,55 @@ async def test_field_errors_from_the_service_reach_the_client(
         422,
         {"detail": "ข้อมูลไม่ผ่านการตรวจสอบ", "fields": {"weight_kg": "น้ำหนัก 0-500 กก."}},
     )
+
+
+# --- GET autofill ------------------------------------------------------------------
+
+
+@pytest.fixture
+def fake_autofill(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    from src.tasks import autofill
+
+    mock = AsyncMock()
+    monkeypatch.setattr(autofill, "autofill", mock)
+    return mock
+
+
+async def test_autofill_returns_the_offer_with_a_go_time(
+    client: AsyncClient, fake_autofill: AsyncMock
+) -> None:
+    from src.tasks.schemas import AutofillOut
+
+    task_id = uuid4()
+    fake_autofill.return_value = AutofillOut(
+        submitted_at=datetime(2026, 10, 2, 3, 4, 5), answer={"note": "ใส่ปุ๋ย"}
+    )
+
+    response = await client.get(f"/api/v1/tasks/{task_id}/autofill", headers=_auth())
+
+    assert (response.status_code, response.json()) == (
+        200,
+        {"submitted_at": "2026-10-02T03:04:05Z", "answer": {"note": "ใส่ปุ๋ย"}},
+    )
+    _, actor, called_task = fake_autofill.await_args.args
+    assert (actor.user_id, called_task) == (USER_ID, task_id)
+
+
+async def test_autofill_with_nothing_to_offer_is_204(
+    client: AsyncClient, fake_autofill: AsyncMock
+) -> None:
+    fake_autofill.return_value = None
+
+    response = await client.get(f"/api/v1/tasks/{uuid4()}/autofill", headers=_auth())
+
+    assert (response.status_code, response.content) == (204, b"")
+
+
+async def test_autofill_of_an_unknown_task_is_404(
+    client: AsyncClient, fake_autofill: AsyncMock
+) -> None:
+    fake_autofill.side_effect = NotFound("ไม่พบแบบฟอร์มสำหรับงานที่ระบุ")
+
+    response = await client.get(f"/api/v1/tasks/{uuid4()}/autofill", headers=_auth())
+
+    assert response.status_code == 404

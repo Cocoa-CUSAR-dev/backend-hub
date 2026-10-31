@@ -1,19 +1,26 @@
 """/api/v1/tasks -- the farmer's tasks, their forms and my answers to them.
 
 Replaces mobile-backend's GET /tasks, /tasks/:taskId, /tasks/:taskId/form,
-/tasks/:taskId/responses, POST /tasks and PUT /tasks (TASK-01..07 in the API
-migration map).
+/tasks/:taskId/responses, /tasks/:taskId/autofill, POST /tasks and PUT /tasks
+(TASK-01..07 in the API migration map).
 """
 
 from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 
 from src.auth.dependencies import CurrentActor, SessionDep
-from src.tasks import answers, service
-from src.tasks.schemas import AnswerIn, AnswerSavedOut, ResponseOut, TaskFormOut, TaskOut
+from src.tasks import answers, autofill, service
+from src.tasks.schemas import (
+    AnswerIn,
+    AnswerSavedOut,
+    AutofillOut,
+    ResponseOut,
+    TaskFormOut,
+    TaskOut,
+)
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
 
@@ -39,6 +46,19 @@ async def get(task_id: UUID, actor: CurrentActor, session: SessionDep) -> dict[s
 @router.get("/{task_id}/form", summary="The form to fill for this task, and its version")
 async def get_form(task_id: UUID, actor: CurrentActor, session: SessionDep) -> TaskFormOut:
     return await service.get_form(session, actor, task_id)
+
+
+@router.get(
+    "/{task_id}/autofill",
+    response_model=AutofillOut,
+    responses={status.HTTP_204_NO_CONTENT: {"description": "Nothing to offer: open a blank form"}},
+    summary="My last answer of this form type, safe to prefill a new answer with",
+)
+async def get_autofill(
+    task_id: UUID, actor: CurrentActor, session: SessionDep
+) -> AutofillOut | Response:
+    offer = await autofill.autofill(session, actor, task_id)
+    return offer if offer is not None else Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{task_id}/responses", summary="Every answer I filed for this task, newest first")

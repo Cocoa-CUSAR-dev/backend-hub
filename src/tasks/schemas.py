@@ -102,3 +102,20 @@ class AnswerSavedOut(BaseModel):
     message: str
     # Which response was written, so the caller can edit it later.
     response_id: UUID
+
+
+class AutofillOut(BaseModel):
+    """The prefill offered for a new answer: the caller's last answer of this
+    form type, already sanitized, and when it was given."""
+
+    submitted_at: GoTime
+    answer: dict[str, Any]
+
+
+class LastAnswerOut(BaseModel):
+    """The caller's most recent COMPLETED answer of a handler, unsanitized
+    (Go's GET /service/tasks/last-answer body)."""
+
+    handler: str
+    submitted_at: GoTime
+    answer: dict[str, Any]
