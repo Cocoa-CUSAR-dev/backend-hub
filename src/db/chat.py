@@ -15,10 +15,12 @@ through a side session are here, and the service holds no SQL.
 """
 
 import logging
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import CursorResult, select, update
+from sqlalchemy import CursorResult, select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import set_committed_value
@@ -167,3 +169,63 @@ async def record_submitted(row: ConversationAnswer, submitted: list[str]) -> Non
         )
         await side_session.commit()
     set_committed_value(row, "answer", answer)
+
+
+# ---- where a submitted answer came from (the researcher's review table) -------------
+
+
+@dataclass(frozen=True, slots=True)
+class FinishedConversation:
+    conversation_id: UUID
+    user_id: UUID
+    updated_at: datetime | None
+
+
+async def completed_conversations(
+    session: AsyncSession, user_ids: list[UUID], task_id: UUID
+) -> list[FinishedConversation]:
+    """These people's finished conversations about this task, with when each
+    last changed (the model maps no updated_at, so plain SQL)."""
+    if not user_ids:
+        return []
+    result = await session.execute(
+        text(
+            "SELECT conversation_id, user_id, updated_at FROM chat.conversation"
+            " WHERE user_id = ANY(:user_ids) AND task_id = :task_id AND status = :status"
+        ),
+        {"user_ids": user_ids, "task_id": task_id, "status": ConversationStatus.COMPLETED.value},
+    )
+    return [FinishedConversation(**row._mapping) for row in result]
+
+
+async def answer_sources(
+    session: AsyncSession, conversation_ids: list[UUID]
+) -> dict[UUID, dict[UUID, str]]:
+    """conversation_id -> question_id -> how the chatbot got the answer
+    ("llm_extracted" or "guided_flow")."""
+    if not conversation_ids:
+        return {}
+    result = await session.execute(
+        select(
+            ConversationAnswer.conversation_id,
+            ConversationAnswer.question_id,
+            ConversationAnswer.source,
+        ).where(ConversationAnswer.conversation_id.in_(conversation_ids))
+    )
+    sources: dict[UUID, dict[UUID, str]] = {}
+    for conversation_id, question_id, source in result:
+        sources.setdefault(conversation_id, {})[question_id] = str(source)
+    return sources
+
+
+async def users_with_ai_answers(session: AsyncSession, task_id: UUID) -> list[UUID]:
+    """Who has at least one AI-extracted answer in a conversation about this task."""
+    result = await session.execute(
+        select(Conversation.user_id)
+        .join(
+            ConversationAnswer, ConversationAnswer.conversation_id == Conversation.conversation_id
+        )
+        .where(Conversation.task_id == task_id, ConversationAnswer.source == "llm_extracted")
+        .distinct()
+    )
+    return list(result.scalars().all())

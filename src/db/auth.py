@@ -304,6 +304,18 @@ async def user_ids_with_any_role(session: AsyncSession, role_ids: Sequence[UUID]
     return set(result.scalars())
 
 
+async def user_ids_with_role(session: AsyncSession, role_name: str) -> set[UUID]:
+    """Who holds this role, by name."""
+    result = await session.execute(
+        text(
+            "SELECT ur.user_id FROM auth.user_role ur JOIN auth.role r ON r.role_id = ur.role_id"
+            " WHERE r.role_name = :n"
+        ),
+        {"n": role_name},
+    )
+    return set(result.scalars())
+
+
 async def link_line(
     session: AsyncSession, user_id: UUID, line_user_id: str, display_name: str | None
 ) -> bool:
