@@ -120,8 +120,10 @@ def _points(value: Any) -> list[tuple[float, float]] | None:
     return points
 
 
-def _choice_key(value: Any) -> str:
-    """How Go's %v printed an id: 5.0 -> "5", "A" -> "A"."""
+def choice_key(value: Any) -> str:
+    """How Go's %v printed an id: 5.0 -> "5", True -> "true", "A" -> "A"."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
@@ -140,8 +142,8 @@ def _type_error(question: QuestionOut, value: Any) -> str | None:
     if kind == "BOOLEAN" and _boolean(value) is None:
         return "ต้องเป็นค่า true/false"
     if kind == "OPTION":
-        ids = {_choice_key(choice.id) for choice in question.choices or []}
-        if _choice_key(value) not in ids:
+        ids = {choice_key(choice.id) for choice in question.choices or []}
+        if choice_key(value) not in ids:
             return "ตัวเลือกไม่ถูกต้อง"
     if kind == "GEODATA" and _points(value) is None:
         return "ข้อมูลพิกัดไม่ถูกต้อง"
