@@ -72,6 +72,11 @@ TAGS: list[dict[str, Any]] = [
         "name": "processing",
         "description": "Processing stations and their batches (processors).",
     },
+    {
+        "name": "ref",
+        "description": "Dropdown choices for forms: reference tables, addresses, and my own "
+        "farms, plots, hubs, harvests, stations and batches.",
+    },
     {"name": "line", "description": "LINE webhook: every chat event from the LINE OA."},
     {"name": "liff", "description": "Endpoints the LIFF pages call from inside LINE."},
     {

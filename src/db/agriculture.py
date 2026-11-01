@@ -350,3 +350,41 @@ async def farmer_names(session: AsyncSession, user_ids: Sequence[UUID]) -> dict[
         {"ids": list(user_ids)},
     )
     return {row.user_id: row.name for row in result}
+
+
+async def farm_choices(session: AsyncSession, farmer_id: UUID) -> list[tuple[UUID, str | None]]:
+    """(farm_id, farm_name) of this farmer's farms, by name."""
+    result = await session.execute(
+        text(
+            """
+            SELECT f.farm_id, f.farm_name
+            FROM agriculture.farm f
+            JOIN agriculture.farmer_farm ff ON ff.farm_id = f.farm_id
+            WHERE ff.farmer_id = :farmer_id
+            ORDER BY f.farm_name, f.farm_id
+            """
+        ),
+        {"farmer_id": farmer_id},
+    )
+    return [(row.farm_id, row.farm_name) for row in result]
+
+
+async def plot_choices(
+    session: AsyncSession, farmer_id: UUID, farm_id: str | None = None
+) -> list[tuple[UUID, str | None]]:
+    """(plot_id, plot_name) of the plots on this farmer's farms, by name;
+    only those of `farm_id` (compared as text) when given."""
+    result = await session.execute(
+        text(
+            """
+            SELECT p.plot_id, p.plot_name
+            FROM agriculture.plot p
+            JOIN agriculture.farmer_farm ff ON ff.farm_id = p.farm_id
+            WHERE ff.farmer_id = :farmer_id
+              AND (CAST(:farm_id AS text) IS NULL OR p.farm_id::text = :farm_id)
+            ORDER BY p.plot_name, p.plot_id
+            """
+        ),
+        {"farmer_id": farmer_id, "farm_id": farm_id},
+    )
+    return [(row.plot_id, row.plot_name) for row in result]
