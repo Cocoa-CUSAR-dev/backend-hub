@@ -33,6 +33,7 @@ async def test_login_returns_tokens_in_the_body_with_every_role(
     assert body["user"] == {
         "user_id": str(user_id),
         "username": "0811111111",
+        "email": None,
         "roles": ["farmer", "processor"],
         "must_reset_password": False,
     }
@@ -150,3 +151,106 @@ async def test_load_actor_unions_permissions_of_every_role(db_session: AsyncSess
     actor = await service.load_actor(db_session, user_id, channel="line")
     assert actor.roles == {"farmer", "processor"}
     assert actor.perms == {"read:profile:own", "read:farm:own", "read:station:own"}
+
+
+# ---- email -----------------------------------------------------------------
+
+
+async def test_sign_in_with_the_username_or_the_email(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    created = await client.post(
+        f"{AUTH}/register",
+        json={**_creds("0822222222", "cocoa-pass"), "email": " Somchai@Example.COM "},
+    )
+    assert created.status_code == 201
+    assert created.json()["user"]["email"] == "somchai@example.com"
+
+    for name in ("0822222222", "somchai@example.com", "SOMCHAI@example.com"):
+        response = await client.post(f"{AUTH}/login", json=_creds(name, "cocoa-pass"))
+        assert response.status_code == 200, name
+        assert response.json()["user"]["username"] == "0822222222"
+
+
+async def test_email_is_optional_and_a_blank_one_is_none(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    without = await client.post(f"{AUTH}/register", json=_creds("0822222223", "cocoa-pass"))
+    blank = await client.post(
+        f"{AUTH}/register", json={**_creds("0822222224", "cocoa-pass"), "email": "  "}
+    )
+    assert without.json()["user"]["email"] is None
+    assert blank.json()["user"]["email"] is None
+
+
+async def test_a_username_that_is_an_email_is_the_email_too(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    response = await client.post(f"{AUTH}/register", json=_creds("Ann@Test.com", "cocoa-pass"))
+    assert response.json()["user"]["username"] == "Ann@Test.com"
+    assert response.json()["user"]["email"] == "ann@test.com"
+
+
+async def test_a_bad_email_is_refused(client: AsyncClient, db_session: AsyncSession) -> None:
+    response = await client.post(
+        f"{AUTH}/register", json={**_creds("0822222225", "cocoa-pass"), "email": "not-an-email"}
+    )
+    assert response.status_code == 422
+
+
+async def test_no_name_signs_in_to_two_accounts(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    first = {**_creds("0822222226", "cocoa-pass"), "email": "taken@test.com"}
+    assert (await client.post(f"{AUTH}/register", json=first)).status_code == 201
+
+    same_email = {**_creds("0822222227", "cocoa-pass"), "email": "TAKEN@test.com"}
+    email_as_username = _creds("taken@test.com", "cocoa-pass")
+    assert (await client.post(f"{AUTH}/register", json=same_email)).status_code == 409
+    assert (await client.post(f"{AUTH}/register", json=email_as_username)).status_code == 409
+
+
+async def test_a_wrong_password_is_refused_through_the_email_too(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    body = {**_creds("0822222229", "cocoa-pass"), "email": "pw@test.com"}
+    assert (await client.post(f"{AUTH}/register", json=body)).status_code == 201
+    response = await client.post(f"{AUTH}/login", json=_creds("pw@test.com", "wrong-pass"))
+    assert response.status_code == 401
+
+
+async def test_me_changes_and_removes_the_email(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    created = await client.post(f"{AUTH}/register", json=_creds("0822222230", "cocoa-pass"))
+    headers = {"Authorization": f"Bearer {created.json()['access_token']}"}
+    other = {**_creds("0822222231", "cocoa-pass"), "email": "other@test.com"}
+    assert (await client.post(f"{AUTH}/register", json=other)).status_code == 201
+
+    added = await client.patch("/api/v1/me/account", json={"email": "Me@Test.com"}, headers=headers)
+    assert added.status_code == 200
+    assert added.json()["email"] == "me@test.com"
+    assert added.json()["username"] == "0822222230"
+    login = await client.post(f"{AUTH}/login", json=_creds("me@test.com", "cocoa-pass"))
+    assert login.status_code == 200
+
+    taken = await client.patch(
+        "/api/v1/me/account", json={"email": "other@test.com"}, headers=headers
+    )
+    assert taken.status_code == 409
+
+    # Saving the same address again isn't taken by myself.
+    again = await client.patch("/api/v1/me/account", json={"email": "me@test.com"}, headers=headers)
+    assert again.status_code == 200
+
+    removed = await client.patch("/api/v1/me/account", json={"email": None}, headers=headers)
+    assert removed.json()["email"] is None
+    gone = await client.post(f"{AUTH}/login", json=_creds("me@test.com", "cocoa-pass"))
+    assert gone.status_code == 401
+
+
+async def test_changing_the_email_needs_a_signed_in_person(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    response = await client.patch("/api/v1/me/account", json={"email": "a@test.com"})
+    assert response.status_code == 401

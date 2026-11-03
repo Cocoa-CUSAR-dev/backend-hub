@@ -6,6 +6,7 @@ from uuid import UUID
 from src import db
 from src.actor import Actor, require
 from src.auth import passwords
+from src.auth.service import create_account
 from src.database import Session, transaction
 from src.exceptions import Conflict, Forbidden, Invalid, NotFound
 
@@ -31,14 +32,7 @@ async def create_user(
         raise Forbidden(f"'{role}' is added by the user with their own profile")
     passwords.check_strength(temporary_password)
     async with transaction(session):
-        user_id = await db.auth.create_user(
-            session,
-            username.strip(),
-            passwords.hash_password(temporary_password),
-            requires_reset=True,
-        )
-        if user_id is None:
-            raise Conflict("ชื่อผู้ใช้นี้ถูกใช้งานแล้ว")
+        user_id = await create_account(session, username, temporary_password, requires_reset=True)
         try:
             await db.auth.add_role(session, user_id, role)
         except LookupError as exc:

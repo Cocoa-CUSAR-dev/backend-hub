@@ -29,13 +29,15 @@ CREATE SCHEMA research;
 CREATE TABLE auth.user_account (
     user_id uuid DEFAULT gen_random_uuid() NOT NULL,
     username character varying,
+    email character varying CONSTRAINT ck_user_account_email_lower CHECK (email = lower(email)),
     password_hash character varying,
     is_password_reset boolean DEFAULT false,
     is_requires_password_reset boolean DEFAULT false,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     CONSTRAINT pk_user_account PRIMARY KEY (user_id),
-    CONSTRAINT uq_user_account_username UNIQUE (username)
+    CONSTRAINT uq_user_account_username UNIQUE (username),
+    CONSTRAINT uq_user_account_email UNIQUE (email)
 );
 
 CREATE TABLE auth.role (

@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
     summary="Create an account (no role yet) and sign in",
 )
 async def register(body: RegisterIn, session: SessionDep) -> TokenPairOut:
-    return await service.register(session, body.username, body.password)
+    return await service.register(session, body.username, body.password, body.email)
 
 
 @router.post("/login", summary="Sign in with username + password")
