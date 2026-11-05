@@ -31,6 +31,7 @@ class UserRow:
     password_hash: str | None
     is_requires_password_reset: bool
     is_password_reset: bool
+    email: str | None = None
 
     @property
     def must_reset_password(self) -> bool:
@@ -48,7 +49,7 @@ class RefreshTokenRow:
 
 
 _USER_COLUMNS = """
-    user_id, username, password_hash,
+    user_id, username, email, password_hash,
     COALESCE(is_requires_password_reset, false) AS is_requires_password_reset,
     COALESCE(is_password_reset, false) AS is_password_reset
 """
@@ -71,6 +72,23 @@ async def user_by_username(session: AsyncSession, username: str) -> UserRow | No
     return _user(row) if row else None
 
 
+async def user_by_login(session: AsyncSession, login: str) -> UserRow | None:
+    """The account signing in with this username or email. A username match
+    wins, should an old account's username be someone else's email.
+    """
+    row = (
+        await session.execute(
+            text(
+                f"SELECT {_USER_COLUMNS} FROM auth.user_account"
+                " WHERE username = :login OR email = lower(:login)"
+                " ORDER BY username = :login DESC LIMIT 1"
+            ),
+            {"login": login},
+        )
+    ).first()
+    return _user(row) if row else None
+
+
 async def user_by_id(session: AsyncSession, user_id: UUID) -> UserRow | None:
     row = (
         await session.execute(
@@ -82,22 +100,52 @@ async def user_by_id(session: AsyncSession, user_id: UUID) -> UserRow | None:
 
 
 async def create_user(
-    session: AsyncSession, username: str, password_hash: str, *, requires_reset: bool = False
+    session: AsyncSession,
+    username: str,
+    password_hash: str,
+    *,
+    requires_reset: bool = False,
+    email: str | None = None,
 ) -> UUID | None:
-    """New account with no roles. None if the username is taken
-    (uq_user_account_username, V8).
+    """New account with no roles. None if the username or email is taken
+    (uq_user_account_username, V8; uq_user_account_email, V36).
     """
     return (
         await session.execute(
             text(
                 "INSERT INTO auth.user_account"
-                " (username, password_hash, is_requires_password_reset)"
-                " VALUES (:u, :p, :r)"
-                " ON CONFLICT (username) DO NOTHING RETURNING user_id"
+                " (username, email, password_hash, is_requires_password_reset)"
+                " VALUES (:u, :e, :p, :r)"
+                " ON CONFLICT DO NOTHING RETURNING user_id"
             ),
-            {"u": username, "p": password_hash, "r": requires_reset},
+            {"u": username, "e": email, "p": password_hash, "r": requires_reset},
         )
     ).scalar_one_or_none()
+
+
+async def login_name_in_use(
+    session: AsyncSession, name: str, *, except_user: UUID | None = None
+) -> bool:
+    """Whether another account signs in with this lower-case name, as its
+    email or its username.
+    """
+    return (
+        await session.execute(
+            text(
+                "SELECT 1 FROM auth.user_account"
+                " WHERE (email = :name OR lower(username) = :name)"
+                " AND user_id IS DISTINCT FROM CAST(:me AS uuid) LIMIT 1"
+            ),
+            {"name": name, "me": except_user},
+        )
+    ).first() is not None
+
+
+async def set_email(session: AsyncSession, user_id: UUID, email: str | None) -> None:
+    await session.execute(
+        text("UPDATE auth.user_account SET email = :e, updated_at = now() WHERE user_id = :id"),
+        {"e": email, "id": user_id},
+    )
 
 
 async def set_password(session: AsyncSession, user_id: UUID, password_hash: str) -> None:

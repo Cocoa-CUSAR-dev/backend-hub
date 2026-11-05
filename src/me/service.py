@@ -13,7 +13,7 @@ from uuid import UUID
 
 from src import db
 from src.actor import Actor, require
-from src.auth.service import issue_session
+from src.auth.service import EMAIL_TAKEN, clean_email, issue_session
 from src.config import settings
 from src.database import Session, transaction
 from src.exceptions import Conflict, Forbidden, NotFound, Unauthorized
@@ -79,10 +79,24 @@ async def me(session: Session, actor: Actor) -> MeOut:
     return MeOut(
         user_id=user.user_id,
         username=user.username,
+        email=user.email,
         roles=sorted(roles),
         must_reset_password=user.must_reset_password,
         profiles=Profiles(**{r: p for r, p in profiles.items() if r in roles}),
     )
+
+
+async def set_email(session: Session, actor: Actor, email: str | None) -> MeOut:
+    """Add, change or remove my email. The username stays as it is.
+    No permission key, for the same reason as `me`.
+    """
+    user_id = _user_id(actor)
+    cleaned = clean_email(email)
+    async with transaction(session):
+        if cleaned and await db.auth.login_name_in_use(session, cleaned, except_user=user_id):
+            raise Conflict(EMAIL_TAKEN)
+        await db.auth.set_email(session, user_id, cleaned)
+    return await me(session, actor)
 
 
 async def add_role(

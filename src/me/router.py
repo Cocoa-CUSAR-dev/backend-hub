@@ -11,6 +11,7 @@ from fastapi import APIRouter, status
 from src.auth.dependencies import CurrentActor, SessionDep
 from src.me import service
 from src.me.schemas import (
+    AccountIn,
     FarmerProfile,
     FarmerProfileCreate,
     HubCollectorProfile,
@@ -31,6 +32,11 @@ _ADDED = status.HTTP_201_CREATED
 @router.get("", summary="Me: every role I hold and each role's profile")
 async def me(actor: CurrentActor, session: SessionDep) -> MeOut:
     return await service.me(session, actor)
+
+
+@router.patch("/account", summary="Add, change or remove my email")
+async def set_email(body: AccountIn, actor: CurrentActor, session: SessionDep) -> MeOut:
+    return await service.set_email(session, actor, body.email)
 
 
 # ---- add a role ------------------------------------------------------------

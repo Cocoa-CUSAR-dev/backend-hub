@@ -5,13 +5,16 @@ from pydantic import BaseModel, Field
 
 
 class LoginIn(BaseModel):
-    username: str = Field(min_length=1, examples=["0812345678"])
+    username: str = Field(
+        min_length=1, description="The username or the email.", examples=["0812345678"]
+    )
     password: str = Field(min_length=1)
 
 
 class RegisterIn(BaseModel):
     username: str = Field(min_length=1, examples=["0812345678"])
     password: str
+    email: str | None = Field(default=None, description="Optional; can sign in with it too.")
 
 
 class RefreshIn(BaseModel):
@@ -39,6 +42,7 @@ class SsoExchangeIn(BaseModel):
 class SessionUser(BaseModel):
     user_id: UUID
     username: str
+    email: str | None
     roles: list[str]
     must_reset_password: bool = Field(
         description="Admin-created account: send the user to reset-password first."

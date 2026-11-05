@@ -102,9 +102,14 @@ class Profiles(BaseModel):
     researcher: dict[str, Any] | None = None
 
 
+class AccountIn(BaseModel):
+    email: str | None = Field(description="My email; blank or null removes it.")
+
+
 class MeOut(BaseModel):
     user_id: UUID
     username: str
+    email: str | None
     roles: list[str]
     must_reset_password: bool
     profiles: Profiles

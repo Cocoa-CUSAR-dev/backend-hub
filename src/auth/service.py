@@ -4,6 +4,7 @@ Every login-like action ends in `issue_session`, so web and mobile get the
 same token pair in the response body (CONVENTIONS.md §5).
 """
 
+import re
 from datetime import timedelta
 from uuid import UUID
 
@@ -15,10 +16,19 @@ from src.clock import utc_now_naive
 from src.config import settings
 from src.database import Session, transaction
 from src.db.auth import UserRow
-from src.exceptions import Conflict, InvalidLiffToken, LineAccountNotLinked, Unauthorized
+from src.exceptions import (
+    Conflict,
+    Invalid,
+    InvalidLiffToken,
+    LineAccountNotLinked,
+    Unauthorized,
+)
 from src.line import liff
 
 _WRONG_LOGIN = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+_USERNAME_TAKEN = "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว"
+EMAIL_TAKEN = "อีเมลนี้ถูกใช้งานแล้ว"
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 # Two requests racing with the same refresh token (two browser tabs, a retry)
 # are not theft; only a reuse after this window revokes every session.
 _REUSE_GRACE = timedelta(seconds=60)
@@ -43,28 +53,71 @@ async def issue_session(session: Session, user: UserRow) -> TokenPairOut:
         user=SessionUser(
             user_id=user.user_id,
             username=user.username,
+            email=user.email,
             roles=sorted(roles),
             must_reset_password=user.must_reset_password,
         ),
     )
 
 
-async def register(session: Session, username: str, password: str) -> TokenPairOut:
+def clean_email(email: str | None) -> str | None:
+    """An email as stored: lower case. Blank means none."""
+    cleaned = (email or "").strip().lower()
+    if not cleaned:
+        return None
+    if not _EMAIL.fullmatch(cleaned):
+        raise Invalid("รูปแบบอีเมลไม่ถูกต้อง", fields={"email": "รูปแบบไม่ถูกต้อง"})
+    return cleaned
+
+
+async def create_account(
+    session: Session,
+    username: str,
+    password: str,
+    *,
+    email: str | None = None,
+    requires_reset: bool = False,
+) -> UUID:
+    """New account with no roles, in the caller's transaction. A username that
+    is an email address is the account's email too, unless one was given. No
+    name may sign in to two accounts, so a username can't be another account's
+    email, or the reverse.
+    """
+    username = username.strip()
+    email = clean_email(email)
+    if email is None and _EMAIL.fullmatch(username.lower()):
+        email = username.lower()
+    if await db.auth.login_name_in_use(session, username.lower()):
+        raise Conflict(_USERNAME_TAKEN)
+    if email and await db.auth.login_name_in_use(session, email):
+        raise Conflict(EMAIL_TAKEN)
+    user_id = await db.auth.create_user(
+        session,
+        username,
+        passwords.hash_password(password),
+        requires_reset=requires_reset,
+        email=email,
+    )
+    if user_id is None:
+        raise Conflict(_USERNAME_TAKEN)
+    return user_id
+
+
+async def register(
+    session: Session, username: str, password: str, email: str | None = None
+) -> TokenPairOut:
     """New account with no roles yet; the user adds roles through /me/roles."""
     passwords.check_strength(password)
     async with transaction(session):
-        user_id = await db.auth.create_user(
-            session, username.strip(), passwords.hash_password(password)
-        )
-        if user_id is None:
-            raise Conflict("ชื่อผู้ใช้นี้ถูกใช้งานแล้ว")
+        user_id = await create_account(session, username, password, email=email)
         user = await db.auth.user_by_id(session, user_id)
         assert user is not None
         return await issue_session(session, user)
 
 
 async def login(session: Session, username: str, password: str) -> TokenPairOut:
-    user = await db.auth.user_by_username(session, username.strip())
+    """`username` is the username or the email."""
+    user = await db.auth.user_by_login(session, username.strip())
     if user is None or not passwords.verify_password(password, user.password_hash):
         raise Unauthorized(_WRONG_LOGIN)
     async with transaction(session):
@@ -148,7 +201,7 @@ async def line_link(session: Session, id_token: str, username: str, password: st
     """Link a LINE account to an existing account (username + password),
     then sign in. Replaces mobile-backend's POST /public/liff/link.
     """
-    user = await db.auth.user_by_username(session, username.strip())
+    user = await db.auth.user_by_login(session, username.strip())
     if user is None or not passwords.verify_password(password, user.password_hash):
         raise Unauthorized(_WRONG_LOGIN)
     claims = await liff.verify_for_any_channel(id_token)
