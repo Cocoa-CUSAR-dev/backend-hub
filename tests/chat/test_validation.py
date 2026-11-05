@@ -1,5 +1,5 @@
 from src.chat.validation import parse_lat_lng, validate_answer
-from src.forms.client import _convert_keys
+from src.forms.detail import snake_keys
 
 
 def test_none_rule_always_passes() -> None:
@@ -134,10 +134,10 @@ class TestParseLatLng:
             assert parse_lat_lng(text) is None, text
 
 
-def test_real_camel_case_shape_survives_convert_keys_and_validates() -> None:
+def test_real_camel_case_shape_survives_snake_keys_and_validates() -> None:
     """Locks in the actual wrinkle: Kotlin's jsonb column (and therefore its
     JSON response) spells these keys errorMessage/maxLength, not
-    error_message/max_length -- forms/client.py's _convert_keys is what
+    error_message/max_length -- forms.detail's snake_keys is what
     renames them before validate_answer ever sees the dict. If that
     conversion step were ever skipped, or this module reverted to reading
     the camelCase spelling, every answer would silently pass unvalidated
@@ -151,7 +151,7 @@ def test_real_camel_case_shape_survives_convert_keys_and_validates() -> None:
         "errorMessage": "0-50 เท่านั้น",
     }
 
-    converted_rule = _convert_keys(kotlin_shaped_rule)
+    converted_rule = snake_keys(kotlin_shaped_rule)
 
     assert validate_answer(converted_rule, "999") == "0-50 เท่านั้น"
     assert validate_answer(converted_rule, "25") is None

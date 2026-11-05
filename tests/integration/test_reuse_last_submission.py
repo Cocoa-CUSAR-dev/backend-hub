@@ -28,6 +28,7 @@ from tests.integration.helpers import (
     question_json,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
@@ -204,9 +205,7 @@ class TestReuseLastSubmission:
         sanitized = {"answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"}}
 
         with respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             respx.get(f"{settings.GO_BACKEND_URL}/service/tasks/last-answer").mock(
                 return_value=Response(200, json=last_answer)
             )
@@ -275,9 +274,7 @@ class TestAutofillDecline:
         sanitized = {"answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"}}
 
         with respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             respx.get(f"{settings.GO_BACKEND_URL}/service/tasks/last-answer").mock(
                 return_value=Response(200, json=last_answer)
             )
@@ -342,9 +339,7 @@ class TestEditingAnAutofilledField:
         sanitized = {"answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"}}
 
         with respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             respx.get(f"{settings.GO_BACKEND_URL}/service/tasks/last-answer").mock(
                 return_value=Response(200, json=last_answer)
             )

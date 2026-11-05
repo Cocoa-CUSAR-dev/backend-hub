@@ -3,13 +3,14 @@ so files outside this directory never pull in a real Postgres dependency.
 """
 
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import async_session_maker
+from tests.integration.helpers import SERVED_FORMS
 
 _CLEANUP_TABLES = (
     "agriculture.plot",
@@ -58,3 +59,20 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
             for table in _CLEANUP_TABLES:
                 await session.execute(text(f"DELETE FROM {table}"))
             await session.commit()
+
+
+@pytest.fixture(autouse=True)
+def served_forms(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Forms are read from the database in production. Here the tests do not
+    seed form rows; they `serve_form(...)` the form they want, and the
+    database read (forms.detail.load_form) answers with it. None for a form
+    nobody served, like a form that does not exist.
+    """
+
+    async def load_served_form(_session: object, form_id: object) -> object:
+        return SERVED_FORMS.get(form_id)  # type: ignore[call-overload]
+
+    monkeypatch.setattr("src.forms.detail.load_form", load_served_form)
+    SERVED_FORMS.clear()
+    yield
+    SERVED_FORMS.clear()

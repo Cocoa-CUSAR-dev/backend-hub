@@ -16,11 +16,10 @@ import json
 import uuid
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import settings
 from src.database import async_session_maker
 from tests.integration.helpers import (
     build_form_response,
@@ -30,6 +29,7 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
 )
 from tests.integration.test_multi_choice_flow import (
     _flex_json,
@@ -43,9 +43,7 @@ from tests.integration.test_non_text_messages import _send as _send_message
 
 
 def _mock_form(task_form_id: uuid.UUID, form: dict) -> None:
-    respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-        return_value=Response(200, json=form)
-    )
+    serve_form(task_form_id, form)
 
 
 async def _answers(session: AsyncSession, conversation_id: uuid.UUID) -> list[dict]:

@@ -14,7 +14,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +29,7 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
@@ -151,9 +152,7 @@ class TestFarmAndPlotChoicesAreScoped:
         s = await _seed(db_session)
 
         with patch.object(settings, "PLOT_SCOPE_MODE", "farmer"), respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{s.task_form_id}").mock(
-                return_value=Response(200, json=s.form_response)
-            )
+            serve_form(s.task_form_id, s.form_response)
             farm_question = await _post(
                 client,
                 build_postback_event(
@@ -196,9 +195,7 @@ class TestFarmAndPlotChoicesAreScoped:
         s = await _seed(db_session)
 
         with patch.object(settings, "PLOT_SCOPE_MODE", "all"), respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{s.task_form_id}").mock(
-                return_value=Response(200, json=s.form_response)
-            )
+            serve_form(s.task_form_id, s.form_response)
             farm_question = await _post(
                 client,
                 build_postback_event(

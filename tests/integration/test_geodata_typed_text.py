@@ -10,15 +10,15 @@ import uuid
 from unittest.mock import AsyncMock
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import settings
 from tests.integration.helpers import (
     build_text_message_event,
     seed_conversation,
     seed_conversation_answer,
     seed_user_with_line_identity,
+    serve_form,
 )
 from tests.integration.test_geodata_location import (
     _assert_go_accepts,
@@ -48,9 +48,7 @@ class TestTypedTextAtAGeodataQuestion:
             db_session, conversation_id=conversation_id, question_id=notes_q, text_value="x"
         )
         with respx.mock:
-            respx.get(f"{settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _post(
                 client,
                 build_text_message_event(line_user_id=line_user_id, text_content=typed),

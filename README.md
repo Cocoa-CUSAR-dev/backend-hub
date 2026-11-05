@@ -12,12 +12,12 @@ The one backend for the Cocoa Supply Chain Databank (Is Thai Cacao). It started 
 
 | Part | Status |
 |---|---|
-| LINE chatbot (webhook, LIFF, conversation, reminders) | moved into `chat/`, `jobs/`, `line/client.py` and `reminders/`; all of its SQL is in `src/db/`, and the conventions check passes with only the Kotlin/Go clients left in the baseline. LINE and LIFF list tasks with `tasks.service.list_for` as an `Actor`, and the reminder schedule functions take an `Actor`. Still to do: the conversation functions in `chat/service.py` take no `actor` yet, and submitting still goes to Go until `tasks.service.submit` exists (it needs `create:response:own`, database V35) |
+| LINE chatbot (webhook, LIFF, conversation, reminders) | moved into `chat/`, `jobs/`, `line/client.py` and `reminders/`; all of its SQL is in `src/db/`, and the conventions check passes with only Go's "use last answer" client left in the baseline. LINE and LIFF list tasks with `tasks.service.list_for` as an `Actor`, a confirmed answer is saved with `tasks.answers.submit` (`chat/submit.py`, in its own session; it needs `create:response:own`, database V35), a form is read with `forms.detail.load_chat_form`, and the reminder schedule functions take an `Actor`. Still to do: the conversation functions in `chat/service.py` take no `actor` yet, and "use last answer" still asks Go (`src/tasks/client.py`) until `tasks.service.autofill` exists (docs-and-plan#264) |
 | Foundation: one `config.py`, one `exceptions.py`, `actor.py`, `clock.py`, `src/db/` owners, conventions check in CI | done |
 | Login + roles (from Kotlin + Go) | next |
 | Mobile endpoints (from Go) / web endpoints (from Kotlin) | planned |
 
-Until a part is merged, this service still calls the old backend for it: `src/forms`, `src/diary` and `src/sso` call Kotlin, and `src/tasks` calls Go. Those clients are deleted as their parts move in.
+Until a part is merged, this service still calls the old backend for it: only `src/tasks/client.py` is left, calling Go for "use last answer". It is deleted when that part moves in.
 
 ## Tech stack
 
@@ -41,7 +41,7 @@ src/
 ├── llm/                 # the only LiteLLM caller
 ├── chat/                # LINE door + chatbot brain (webhook, LIFF, ui/, state machine, intent, parsing)
 ├── line/                # client.py (the one linebot importer) + service.py (outgoing messages); the rest is moving out
-├── forms/  tasks/  diary/  sso/   # temporary clients to Kotlin/Go
+├── forms/  tasks/  diary/  sso/   # feature folders; tasks/client.py is the last call to Go
 ├── reminders/  notifications/
 ├── jobs/                # cron door (/internal/cron/*) and the scheduler
 └── ...                  # feature folders arrive with the merge: auth/ me/ agriculture/ ...

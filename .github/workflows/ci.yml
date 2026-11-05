@@ -57,7 +57,6 @@ jobs:
       # points at the real Postgres service above, since DB-backed
       # integration tests (see tests/resources/schema.sql) use it directly.
       DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/chatbot_test
-      KOTLIN_BACKEND_URL: http://localhost:3001/api/v1
       GO_BACKEND_URL: http://localhost:8080
       LINE_CHANNEL_SECRET: test-secret
       LINE_CHANNEL_ACCESS_TOKEN: test-token

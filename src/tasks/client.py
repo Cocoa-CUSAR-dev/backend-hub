@@ -1,12 +1,14 @@
-"""Task Submission Client -- write side. Calls Go's POST /service/tasks,
-authenticated with a shared service key rather than a farmer's JWT cookie
-(the chatbot has no such cookie for anyone -- see mobile-backend's
-internal/middleware/service_auth_middleware.go for the trust model).
+"""What the chatbot still asks Go for: "use last answer" (US2-4, US2-5).
 
-Go's dissection logic is real for the 4 handlers this sprint's forms use
-(farm_activity, processing_record, farm_pest_disease_record, harvest) --
-merged in mobile-backend's feat/dissection-standalone-handlers. A successful
-call here does create a real domain row, not just a form.response one.
+Both calls use Go's service routes, authenticated with a shared service key
+rather than a farmer's JWT (the chatbot has no such cookie for anyone -- see
+mobile-backend's internal/middleware/service_auth_middleware.go).
+
+Everything else the chatbot used to ask Go for is in-process now: saving an
+answer is src/chat/submit.py (-> tasks.answers.submit) and the task list is
+tasks.service.list_for. These two go when `tasks.service.autofill` exists
+(TASK-04, docs-and-plan#264): it replaces the last-answer read and the
+sanitizer in one function, shared by the app and the chatbot.
 """
 
 from typing import Any
@@ -14,88 +16,8 @@ from typing import Any
 import httpx
 
 from src.config import settings
-from src.exceptions import HandlerNotSupported, UpstreamServiceError
+from src.exceptions import UpstreamServiceError
 from src.request_id import REQUEST_ID_HEADER, get_request_id
-from src.tasks.schemas import TaskListItem, TaskSubmission
-
-
-async def submit_task(submission: TaskSubmission) -> None:
-    # 30s, not httpx's 5s default -- Go's own liveColumns cache (form_handler
-    # .go) has a one-time cold-cache cost per destination table per process
-    # lifetime, same shape as Kotlin's fetchRefChoices (BE-5). Live-caught
-    # 2026-08-19: the very first submission ever made against
-    # agriculture.farm_activity_fertilizer (one of the 5 newly-unblocked
-    # handlers) took 6.6s end to end on Go's side and actually succeeded --
-    # but this client's old 5s default timed out first, so confirm_conversation
-    # told the farmer it failed and to retry, when retrying would have
-    # inserted a second, duplicate row (dissectAnswer has no idempotency
-    # guard). Same fix, same reasoning as src/forms/client.py's get_form().
-    async with httpx.AsyncClient(base_url=settings.GO_BACKEND_URL, timeout=30.0) as client:
-        response = await client.post(
-            "/service/tasks",
-            json=submission.model_dump(),
-            headers={
-                "X-Service-Key": settings.GO_SERVICE_KEY,
-                REQUEST_ID_HEADER: get_request_id(),
-            },
-        )
-
-    if response.status_code < 400:
-        return
-
-    # Go's real response shapes (form_handler.go) -- distinguish them so
-    # logs say what actually went wrong instead of one generic message.
-    detail = _error_detail(response)
-    if response.status_code == 401:
-        raise UpstreamServiceError(
-            f"Go rejected the service key (401) -- confirm GO_SERVICE_KEY here matches "
-            f"CHATBOT_SERVICE_KEY on mobile-backend: {detail}"
-        )
-    if response.status_code == 403:
-        raise UpstreamServiceError(
-            f"Go found no chat.conversation for this user_id+task_id (403) -- the "
-            f"submission's user_id/task_id don't match a real conversation: {detail}"
-        )
-    if response.status_code == 501:
-        # Not an UpstreamServiceError -- Go isn't broken, it's correctly
-        # saying "not built yet." confirm_conversation catches this
-        # specifically to tell the farmer that honestly instead of
-        # suggesting a retry that can never succeed.
-        raise HandlerNotSupported(
-            f"Go doesn't support automatic storage for this handler yet (501): {detail}"
-        )
-    raise UpstreamServiceError(f"Go backend returned {response.status_code}: {detail}")
-
-
-async def fetch_pending_tasks(*, user_id: str) -> list[TaskListItem]:
-    """GET Go's /service/tasks (docs-and-plan#176) -- the service-key twin
-    of Go's own farmer-facing GetTasks, for the chatbot's LIFF to-do list
-    (no farmer JWT session to call the real /tasks with). Returns every
-    task Go knows about for this user_id, status included -- "pending"
-    filtering (excluding COMPLETED) is this caller's job, not Go's, same
-    division of responsibility as fetch_last_answer/GetLastAnswer.
-
-    page_size=100, not Go's own default of 50 -- a farmer's full open task
-    list is expected to comfortably fit in one page for the to-do screen;
-    revisit with real pagination if that stops being true.
-    """
-    async with httpx.AsyncClient(base_url=settings.GO_BACKEND_URL, timeout=30.0) as client:
-        response = await client.get(
-            "/service/tasks",
-            params={"user_id": user_id, "page_size": 100},
-            headers={
-                "X-Service-Key": settings.GO_SERVICE_KEY,
-                REQUEST_ID_HEADER: get_request_id(),
-            },
-        )
-
-    if response.status_code >= 400:
-        raise UpstreamServiceError(
-            f"Go backend returned {response.status_code} for pending-tasks lookup: "
-            f"{_error_detail(response)}"
-        )
-
-    return [TaskListItem.model_validate(row) for row in response.json()]
 
 
 async def fetch_last_answer(*, user_id: str, handler: str) -> dict[str, Any] | None:

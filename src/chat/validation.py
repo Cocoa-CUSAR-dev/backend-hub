@@ -2,20 +2,20 @@
 Answer step between GUIDED_AWAITING_FIXED_ANSWER and either the next
 question or a re-ask with guidance on the expected format.
 
-Rules come from Kotlin's field validation rules, keyed by field_name and
-joined onto each question server-side (web-backend's FormRepository.kt --
-queryFormRecords LEFT JOINs FIELD_VALIDATION_RULE on field_name,
-toQuestionEntity maps it into Question.Entity.validationRule). GET
-/service/forms/{formId} (the exact route forms/client.py's get_form() calls)
-returns it null for OPTION/BOOLEAN/upload questions (already constrained
-another way) and as the rule's own JSON object otherwise -- validate_answer
-below takes that dict directly, already attached to the question by
-service.py's _question_from_dict, no lookup needed here.
+Rules come from the field validation rules, keyed by field_name and joined
+onto each question when the form is loaded (db.forms.form_rows LEFT JOINs
+field_validation_rule on field_name; forms.detail.load_form puts it in
+QuestionOut.validation_rule). forms.detail.load_chat_form, which the chat
+reads a form through, has it null for OPTION/BOOLEAN/upload questions
+(already constrained another way) and as the rule's own JSON object
+otherwise -- validate_answer below takes that dict directly, already
+attached to the question by service.py's _question_from_dict, no lookup
+needed here.
 
-Mind the key casing: forms/client.py's _convert_keys recursively
-camelCase -> snake_cases *every* nested dict in Kotlin's response, including
-the contents of validationRule itself, not just the outer question/section
-keys it exists for. So by the time a rule dict reaches this module, its keys
+Mind the key casing: load_chat_form recursively camelCase -> snake_cases
+*every* nested dict of the form, including the contents of validationRule
+itself, not just the outer question/section keys it exists for. So by the
+time a rule dict reaches this module, its keys
 are already error_message/max_length/integer_only/max_date/valid_lat_lng --
 not the jsonb column's own camelCase spelling (type/min/max are single
 words, unaffected). Reading the camelCase spelling here would silently

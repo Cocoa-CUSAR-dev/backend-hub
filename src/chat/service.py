@@ -5,9 +5,9 @@ Conversation + ConversationAnswer rows and decides what to say back.
 
 Deliberately takes the form's question script (`FormDetail`) as a parameter
 rather than fetching it itself -- lets the same logic run against either
-`forms.client.get_form()` (real Kotlin call, production) or a direct DB query
-(this sprint's test router, see src/chat/dev_router.py) without this
-module knowing or caring which. Confirmed against Kotlin's actual DTOs
+`forms.detail.load_chat_form()` (production) or a direct DB query (this
+sprint's test router, see src/chat/dev_router.py) without this module
+knowing or caring which. Confirmed against Kotlin's actual DTOs
 (web-backend's FormRepository/Question.kt): each question dict carries
 question_id/label/field_name/is_mandatory/sort_order, and OPTION-type
 questions additionally carry choices: [{id, name}].
@@ -39,13 +39,13 @@ from src.chat.constants import (
     ConversationStatus,
 )
 from src.chat.state_machine import on_guided_answer
+from src.chat.submit import submit_task
 from src.chat.validation import parse_lat_lng, validate_answer
 from src.database import Session
 from src.db.models import Conversation, ConversationAnswer
 from src.exceptions import AnswerInFlight, ConversationNotFound, HandlerNotSupported
 from src.forms.schemas import FormDetail
 from src.line import parent_picker, plot_picker
-from src.tasks.client import submit_task
 from src.tasks.schemas import TaskSubmission
 
 logger = logging.getLogger(__name__)
