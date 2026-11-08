@@ -4,29 +4,31 @@ Every other OPTION question in the picker uses its own choices as Kotlin sent
 them; the plot question is the one exception, for the reason below.
 
 Why this exists at all: the plot question's choices normally come from Kotlin
-(`FormRepository.fetchRefChoices` -> `SELECT plot_id, plot_name FROM
-ref.plot_constant`), which is EVERY plot in the system, not this farmer's.
-That is survivable for a one-of-many Quick Reply -- a farmer scrolls past
-other people's plots -- but it is not survivable for a picker whose whole
-point is tapping several plots in one go: the list has to be short, and every
-row in it has to be one the farmer could legitimately file an activity
-against. So this picker reads the farmer's plots directly, scoped through
-agriculture.farmer_farm, exactly the way src/line/parent_picker.py already
-scopes its parent rows.
+(its reference-choices query over the plot constants table), which is EVERY
+plot in the system, not this farmer's. That is survivable for a one-of-many
+Quick Reply -- a farmer scrolls past other people's plots -- but it is not
+survivable for a picker whose whole point is tapping several plots in one go:
+the list has to be short, and every row in it has to be one the farmer could
+legitimately file an activity against. So this picker lists the farmer's own
+plots, scoped through the farmer-to-farm links, the same way
+src/line/parent_picker.py scopes its parent rows. The queries themselves
+are in the agriculture module of src/db/.
 
-Deliberate, permanent exception to "the chatbot never touches form.* directly"
-(ADR 0001), and the same one parent_picker.py documents: agriculture.* is a
-domain Go owns for writes but never exposed a scoped read API for. Note the
-narrower scope than fixing the global list everywhere -- the ref.plot_constant
-problem on ordinary plot questions is a real issue, but a separate one (see
+Note the narrower scope than fixing the global list everywhere -- the global
+plot list on ordinary plot questions is a real issue, but a separate one (see
 the design doc's open questions).
 """
 
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from src import db
+from src.config import settings
+from src.database import Session
+
+# Fields whose choices are scoped to the farmer's own rows (US2-13). Kotlin
+# sends both as global lists (ref.farm_constant / ref.plot_constant).
+FARMER_SCOPED_FIELDS = frozenset({"farm_id", "plot_id"})
 
 # A Flex bubble stays readable at roughly a dozen buttons, and the carousel
 # the builder falls back to is capped at 12 bubbles by LINE itself. This cap
@@ -48,7 +50,7 @@ class PlotOption:
 
 
 async def list_plots(
-    session: AsyncSession, user_id: UUID, *, farm_id: str | None = None
+    session: Session, user_id: UUID, *, farm_id: str | None = None
 ) -> list[PlotOption]:
     """Every plot on a farm this farmer is linked to, newest farm/plot name
     order, optionally narrowed to one farm.
@@ -65,22 +67,15 @@ async def list_plots(
     adding "(ไร่เหนือ)" to every button of a single-farm farmer is noise on a
     button whose text budget is already tight.
     """
-    rows = (
-        await session.execute(
-            text(
-                """
-                SELECT p.plot_id, p.plot_name, f.farm_name
-                FROM agriculture.plot p
-                JOIN agriculture.farmer_farm ff ON ff.farm_id = p.farm_id
-                JOIN agriculture.farm f ON f.farm_id = p.farm_id
-                WHERE ff.farmer_id = :user_id
-                  AND (CAST(:farm_id AS uuid) IS NULL OR p.farm_id = CAST(:farm_id AS uuid))
-                ORDER BY f.farm_name, p.plot_name
-                """
-            ),
-            {"user_id": str(user_id), "farm_id": farm_id},
-        )
-    ).all()
+    # US2-13: PLOT_SCOPE_MODE=all drops the farmer scoping (dev/test accounts
+    # aren't linked to any farm). The farm narrowing still applies -- a plot
+    # of another farm would contradict the farm the farmer just picked.
+    scope_to_farmer = settings.PLOT_SCOPE_MODE == "farmer"
+    rows = await db.agriculture.plots_with_farm_name(
+        session,
+        farmer_id=user_id if scope_to_farmer else None,
+        farm_id=UUID(farm_id) if farm_id else None,
+    )
 
     farm_names = {row.farm_name for row in rows}
     show_farm = len(farm_names) > 1
@@ -90,3 +85,22 @@ async def list_plots(
         label = f"{name} ({row.farm_name})" if show_farm and row.farm_name else name
         options.append(PlotOption(id=str(row.plot_id), label=label))
     return options[:MAX_PLOTS]
+
+
+async def farmer_owned_ids(session: Session, user_id: UUID, field_name: str) -> set[str] | None:
+    """The ids of `field_name`'s choices this farmer may pick: the farms
+    they're linked to, or those farms' plots.
+
+    None means "don't narrow": PLOT_SCOPE_MODE=all, or a field this scoping
+    doesn't apply to. An empty set is a real answer -- a farmer linked to no
+    farm is offered none, rather than everyone's (US2-13; until now only the
+    multi-choice plot picker above was scoped, and every ordinary farm/plot
+    question showed every farm and plot in the system).
+    """
+    if settings.PLOT_SCOPE_MODE != "farmer" or field_name not in FARMER_SCOPED_FIELDS:
+        return None
+    if field_name == "farm_id":
+        ids = await db.agriculture.farm_ids_of_farmer(session, user_id)
+    else:
+        ids = await db.agriculture.plot_ids_of_farmer(session, user_id)
+    return {str(i) for i in ids}

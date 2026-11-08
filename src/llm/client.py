@@ -3,6 +3,7 @@
   1. extract_slots() -- pull structured fields out of the farmer's free text
   2. generate_follow_up() -- author the next question in natural language
      when some required slots are still missing
+plus complete(), a plain prompt -> text call (the daily diary's polish).
 
 Both go through this one client so the provider/model is swappable in one
 place (ADR 0004).
@@ -13,8 +14,8 @@ from typing import cast
 import litellm
 from pydantic import BaseModel
 
-from src.llm.config import llm_settings
-from src.llm.exceptions import LLMUnavailable
+from src.config import settings
+from src.exceptions import LLMUnavailable
 
 
 async def extract_slots[SchemaT: BaseModel](
@@ -34,11 +35,11 @@ async def extract_slots[SchemaT: BaseModel](
         messages.insert(0, {"role": "system", "content": instructions})
     try:
         response = await litellm.acompletion(
-            model=llm_settings.LLM_MODEL,
-            api_key=llm_settings.LLM_API_KEY,
+            model=settings.LLM_MODEL,
+            api_key=settings.LLM_API_KEY,
             messages=messages,
             response_format=schema,
-            timeout=llm_settings.LLM_TIMEOUT_SECONDS,
+            timeout=settings.LLM_TIMEOUT_SECONDS,
         )
     except Exception as exc:  # noqa: BLE001 -- provider errors are intentionally broad here
         raise LLMUnavailable from exc
@@ -62,8 +63,8 @@ async def generate_follow_up(missing_field: str, context: str) -> str:
     )
     try:
         response = await litellm.acompletion(
-            model=llm_settings.LLM_MODEL,
-            api_key=llm_settings.LLM_API_KEY,
+            model=settings.LLM_MODEL,
+            api_key=settings.LLM_API_KEY,
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as exc:  # noqa: BLE001
@@ -72,3 +73,24 @@ async def generate_follow_up(missing_field: str, context: str) -> str:
     # LiteLLM's response model isn't strictly typed here (Any) -- same trust
     # in the provider's shape extract_slots above already relies on.
     return cast(str, response.choices[0].message.content)
+
+
+async def complete(prompt: str, *, timeout: float, retries: int = 0) -> str:
+    """The model's plain-text answer to one prompt, stripped. `retries` are
+    extra attempts on a provider error (a busy model usually answers a few
+    seconds later). Raises LLMUnavailable on failure, timeout or an empty
+    answer."""
+    try:
+        response = await litellm.acompletion(
+            model=settings.LLM_MODEL,
+            api_key=settings.LLM_API_KEY,
+            messages=[{"role": "user", "content": prompt}],
+            timeout=timeout,
+            num_retries=retries,
+        )
+    except Exception as exc:  # noqa: BLE001 -- provider errors are intentionally broad here
+        raise LLMUnavailable from exc
+    text = cast(str | None, response.choices[0].message.content)
+    if not text or not text.strip():
+        raise LLMUnavailable("the model answered with no text")
+    return text.strip()

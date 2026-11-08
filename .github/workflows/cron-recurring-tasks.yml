@@ -1,0 +1,34 @@
+# Manual-trigger-only companion to the real external trigger for
+# /internal/cron/recurrence (docs-and-plan#276), which is cron-job.org, as for
+# the other /internal/cron/* endpoints -- see src/jobs/router.py's docstring
+# for why an external trigger is needed at all. Moved here from web-backend's
+# cron-recurring-tasks.yml, which called its POST /service/recurrence/run.
+#
+# Set up the cron-job.org job like this:
+#   URL      POST <the hub's deployed URL>/internal/cron/recurrence
+#   Header   Authorization: Bearer <CRON_SECRET>
+#   When     once a day shortly after midnight Bangkok time (00:05 Asia/Bangkok =
+#            17:05 UTC), so a round opens at the start of its day.
+#   Alert    on any non-200 answer: the endpoint answers 500 (with the counts in
+#            the body) if any round failed.
+#
+# Safe to run as often as you like: a round that already exists is never
+# created twice. A late run still opens rounds up to 6 days back.
+#
+# Kept as workflow_dispatch only (no `schedule:`), so it never double-fires
+# alongside cron-job.org; use it to try the endpoint or catch up by hand.
+# Requires the same two repo secrets as cron-reminders.yml: CHATBOT_URL and
+# CRON_SECRET.
+name: Open next rounds of repeating tasks
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call POST /internal/cron/recurrence
+        run: |
+          curl -sf -X POST "${{ secrets.CHATBOT_URL }}/internal/cron/recurrence" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

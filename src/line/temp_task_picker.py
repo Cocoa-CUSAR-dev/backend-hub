@@ -4,19 +4,20 @@ is meant to replace this with a real LIFF screen -- until that ships, a
 farmer types a keyword and gets their pending tasks back as LINE Quick Reply
 buttons instead.
 
-Deliberate, temporary exception to "the chatbot never touches form.*
-directly" (ADR 0001) -- the same shortcut src/conversation/dev_queries.py
-takes for dev testing, but this is production code reachable from real LINE
-messages, not test scaffolding. Delete this file (and the keyword-handling
-branch in src/line/router.py that calls it) once Sprint 5's real picker
-ships.
+Temporary: this is production code reachable from real LINE messages, not
+test scaffolding. Delete this file (and the keyword-handling branch in
+src/chat/router.py that calls it) once Sprint 5's real picker ships.
 """
 
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from src import db
+from src.actor import Actor
+from src.database import Session
+from src.exceptions import Forbidden
+from src.tasks import service as tasks_service
+from src.tasks.schemas import TaskOut
 
 # The one keyword every hint message names (#186 item 1). START_KEYWORDS is a
 # set, so `next(iter(...))` -- what the hint used to do -- could tell one
@@ -29,6 +30,7 @@ PRIMARY_START_KEYWORD = "เริ่ม"
 START_KEYWORDS = {PRIMARY_START_KEYWORD, "start", "ทำแบบฟอร์ม"}
 
 _QUICK_REPLY_LIMIT = 13  # LINE's own cap on Quick Reply items per message
+_PAGE_SIZE = 50  # how many tasks to read at a time while filling the list
 
 
 @dataclass(frozen=True)
@@ -44,50 +46,48 @@ class PendingTask:
     has_conversation: bool
 
 
-async def list_pending_tasks(session: AsyncSession, user_id: UUID) -> list[PendingTask]:
-    """A task is "pending" if this user has no form.response row for it yet,
-    OR its form is multiple-submit (in which case it stays listed no matter
-    how many responses exist -- see the WHERE clause) -- mirrors
-    mobile-backend's real GetTasks logic (form_handler.go), rather
-    than form.assignment, which turns out to be unpopulated in this DB
-    despite existing in the schema. Deliberately blind to chat.conversation
-    status for this filter: a task with an ACTIVE/PAUSED-but-unconfirmed
-    conversation still has no form.response row yet, so it already shows up
-    here correctly -- has_conversation only changes how it's labeled/handled,
-    not whether it's listed at all.
+async def list_pending_tasks(session: Session, actor: Actor) -> list[PendingTask]:
+    """A task is "pending" while it is not COMPLETED: not answered yet, or a
+    multiple-submit form (which never reaches COMPLETED, because the farmer is
+    expected to file several rows against it). Overdue tasks stay, they are
+    still owed. Only tasks with a form can be started, so the rest are left out.
+
+    This is tasks.service.list_for, the same function the mobile app's task
+    list uses: same visibility (a task with assignees is listed only to them),
+    same order (newest first), same status. Which tasks are in the list is that
+    function's job; what this adds is the Quick Reply cap and which of them the
+    farmer already has a conversation open for.
+
+    `actor` must be allowed to read forms (read:form:assigned); anyone else
+    gets Forbidden, which the caller turns into a reply.
 
     handler is included so callers can warn the farmer before they invest
     time answering a form Go can't save yet -- previously this picker had no
     way to know that at all, and the farmer only found out after answering
     every question and tapping confirm.
     """
-    rows = await session.execute(
-        text(
-            """
-            SELECT t.task_id, tf.form_id AS task_form_id, t.title, tf.handler,
-                   EXISTS (
-                       SELECT 1 FROM chat.conversation c
-                       WHERE c.task_id = t.task_id AND c.user_id = :user_id
-                         AND c.status IN ('active', 'paused')
-                   ) AS has_conversation
-            FROM form.task t
-            JOIN form.task_form tf ON tf.task_id = t.task_id
-            WHERE (
-                -- A multiple-submit form is the whole point of this change:
-                -- it stays listed after the first submission, because the
-                -- farmer is expected to file several rows against it (three
-                -- grades for one harvest). Dropping it the moment one
-                -- response existed made the second one unreachable.
-                tf.is_multiple_submit
-                OR NOT EXISTS (
-                    SELECT 1 FROM form.response r
-                    WHERE r.task_log_id = t.task_id AND r.user_id = :user_id
-                )
-            )
-            ORDER BY t.open_at DESC
-            LIMIT :limit
-            """
-        ),
-        {"user_id": str(user_id), "limit": _QUICK_REPLY_LIMIT},
-    )
-    return [PendingTask(**dict(row._mapping)) for row in rows]
+    if actor.user_id is None:
+        raise Forbidden("A user is required")
+
+    pending: list[TaskOut] = []
+    page = 0
+    while len(pending) < _QUICK_REPLY_LIMIT:
+        rows = await tasks_service.list_for(session, actor, page=page, page_size=_PAGE_SIZE)
+        pending += [t for t in rows if t.task_form_id is not None and t.status != "COMPLETED"]
+        if len(rows) < _PAGE_SIZE:
+            break
+        page += 1
+
+    pending = pending[:_QUICK_REPLY_LIMIT]
+    open_tasks = await db.chat.open_task_ids(session, actor.user_id, [t.task_id for t in pending])
+    return [
+        PendingTask(
+            task_id=task.task_id,
+            task_form_id=task.task_form_id,
+            title=task.title or "",
+            handler=task.handler or "",
+            has_conversation=task.task_id in open_tasks,
+        )
+        for task in pending
+        if task.task_form_id is not None
+    ]

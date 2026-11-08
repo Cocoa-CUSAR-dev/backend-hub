@@ -1,16 +1,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_session
+from src.database import Session, get_session
 from src.notifications.dependencies import require_service_key
 from src.notifications.schemas import SendNotificationRequest, SendNotificationResponse
 from src.notifications.service import send_notification
 
 router = APIRouter(prefix="/service", tags=["notifications"])
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @router.post(

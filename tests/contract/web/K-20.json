@@ -1,0 +1,189 @@
+{
+  "kid": "K-20",
+  "after": "FORM-11",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/reminders/recipient-options/users"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/reminder-recipients/users"
+  },
+  "seeds": [
+    "base"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "search contract",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/reminders/recipient-options/users",
+      "actor": "researcher",
+      "query": {
+        "q": "contract"
+      },
+      "body": null,
+      "response": [
+        {
+          "userId": "20000000-0000-4000-8000-000000000001",
+          "username": "contract_admin",
+          "roles": [
+            "admin"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000007",
+          "username": "contract_collector",
+          "roles": [
+            "hub_collector"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000003",
+          "username": "contract_farmer_1",
+          "roles": [
+            "farmer"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000004",
+          "username": "contract_farmer_2",
+          "roles": [
+            "farmer"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000006",
+          "username": "contract_no_role",
+          "roles": []
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000005",
+          "username": "contract_processor",
+          "roles": [
+            "processor"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000002",
+          "username": "contract_researcher",
+          "roles": [
+            "researcher"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000008",
+          "username": "contract_researcher_2",
+          "roles": [
+            "researcher"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "search farmer",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/reminders/recipient-options/users",
+      "actor": "researcher",
+      "query": {
+        "q": "farmer"
+      },
+      "body": null,
+      "response": [
+        {
+          "userId": "20000000-0000-4000-8000-000000000003",
+          "username": "contract_farmer_1",
+          "roles": [
+            "farmer"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000004",
+          "username": "contract_farmer_2",
+          "roles": [
+            "farmer"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "empty search",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/reminders/recipient-options/users",
+      "actor": "researcher",
+      "body": null,
+      "response": [
+        {
+          "userId": "20000000-0000-4000-8000-000000000001",
+          "username": "contract_admin",
+          "roles": [
+            "admin"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000007",
+          "username": "contract_collector",
+          "roles": [
+            "hub_collector"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000003",
+          "username": "contract_farmer_1",
+          "roles": [
+            "farmer"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000004",
+          "username": "contract_farmer_2",
+          "roles": [
+            "farmer"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000006",
+          "username": "contract_no_role",
+          "roles": []
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000005",
+          "username": "contract_processor",
+          "roles": [
+            "processor"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000002",
+          "username": "contract_researcher",
+          "roles": [
+            "researcher"
+          ]
+        },
+        {
+          "userId": "20000000-0000-4000-8000-000000000008",
+          "username": "contract_researcher_2",
+          "roles": [
+            "researcher"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/reminders/recipient-options/users",
+      "actor": "farmer_1",
+      "query": {
+        "q": "contract"
+      },
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

@@ -3,8 +3,8 @@ from typing import Annotated
 
 from fastapi import Header
 
-from src.notifications.config import notifications_settings
-from src.notifications.exceptions import InvalidServiceKey
+from src.config import settings
+from src.exceptions import InvalidServiceKey
 
 
 async def require_service_key(
@@ -15,6 +15,6 @@ async def require_service_key(
     service_auth_middleware.go / web-backend's ServiceKeyFilter -- a shared
     secret between first-party services, not a per-user credential.
     """
-    expected = notifications_settings.CHATBOT_SERVICE_KEY
+    expected = settings.CHATBOT_SERVICE_KEY
     if not x_service_key or not secrets.compare_digest(x_service_key, expected):
         raise InvalidServiceKey()

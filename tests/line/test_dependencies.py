@@ -6,13 +6,13 @@ import json
 import pytest
 from starlette.requests import Request
 
-from src.line.config import line_settings
+from src.config import settings
+from src.exceptions import InvalidLineSignature
 from src.line.dependencies import parse_line_events
-from src.line.exceptions import InvalidLineSignature
 
 
 def _sign(body: bytes) -> str:
-    digest = hmac.new(line_settings.LINE_CHANNEL_SECRET.encode(), body, hashlib.sha256).digest()
+    digest = hmac.new(settings.LINE_CHANNEL_SECRET.encode(), body, hashlib.sha256).digest()
     return base64.b64encode(digest).decode()
 
 

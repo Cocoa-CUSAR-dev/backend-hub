@@ -1,7 +1,7 @@
 # Manual-trigger-only companion to the real external trigger for
 # /internal/cron/reminders, which is cron-job.org, not GitHub Actions --
-# see src/internal/router.py's docstring for why an external trigger is
-# needed at all (Vercel serverless can't run src/reminders/scheduler.py's
+# see src/jobs/router.py's docstring for why an external trigger is
+# needed at all (Vercel serverless can't run src/jobs/scheduler.py's
 # own in-process scheduler on time). Kept as workflow_dispatch so this
 # endpoint can still be exercised by hand (e.g. while debugging) without
 # also running on its own schedule and double-firing alongside
@@ -16,7 +16,7 @@
 # used only when this workflow is run by hand:
 #   CHATBOT_URL   -- the deployed base URL, e.g. https://<project>.vercel.app
 #   CRON_SECRET   -- must match the CRON_SECRET env var set on the Vercel
-#                    project itself (src/internal/config.py)
+#                    project itself (src/config.py)
 #
 # Not needed at all if this service is ever moved to a persistent host
 # (Render, a VM, ...) -- there, scheduler.py's own scheduling just works and

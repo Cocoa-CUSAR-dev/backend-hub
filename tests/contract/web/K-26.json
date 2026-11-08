@@ -1,0 +1,161 @@
+{
+  "kid": "K-26",
+  "after": "FORM-14",
+  "note": "",
+  "kotlin": {
+    "method": "PATCH",
+    "path": "/api/v1/tasks/{taskId}/review/{responseId}/fields/{fieldName}"
+  },
+  "hub": {
+    "method": "PATCH",
+    "path": "/api/v1/forms/{form_id}/responses/{response_id}/fields/{field_name}",
+    "params": {
+      "form_id": "form_of:taskId",
+      "response_id": "responseId",
+      "field_name": "fieldName"
+    }
+  },
+  "seeds": [
+    "base",
+    "forms",
+    "answers"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "fix a text field",
+      "status": 200,
+      "method": "PATCH",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000001/fields/logistic_result",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000001",
+        "fieldName": "logistic_result"
+      },
+      "body": {
+        "value": "รถมอเตอร์ไซค์",
+        "reason": "ผู้ตอบแจ้งแก้"
+      },
+      "response": {
+        "fieldName": "logistic_result",
+        "label": "อธิบายการขนส่ง",
+        "inputType": "VARCHAR",
+        "value": "รถมอเตอร์ไซค์",
+        "source": null,
+        "editable": true
+      }
+    },
+    {
+      "name": "fix a date",
+      "status": 200,
+      "method": "PATCH",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000004/fields/harvest_date",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000004",
+        "fieldName": "harvest_date"
+      },
+      "body": {
+        "value": "2026-10-07"
+      },
+      "response": {
+        "fieldName": "harvest_date",
+        "label": "วันที่ส่งมา",
+        "inputType": "DATE",
+        "value": "2026-10-07",
+        "source": null,
+        "editable": true
+      }
+    },
+    {
+      "name": "not a date",
+      "status": 400,
+      "method": "PATCH",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000004/fields/harvest_date",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000004",
+        "fieldName": "harvest_date"
+      },
+      "body": {
+        "value": "7 Oct"
+      },
+      "response": {
+        "error": "Value must be a date like 2026-09-27"
+      }
+    },
+    {
+      "name": "choice fields can't be edited",
+      "status": 400,
+      "method": "PATCH",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000001/fields/farm_id",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000001",
+        "fieldName": "farm_id"
+      },
+      "body": {
+        "value": "40000000-0000-4000-8000-000000000001"
+      },
+      "response": {
+        "error": "Fields of type OPTION cannot be corrected here"
+      }
+    },
+    {
+      "name": "unknown field",
+      "status": 400,
+      "method": "PATCH",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000001/fields/nope",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000001",
+        "fieldName": "nope"
+      },
+      "body": {
+        "value": "x"
+      },
+      "response": {
+        "error": "Unknown field 'nope' for this task"
+      }
+    },
+    {
+      "name": "unknown answer",
+      "status": 404,
+      "method": "PATCH",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/5f000000-0000-4000-8000-000000000999/fields/logistic_result",
+      "actor": "researcher",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "5f000000-0000-4000-8000-000000000999",
+        "fieldName": "logistic_result"
+      },
+      "body": {
+        "value": "x"
+      },
+      "response": {
+        "error": "Response not found"
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "PATCH",
+      "path": "/api/v1/tasks/50000000-0000-4000-8000-000000000001/review/54000000-0000-4000-8000-000000000001/fields/logistic_result",
+      "actor": "farmer_1",
+      "params": {
+        "taskId": "50000000-0000-4000-8000-000000000001",
+        "responseId": "54000000-0000-4000-8000-000000000001",
+        "fieldName": "logistic_result"
+      },
+      "body": {
+        "value": "x"
+      },
+      "response": "Access Denied: You do not have the required permissions."
+    }
+  ]
+}

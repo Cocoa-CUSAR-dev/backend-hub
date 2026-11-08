@@ -1,5 +1,5 @@
 """DB-backed tests for the reminder check (src/reminders). Exercises the real
-notify.*/form.* SQL in src/reminders/queries.py -- the unit tests in
+notify.*/form.* SQL behind src/reminders -- the unit tests in
 tests/reminders/test_jobs.py mock all of that out. Skipped unless
 RUN_DB_TESTS is set (see tests/integration/conftest.py).
 """
@@ -12,15 +12,13 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.reminders.exceptions import InvalidReminderReference, ReminderNotFound
+from src import db
+from src.actor import Actor
+from src.db.notify import Recipient
+from src.exceptions import InvalidReminderReference, ReminderNotFound
+from src.reminders import service
 from src.reminders.jobs import _run_reminder_check, check_and_send_reminders
-from src.reminders.queries import (
-    create_reminder_schedule,
-    list_schedules_for_task,
-    update_reminder_schedule,
-    users_owing_task,
-)
-from src.reminders.schemas import RecipientRule
+from src.reminders.service import users_owing_task
 from tests.integration.helpers import (
     seed_form_response,
     seed_task_form,
@@ -34,6 +32,25 @@ _NOW = datetime(2026, 9, 7, 17, 0)
 # Tasks are seeded open well before _NOW so they're inside their window
 # regardless of the wall-clock date the suite actually runs on.
 _PAST = datetime(2026, 1, 1)
+
+
+async def create_reminder_schedule(
+    session: AsyncSession,
+    *,
+    task_id: uuid.UUID,
+    time_of_day: time,
+    created_by: uuid.UUID,
+    recipients: list[Recipient] | None = None,
+) -> uuid.UUID:
+    row = await service.create_schedule(
+        session,
+        Actor.system(),
+        task_id=task_id,
+        time_of_day=time_of_day,
+        created_by=created_by,
+        recipients=recipients or [],
+    )
+    return row.schedule_id
 
 
 async def _seed_schedule(
@@ -264,10 +281,10 @@ async def test_check_and_send_reminders_wrapper_reads_real_clock_and_own_session
 
     fixed_now = datetime(2026, 9, 7, 17, 0, tzinfo=_BANGKOK)
     with (
-        patch("src.reminders.jobs.datetime") as mock_datetime,
+        patch("src.reminders.jobs.bangkok_now") as mock_now,
         patch("src.reminders.jobs.multicast_text_batched", new=_all_succeed()) as multicast,
     ):
-        mock_datetime.now.return_value = fixed_now
+        mock_now.return_value = fixed_now
         await check_and_send_reminders()
 
     multicast.assert_awaited_once()
@@ -292,18 +309,18 @@ async def test_check_and_send_reminders_does_not_double_send_across_the_bangkok_
     second_tick = datetime(2026, 9, 7, 1, 15, tzinfo=_BANGKOK)
 
     with (
-        patch("src.reminders.jobs.datetime") as mock_datetime,
+        patch("src.reminders.jobs.bangkok_now") as mock_now,
         patch("src.reminders.jobs.multicast_text_batched", new=_all_succeed()) as first,
     ):
-        mock_datetime.now.return_value = first_tick
+        mock_now.return_value = first_tick
         await check_and_send_reminders()
     first.assert_awaited_once()
 
     with (
-        patch("src.reminders.jobs.datetime") as mock_datetime,
+        patch("src.reminders.jobs.bangkok_now") as mock_now,
         patch("src.reminders.jobs.multicast_text_batched", new=_all_succeed()) as second,
     ):
-        mock_datetime.now.return_value = second_tick
+        mock_now.return_value = second_tick
         await check_and_send_reminders()
     second.assert_not_awaited()
 
@@ -365,7 +382,7 @@ async def test_role_rule_reminds_only_holders_of_that_role(db_session: AsyncSess
         task_id=task_id,
         time_of_day=time(8, 0),
         created_by=a,
-        recipients=[RecipientRule(type="ROLE", id=farmer_role)],
+        recipients=[Recipient(type="ROLE", id=farmer_role)],
     )
 
     owing = await users_owing_task(db_session, task_id, _NOW, schedule_id=schedule_id)
@@ -383,8 +400,8 @@ async def test_user_rule_reminds_that_person_even_without_the_role(
         time_of_day=time(8, 0),
         created_by=a,
         recipients=[
-            RecipientRule(type="ROLE", id=farmer_role),
-            RecipientRule(type="USER", id=p),
+            Recipient(type="ROLE", id=farmer_role),
+            Recipient(type="USER", id=p),
         ],
     )
 
@@ -403,8 +420,8 @@ async def test_someone_matching_both_a_role_and_a_user_rule_is_listed_once(
         time_of_day=time(8, 0),
         created_by=a,
         recipients=[
-            RecipientRule(type="ROLE", id=farmer_role),
-            RecipientRule(type="USER", id=a),
+            Recipient(type="ROLE", id=farmer_role),
+            Recipient(type="USER", id=a),
         ],
     )
 
@@ -423,7 +440,7 @@ async def test_a_targeted_person_who_already_submitted_is_not_reminded(
         task_id=task_id,
         time_of_day=time(8, 0),
         created_by=a,
-        recipients=[RecipientRule(type="ROLE", id=farmer_role)],
+        recipients=[Recipient(type="ROLE", id=farmer_role)],
     )
 
     owing = await users_owing_task(db_session, task_id, _NOW, schedule_id=schedule_id)
@@ -438,7 +455,7 @@ async def test_job_only_pushes_to_the_targeted_role(db_session: AsyncSession) ->
         task_id=task_id,
         time_of_day=time(8, 0),
         created_by=a,
-        recipients=[RecipientRule(type="ROLE", id=farmer_role)],
+        recipients=[Recipient(type="ROLE", id=farmer_role)],
     )
     push = _all_succeed()
 
@@ -460,14 +477,14 @@ async def test_creating_with_a_nonexistent_role_is_rejected_cleanly(
             task_id=task_id,
             time_of_day=time(8, 0),
             created_by=a,
-            recipients=[RecipientRule(type="ROLE", id=uuid.uuid4())],
+            recipients=[Recipient(type="ROLE", id=uuid.uuid4())],
         )
     except InvalidReminderReference:
         pass
     else:
         raise AssertionError("expected InvalidReminderReference")
 
-    assert await list_schedules_for_task(db_session, task_id) == []
+    assert await db.notify.list_schedules_for_task(db_session, task_id) == []
 
 
 async def test_update_changes_time_recipients_and_active_flag(db_session: AsyncSession) -> None:
@@ -477,29 +494,30 @@ async def test_update_changes_time_recipients_and_active_flag(db_session: AsyncS
         task_id=task_id,
         time_of_day=time(8, 0),
         created_by=a,
-        recipients=[RecipientRule(type="ROLE", id=farmer_role)],
+        recipients=[Recipient(type="ROLE", id=farmer_role)],
     )
 
-    updated = await update_reminder_schedule(
+    updated = await service.update_schedule(
         db_session,
+        Actor.system(),
         schedule_id,
         time_of_day=time(10, 30),
         is_active=False,
-        recipients=[RecipientRule(type="ROLE", id=processor_role)],
+        recipients=[Recipient(type="ROLE", id=processor_role)],
     )
 
     assert updated.time_of_day == time(10, 30)
     assert updated.is_active is False
     assert [(r.type, r.id) for r in updated.recipients] == [("ROLE", processor_role)]
 
-    cleared = await update_reminder_schedule(db_session, schedule_id, recipients=[])
-    assert cleared.recipients == []
+    cleared = await service.update_schedule(db_session, Actor.system(), schedule_id, recipients=[])
+    assert cleared.recipients == ()
     assert cleared.time_of_day == time(10, 30)  # untouched fields stay
 
 
 async def test_update_of_unknown_schedule_raises(db_session: AsyncSession) -> None:
     try:
-        await update_reminder_schedule(db_session, uuid.uuid4(), is_active=False)
+        await service.update_schedule(db_session, Actor.system(), uuid.uuid4(), is_active=False)
     except ReminderNotFound:
         pass
     else:

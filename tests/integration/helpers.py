@@ -14,6 +14,11 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth.service import load_actor
+from src.forms.schemas import FormOut
+from src.line.temp_task_picker import PendingTask, list_pending_tasks
+from tests.integration.auth_helpers import seed_role
+
 
 def sign_signature(body: bytes, secret: str) -> str:
     digest = hmac.new(secret.encode(), body, hashlib.sha256).digest()
@@ -110,7 +115,16 @@ def build_postback_event(*, line_user_id: str, data: str, reply_token: str | Non
     return json.dumps(payload).encode()
 
 
-async def seed_user_with_line_identity(session: AsyncSession, *, line_user_id: str) -> uuid.UUID:
+# What the farmer role holds in the database for the task routes.
+FARMER_PERMISSIONS = ["read:form:assigned", "read:response:own"]
+
+
+async def seed_user_with_line_identity(
+    session: AsyncSession, *, line_user_id: str, roles: tuple[str, ...] = ("farmer",)
+) -> uuid.UUID:
+    """A user with a linked LINE account. Like a real LINE user they hold the
+    farmer role unless `roles` says otherwise (`roles=()` is an account that
+    registered but never added a role)."""
     user_id = uuid.uuid4()
     await session.execute(
         text("INSERT INTO auth.user_account (user_id) VALUES (:user_id)"),
@@ -123,8 +137,21 @@ async def seed_user_with_line_identity(session: AsyncSession, *, line_user_id: s
         ),
         {"user_id": user_id, "line_user_id": line_user_id},
     )
+    for role in roles:
+        role_id = await seed_role(session, role, FARMER_PERMISSIONS)
+        await session.execute(
+            text("INSERT INTO auth.user_role (user_id, role_id) VALUES (:u, :r)"),
+            {"u": user_id, "r": role_id},
+        )
     await session.commit()
     return user_id
+
+
+async def pending_tasks_of(session: AsyncSession, user_id: uuid.UUID) -> list[PendingTask]:
+    """What the LINE picker lists for this user, loading their roles as the
+    webhook does."""
+    actor = await load_actor(session, user_id, "line")
+    return await list_pending_tasks(session, actor)
 
 
 async def seed_task_form(
@@ -216,14 +243,14 @@ def question_json(
     choices: list[dict[str, str]] | None = None,
     carry_forward: bool = False,
 ) -> dict[str, Any]:
-    """A question exactly as Kotlin's GET /service/forms/{formId} would spell
-    it -- camelCase, matching web-backend's Question.Entity -- for respx to
-    hand back before forms/client.py's get_form() converts it.
+    """A question spelled the way the form API spells it -- camelCase, as
+    web-backend's Question.Entity did -- for `serve_form` to hand the chatbot
+    before forms.detail.load_chat_form() converts it.
 
     `validation_rule`, if given, should use the same camelCase spelling
     form.field_validation_rule stores it with (e.g. "errorMessage", not
-    "error_message") -- get_form()'s _convert_keys() converts it recursively,
-    same as it would a real Kotlin response.
+    "error_message") -- load_chat_form()'s snake_keys() converts it
+    recursively, the same as it does for a form read from the database.
 
     `choices` (OPTION questions only -- BOOLEAN's are synthesized in
     service.py itself, never sent by Kotlin) is `[{"id": ..., "name": ...}]`,
@@ -251,8 +278,8 @@ def build_form_response(
     questions: list[dict[str, Any]],
     is_multiple_submit: bool = False,
 ) -> dict[str, Any]:
-    """The full `{"value": ..., "error": null}` envelope forms/client.py's
-    get_form() expects, wrapping the given questions in a single section.
+    """The `{"value": ..., "error": null}` envelope `serve_form` takes,
+    wrapping the given questions in a single section.
 
     `is_multiple_submit` is spelled the way Kotlin sends it (camelCase, see
     web-backend's Form.Detail). It matters because the chatbot reads that flag
@@ -388,3 +415,51 @@ async def seed_farm_with_plots(
         plot_ids.append(plot_id)
     await session.commit()
     return farm_id, plot_ids
+
+
+# What the chatbot reads when it loads a form, by form id. Filled by
+# `serve_form`, read by the `served_forms` fixture's stand-in for
+# forms.detail.load_form (tests/integration/conftest.py).
+SERVED_FORMS: dict[uuid.UUID, FormOut] = {}
+
+
+def serve_form(task_form_id: uuid.UUID | str, envelope: dict[str, Any]) -> None:
+    """Make the chatbot's form load answer with this form.
+
+    `envelope` is what `build_form_response` builds: the form spelled the way
+    Kotlin sent it (camelCase, only the keys a test cares about). It is filled
+    out to a whole FormOut, so everything after the database read is the real
+    code: forms.detail.load_chat_form turns it into the FormDetail the
+    conversation reads, exactly as in production.
+    """
+    value = envelope["value"]
+    sections = []
+    for number, section in enumerate(value["sections"], start=1):
+        section_id = str(uuid.uuid4())
+        questions = [
+            {
+                "sectionId": section_id,
+                "description": None,
+                "defaultValue": None,
+                "isActive": True,
+                "choices": None,
+                "validationRule": None,
+                **question,
+            }
+            for question in section["questions"]
+        ]
+        sections.append(
+            {
+                "sectionId": section_id,
+                "title": None,
+                "description": None,
+                "sortOrder": number,
+                "isActive": True,
+                **section,
+                "questions": questions,
+            }
+        )
+    whole = {"title": None, "description": None, "isMultipleSubmit": False, **value}
+    SERVED_FORMS[uuid.UUID(str(task_form_id))] = FormOut.model_validate(
+        {**whole, "sections": sections}
+    )

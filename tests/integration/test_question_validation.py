@@ -1,5 +1,5 @@
 """Webhook-level tests for the guided-flow answer loop -- exercises
-src.line.router + src.conversation.service + a real Postgres session
+src.chat.router + src.chat.service + a real Postgres session
 together through the actual /line/webhook route. Kotlin's forms endpoint is
 mocked with respx (it's httpx-based); LINE's reply call is mocked by
 patching AsyncMessagingApi.reply_message directly, since line-bot-sdk sends
@@ -12,12 +12,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_text_message_event,
@@ -26,6 +25,7 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
@@ -42,9 +42,9 @@ async def _current_question_id(
 
 async def _send_answer(client: AsyncClient, *, line_user_id: str, text_content: str) -> AsyncMock:
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -96,14 +96,12 @@ class TestGuidedFlowRoundTrip:
         )
 
         body = build_text_message_event(line_user_id=line_user_id, text_content="คำตอบที่ถูกต้อง")
-        signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+        signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             with patch(
-                "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+                "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
             ) as reply_message:
                 response = await client.post(
                     "/line/webhook",
@@ -164,28 +162,26 @@ class TestReAskLoop:
     def _mock_form(
         self, *, task_form_id: uuid.UUID, question_1: uuid.UUID, question_2: uuid.UUID
     ) -> None:
-        respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-            return_value=Response(
-                200,
-                json=build_form_response(
-                    task_form_id=task_form_id,
-                    questions=[
-                        question_json(
-                            question_id=question_1,
-                            field_name="quantity_kg",
-                            input_type="FLOAT",
-                            validation_rule=self._QUANTITY_RULE,
-                        ),
-                        question_json(
-                            question_id=question_2,
-                            field_name="notes2",
-                            input_type="VARCHAR",
-                            label="คำถามที่สอง",
-                            sort_order=2,
-                        ),
-                    ],
-                ),
-            )
+        serve_form(
+            task_form_id,
+            build_form_response(
+                task_form_id=task_form_id,
+                questions=[
+                    question_json(
+                        question_id=question_1,
+                        field_name="quantity_kg",
+                        input_type="FLOAT",
+                        validation_rule=self._QUANTITY_RULE,
+                    ),
+                    question_json(
+                        question_id=question_2,
+                        field_name="notes2",
+                        input_type="VARCHAR",
+                        label="คำถามที่สอง",
+                        sort_order=2,
+                    ),
+                ],
+            ),
         )
 
     async def test_invalid_answer_reasks_then_valid_answer_advances(
@@ -341,9 +337,7 @@ class TestAdditionalFieldTypes:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
 
             reply_message = await _send_answer(
                 client, line_user_id=line_user_id, text_content=invalid_answer
@@ -402,28 +396,26 @@ class TestChoiceResolution:
         input_type: str,
         choices: list[dict[str, str]] | None,
     ) -> None:
-        respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-            return_value=Response(
-                200,
-                json=build_form_response(
-                    task_form_id=task_form_id,
-                    questions=[
-                        question_json(
-                            question_id=question_1,
-                            field_name="field_under_test",
-                            input_type=input_type,
-                            choices=choices,
-                        ),
-                        question_json(
-                            question_id=question_2,
-                            field_name="notes2",
-                            input_type="VARCHAR",
-                            label="คำถามที่สอง",
-                            sort_order=2,
-                        ),
-                    ],
-                ),
-            )
+        serve_form(
+            task_form_id,
+            build_form_response(
+                task_form_id=task_form_id,
+                questions=[
+                    question_json(
+                        question_id=question_1,
+                        field_name="field_under_test",
+                        input_type=input_type,
+                        choices=choices,
+                    ),
+                    question_json(
+                        question_id=question_2,
+                        field_name="notes2",
+                        input_type="VARCHAR",
+                        label="คำถามที่สอง",
+                        sort_order=2,
+                    ),
+                ],
+            ),
         )
 
     async def test_option_mismatch_reasks(
@@ -570,29 +562,27 @@ class TestSkipButton:
         question_2: uuid.UUID,
         validation_rule: dict[str, Any] | None,
     ) -> None:
-        respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-            return_value=Response(
-                200,
-                json=build_form_response(
-                    task_form_id=task_form_id,
-                    questions=[
-                        question_json(
-                            question_id=question_1,
-                            field_name="field_under_test",
-                            input_type="VARCHAR",
-                            is_mandatory=False,
-                            validation_rule=validation_rule,
-                        ),
-                        question_json(
-                            question_id=question_2,
-                            field_name="notes2",
-                            input_type="VARCHAR",
-                            label="คำถามที่สอง",
-                            sort_order=2,
-                        ),
-                    ],
-                ),
-            )
+        serve_form(
+            task_form_id,
+            build_form_response(
+                task_form_id=task_form_id,
+                questions=[
+                    question_json(
+                        question_id=question_1,
+                        field_name="field_under_test",
+                        input_type="VARCHAR",
+                        is_mandatory=False,
+                        validation_rule=validation_rule,
+                    ),
+                    question_json(
+                        question_id=question_2,
+                        field_name="notes2",
+                        input_type="VARCHAR",
+                        label="คำถามที่สอง",
+                        sort_order=2,
+                    ),
+                ],
+            ),
         )
 
     async def test_skip_label_skips_without_validation(

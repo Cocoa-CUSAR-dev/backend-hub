@@ -17,12 +17,11 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_text_message_event,
@@ -32,6 +31,7 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
@@ -44,14 +44,14 @@ async def _send_message(client: AsyncClient, *, line_user_id: str, text_content:
     real one would try to reach Kotlin.
     """
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
-        patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-        patch("src.line.router.push_flex", new=AsyncMock()),
-        patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="token")),
+        patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+        patch("src.chat.router.push_flex", new=AsyncMock()),
+        patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -136,10 +136,8 @@ class TestTypedYesWordConfirms:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
-            with patch("src.conversation.service.submit_task", new=AsyncMock()):
+            serve_form(task_form_id, form_response)
+            with patch("src.chat.service.submit_task", new=AsyncMock()):
                 reply_message = await _send_message(
                     client, line_user_id=line_user_id, text_content="เค"
                 )
@@ -158,10 +156,8 @@ class TestTypedYesWordConfirms:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
-            with patch("src.conversation.service.submit_task", new=AsyncMock()):
+            serve_form(task_form_id, form_response)
+            with patch("src.chat.service.submit_task", new=AsyncMock()):
                 await _send_message(client, line_user_id=line_user_id, text_content="ยืนยันครับ")
 
         assert await _status_of(db_session, conversation_id) == "completed"
@@ -178,10 +174,8 @@ class TestTypedYesWordConfirms:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
-            with patch("src.conversation.service.submit_task", new=AsyncMock()):
+            serve_form(task_form_id, form_response)
+            with patch("src.chat.service.submit_task", new=AsyncMock()):
                 reply_message = await _send_message(
                     client, line_user_id=line_user_id, text_content="ตกลง"
                 )
@@ -202,9 +196,7 @@ class TestTypedCancelAndEdit:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             await _send_message(client, line_user_id=line_user_id, text_content="ยกเลิก")
 
         assert await _status_of(db_session, conversation_id) == "cancelled"
@@ -218,9 +210,7 @@ class TestTypedCancelAndEdit:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _send_message(
                 client, line_user_id=line_user_id, text_content="แก้ไข"
             )
@@ -241,9 +231,7 @@ class TestUnrecognisedTextIsNeverADeadEnd:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _send_message(
                 client, line_user_id=line_user_id, text_content="asdfgh"
             )
@@ -271,9 +259,7 @@ class TestUnrecognisedTextIsNeverADeadEnd:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             await _send_message(client, line_user_id=line_user_id, text_content="⏸️ พักไว้ก่อน")
 
         assert await _status_of(db_session, conversation_id) == "paused"

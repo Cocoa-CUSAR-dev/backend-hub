@@ -1,8 +1,8 @@
 """Tests for pause/resume (US2-3) against a real Postgres session -- most
-classes exercise src.line.router + src.conversation.service together through
+classes exercise src.chat.router + src.chat.service together through
 the real /line/webhook route, with Kotlin's forms endpoint and LINE's reply
 call mocked at the boundary. TestPauseIdleConversations is the exception: it
-calls src.conversation.jobs.pause_idle_conversations directly, since that's a
+calls src.chat.jobs.pause_idle_conversations directly, since that's a
 scheduled job with no webhook involved.
 """
 
@@ -10,13 +10,13 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.conversation.jobs import pause_idle_conversations
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.chat.jobs import pause_idle_conversations
+from src.chat.ui import messages
+from src.config import settings
 from src.line.parent_picker import ParentOption
 from tests.integration.helpers import (
     build_form_response,
@@ -28,6 +28,7 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
@@ -49,9 +50,9 @@ async def _conversation_row(session: AsyncSession, conversation_id: uuid.UUID) -
 
 async def _send_message(client: AsyncClient, *, line_user_id: str, text_content: str) -> AsyncMock:
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -62,9 +63,9 @@ async def _send_message(client: AsyncClient, *, line_user_id: str, text_content:
 
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
     body = build_postback_event(line_user_id=line_user_id, data=data)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -123,9 +124,7 @@ class TestExplicitPause:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _send_message(
                 client, line_user_id=line_user_id, text_content=_PAUSE_LABEL
             )
@@ -200,9 +199,7 @@ class TestResume:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _send_postback(
                 client,
                 line_user_id=line_user_id,
@@ -219,6 +216,20 @@ class TestResume:
 
 
 class TestStartKeywordListsTasks:
+    async def test_an_account_with_no_role_is_told_to_register_first(
+        self, db_session: AsyncSession, client: AsyncClient
+    ) -> None:
+        await seed_task_form(db_session, title="งานทดสอบ", handler="notes")
+        line_user_id = f"U{uuid.uuid4().hex}"
+        await seed_user_with_line_identity(db_session, line_user_id=line_user_id, roles=())
+
+        reply_message = await _send_message(
+            client, line_user_id=line_user_id, text_content=_START_KEYWORD
+        )
+
+        reply_message.assert_awaited_once()
+        assert reply_message.await_args.args[0].messages[0].text == messages.NO_FORM_ACCESS
+
     async def test_start_keyword_pauses_active_conversation_and_lists_it(
         self, db_session: AsyncSession, client: AsyncClient
     ) -> None:
@@ -371,9 +382,7 @@ class TestResumeAtParentPicker:
                 return_value=parent_choices,
             ),
         ):
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _send_postback(
                 client,
                 line_user_id=line_user_id,

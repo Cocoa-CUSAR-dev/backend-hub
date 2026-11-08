@@ -1,0 +1,52 @@
+{
+  "kid": "K-RUN",
+  "after": "JOB-03",
+  "note": "Not on the Before sheet. What it opens depends on today's date: compare the status only.",
+  "kotlin": {
+    "method": "POST",
+    "path": "/api/v1/service/recurrence/run"
+  },
+  "hub": {
+    "method": "POST",
+    "path": "/internal/cron/recurrence"
+  },
+  "seeds": [
+    "base",
+    "forms"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "open due rounds",
+      "status": 200,
+      "method": "POST",
+      "path": "/api/v1/service/recurrence/run",
+      "body": null,
+      "response": {
+        "created": 3,
+        "alreadyExisted": 0,
+        "skippedClosed": 0,
+        "skippedNoRecipients": 0,
+        "failed": 0
+      },
+      "hub": {
+        "compare": "status"
+      },
+      "service_key": true
+    },
+    {
+      "name": "wrong service key",
+      "status": 401,
+      "method": "POST",
+      "path": "/api/v1/service/recurrence/run",
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:47.138+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/service/recurrence/run"
+      },
+      "service_key": true
+    }
+  ]
+}

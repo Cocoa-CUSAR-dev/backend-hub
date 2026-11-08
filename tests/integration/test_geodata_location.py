@@ -16,12 +16,11 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_postback_event,
@@ -31,10 +30,11 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
-# The V16 rule exactly as Kotlin sends it (camelCase); get_form() snake_cases
+# The V16 rule as the database stores it (camelCase); load_chat_form() snake_cases
 # it on the way in, which is the path this test exercises.
 _GIS_RULE = {"type": "GEODATA", "validLatLng": True, "errorMessage": "พิกัดไม่ถูกต้อง"}
 
@@ -73,14 +73,14 @@ def _build_location_event(
 
 
 async def _post(client: AsyncClient, body: bytes) -> AsyncMock:
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
-        patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-        patch("src.line.router.push_flex", new=AsyncMock()),
-        patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="token")),
+        patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+        patch("src.chat.router.push_flex", new=AsyncMock()),
+        patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -182,9 +182,7 @@ class TestLocationAnswersTheGeodataQuestion:
 
         submit_task = AsyncMock()
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             summary = await _post(
                 client,
                 _build_location_event(
@@ -195,7 +193,7 @@ class TestLocationAnswersTheGeodataQuestion:
                 ),
             )
             stored = await _stored_answer(db_session, gis_q)
-            with patch("src.conversation.service.submit_task", new=submit_task):
+            with patch("src.chat.service.submit_task", new=submit_task):
                 await _post(
                     client,
                     build_postback_event(
@@ -233,9 +231,7 @@ class TestLocationAnswersTheGeodataQuestion:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             await _post(
                 client,
                 _build_location_event(
@@ -261,9 +257,7 @@ class TestLocationAnswersTheGeodataQuestion:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _post(
                 client,
                 _build_location_event(
@@ -295,9 +289,7 @@ class TestLocationThatIsNotTheAnswerIsNeverStored:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
             reply_message = await _post(
                 client,
                 _build_location_event(

@@ -1,0 +1,386 @@
+{
+  "kid": "K-42",
+  "after": "RPT-01",
+  "note": "web-backend dev answers 400 for every export: XlsxService pages 1000 rows but PageRequest allows at most 500, and the harvest sheet throws on a null yes/no or number (XlsxService.kt:101-108). Recorded from a local build with exactly those two fixed (exportPageSize = 500; a null yes/no cell is '-', a null number 0.0, as the same file does for null text and area): CONTRACT_KOTLIN_URL=<that build> record_web.py K-42.",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/reports/raw-data/download"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/reports/raw-data"
+  },
+  "seeds": [
+    "base",
+    "places"
+  ],
+  "recorded_on": "2026-10-24",
+  "cases": [
+    {
+      "name": "every sheet",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
+      "body": null,
+      "response": {
+        "xlsx": {
+          "Farm Registry": [
+            [
+              "Farm Name",
+              "Found Date",
+              "Area",
+              "Province",
+              "District",
+              "Sub-District",
+              "Contact",
+              "Phone",
+              "Line",
+              "Facebook"
+            ],
+            [
+              "สวนโกโก้ชุมพร",
+              "2020-05-01",
+              "12.5",
+              "Chumphon",
+              "Mueang Chumphon",
+              "Tha Taphao",
+              "สมชาย ใจดี",
+              "0800000001",
+              "somchai",
+              "somchai.fb"
+            ],
+            [
+              "สวนโกโก้แม่ริม",
+              "2021-01-15",
+              "4.0",
+              "Chiang Mai",
+              "Mae Rim",
+              "Rim Tai",
+              "สมหญิง รักสวน",
+              "0800000002",
+              "-",
+              "-"
+            ]
+          ],
+          "Raw Harvest Data": [
+            [
+              "Date",
+              "Farm",
+              "Grade",
+              "Kg",
+              "Gram/Pod",
+              "Clean",
+              "Size OK",
+              "Sprout",
+              "Dry",
+              "Shriveled",
+              "Cut Test"
+            ],
+            [
+              "2026-10-12T01:00",
+              "สวนโกโก้แม่ริม",
+              "B",
+              "75.25",
+              "360.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "slaty 3%"
+            ],
+            [
+              "2026-10-03T01:00",
+              "สวนโกโก้ชุมพร",
+              "A",
+              "140.0",
+              "430.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "well fermented"
+            ],
+            [
+              "2026-10-03T01:00",
+              "สวนโกโก้ชุมพร",
+              "C",
+              "12.0",
+              "300.0",
+              "N",
+              "-",
+              "-",
+              "N",
+              "-",
+              "mouldy"
+            ],
+            [
+              "2026-09-20T01:00",
+              "สวนโกโก้แม่ริม",
+              "B",
+              "60.0",
+              "350.0",
+              "Y",
+              "-",
+              "-",
+              "N",
+              "-",
+              "purple 10%"
+            ],
+            [
+              "2026-09-05T01:00",
+              "สวนโกโก้ชุมพร",
+              "A",
+              "95.0",
+              "420.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "well fermented"
+            ],
+            [
+              "2026-08-10T01:00",
+              "สวนโกโก้ชุมพร",
+              "A",
+              "120.5",
+              "410.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "well fermented"
+            ],
+            [
+              "2026-08-10T01:00",
+              "สวนโกโก้ชุมพร",
+              "B",
+              "30.0",
+              "380.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "slaty 5%"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "farms only",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
+      "query": {
+        "sheets": "FARM"
+      },
+      "body": null,
+      "response": {
+        "xlsx": {
+          "Farm Registry": [
+            [
+              "Farm Name",
+              "Found Date",
+              "Area",
+              "Province",
+              "District",
+              "Sub-District",
+              "Contact",
+              "Phone",
+              "Line",
+              "Facebook"
+            ],
+            [
+              "สวนโกโก้ชุมพร",
+              "2020-05-01",
+              "12.5",
+              "Chumphon",
+              "Mueang Chumphon",
+              "Tha Taphao",
+              "สมชาย ใจดี",
+              "0800000001",
+              "somchai",
+              "somchai.fb"
+            ],
+            [
+              "สวนโกโก้แม่ริม",
+              "2021-01-15",
+              "4.0",
+              "Chiang Mai",
+              "Mae Rim",
+              "Rim Tai",
+              "สมหญิง รักสวน",
+              "0800000002",
+              "-",
+              "-"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "harvests only",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
+      "query": {
+        "sheets": "HARVEST"
+      },
+      "body": null,
+      "response": {
+        "xlsx": {
+          "Raw Harvest Data": [
+            [
+              "Date",
+              "Farm",
+              "Grade",
+              "Kg",
+              "Gram/Pod",
+              "Clean",
+              "Size OK",
+              "Sprout",
+              "Dry",
+              "Shriveled",
+              "Cut Test"
+            ],
+            [
+              "2026-10-12T01:00",
+              "สวนโกโก้แม่ริม",
+              "B",
+              "75.25",
+              "360.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "slaty 3%"
+            ],
+            [
+              "2026-10-03T01:00",
+              "สวนโกโก้ชุมพร",
+              "A",
+              "140.0",
+              "430.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "well fermented"
+            ],
+            [
+              "2026-10-03T01:00",
+              "สวนโกโก้ชุมพร",
+              "C",
+              "12.0",
+              "300.0",
+              "N",
+              "-",
+              "-",
+              "N",
+              "-",
+              "mouldy"
+            ],
+            [
+              "2026-09-20T01:00",
+              "สวนโกโก้แม่ริม",
+              "B",
+              "60.0",
+              "350.0",
+              "Y",
+              "-",
+              "-",
+              "N",
+              "-",
+              "purple 10%"
+            ],
+            [
+              "2026-09-05T01:00",
+              "สวนโกโก้ชุมพร",
+              "A",
+              "95.0",
+              "420.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "well fermented"
+            ],
+            [
+              "2026-08-10T01:00",
+              "สวนโกโก้ชุมพร",
+              "A",
+              "120.5",
+              "410.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "well fermented"
+            ],
+            [
+              "2026-08-10T01:00",
+              "สวนโกโก้ชุมพร",
+              "B",
+              "30.0",
+              "380.0",
+              "Y",
+              "-",
+              "-",
+              "Y",
+              "-",
+              "slaty 5%"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "name": "unknown sheet",
+      "status": 400,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "researcher",
+      "query": {
+        "sheets": "NOPE"
+      },
+      "body": null,
+      "response": {
+        "error": "Invalid parameter value: NOPE. Expected one of the supported types."
+      }
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "actor": "farmer_1",
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/reports/raw-data/download",
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-24T07:52:43.003+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/reports/raw-data/download"
+      }
+    }
+  ]
+}

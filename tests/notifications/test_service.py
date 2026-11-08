@@ -15,7 +15,7 @@ async def _send(id_map, user_ids, *, multicast_batched=None):
     push = AsyncMock()
     with (
         patch(
-            "src.notifications.service.lookup_line_user_ids",
+            "src.db.auth.line_user_ids_for",
             new=AsyncMock(return_value=id_map),
         ),
         patch("src.notifications.service.push_text", new=push),

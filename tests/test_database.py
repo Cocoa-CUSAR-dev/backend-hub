@@ -1,21 +1,22 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase
+from unittest.mock import AsyncMock
 
-from src.database import Base, async_session_maker, get_session
+import pytest
 
-
-def test_base_is_a_declarative_base() -> None:
-    assert issubclass(Base, DeclarativeBase)
+from src.database import transaction
 
 
-async def test_get_session_yields_a_real_async_session() -> None:
-    generator = get_session()
-    session = await anext(generator)
-    try:
-        assert isinstance(session, AsyncSession)
-    finally:
-        await session.close()
+async def test_transaction_commits_when_the_block_finishes() -> None:
+    session = AsyncMock()
+    async with transaction(session):
+        pass
+    session.commit.assert_awaited_once()
+    session.rollback.assert_not_awaited()
 
 
-def test_async_session_maker_builds_async_sessions() -> None:
-    assert async_session_maker.class_ is AsyncSession
+async def test_transaction_rolls_back_and_reraises_on_error() -> None:
+    session = AsyncMock()
+    with pytest.raises(ValueError):
+        async with transaction(session):
+            raise ValueError("second write failed")
+    session.rollback.assert_awaited_once()
+    session.commit.assert_not_awaited()

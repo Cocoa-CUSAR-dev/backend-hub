@@ -2,45 +2,53 @@ from datetime import time
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
+
+# A form's reminder settings and the recipient pickers (FORM-08..11). Same
+# keys as web-backend's Reminder.Request.Create, Reminder.Detail,
+# RoleOption and UserOption, which the web app's settings screen reads.
 
 
-class RecipientRule(BaseModel):
-    """Who a reminder is aimed at: every holder of a role ("ROLE", id is a
-    role_id) or exactly one person ("USER", id is a user_id).
-    """
+class _Camel(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class RecipientIn(_Camel):
+    """ROLE = everyone holding that role (id is a role_id); USER = one person."""
 
     type: Literal["ROLE", "USER"]
     id: UUID
 
 
-class ReminderScheduleCreate(BaseModel):
-    """cadence is deliberately not a field -- see create_reminder_schedule's
-    own docstring in queries.py. This only ever represents "remind daily at
-    this time for this task". No recipients = remind everyone who owes it.
-    """
+class FormReminderIn(_Camel):
+    """A daily reminder at this time; no recipients = everyone who still owes
+    the task. There is no cadence: the reminder job only knows daily."""
 
-    task_id: UUID
+    enabled: bool
     time_of_day: time
-    created_by: UUID
-    recipients: list[RecipientRule] = Field(default_factory=list)
+    recipients: list[RecipientIn] = []
 
 
-class ReminderScheduleUpdate(BaseModel):
-    """Every field optional: only what is sent changes. `recipients`, when
-    sent, REPLACES the whole list (an empty list = back to "everyone").
-    """
-
-    time_of_day: time | None = None
-    is_active: bool | None = None
-    recipients: list[RecipientRule] | None = None
+class RecipientDetailOut(_Camel):
+    type: Literal["ROLE", "USER"]
+    id: UUID
+    label: str  # the role name or username, for the screen
 
 
-class ReminderScheduleResponse(BaseModel):
-    schedule_id: UUID
-    task_id: UUID
-    cadence: str
-    time_of_day: time
-    is_active: bool
-    created_by: UUID
-    recipients: list[RecipientRule] = Field(default_factory=list)
+class FormReminderOut(_Camel):
+    schedule_id: UUID | None
+    enabled: bool
+    time_of_day: time | None
+    recipients: list[RecipientDetailOut]
+
+
+class RoleOptionOut(_Camel):
+    role_id: UUID
+    role_name: str
+
+
+class UserOptionOut(_Camel):
+    user_id: UUID
+    username: str
+    roles: list[str]

@@ -12,12 +12,11 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_postback_event,
@@ -28,15 +27,16 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
 
 async def _send_message(client: AsyncClient, *, line_user_id: str, text_content: str) -> AsyncMock:
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -47,9 +47,9 @@ async def _send_message(client: AsyncClient, *, line_user_id: str, text_content:
 
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
     body = build_postback_event(line_user_id=line_user_id, data=data)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -138,9 +138,7 @@ class TestEditAtConfirmation:
         )
 
         with respx.mock:
-            respx.get(f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{task_form_id}").mock(
-                return_value=Response(200, json=form_response)
-            )
+            serve_form(task_form_id, form_response)
 
             # 1. Tap "แก้ไข" -- expect a picker listing both answered questions.
             reply_message = await _send_postback(

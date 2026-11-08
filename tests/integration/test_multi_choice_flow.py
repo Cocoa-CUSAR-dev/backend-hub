@@ -12,15 +12,16 @@ multiple-submit form is a precondition of this feature.
 
 import json
 import uuid
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, patch
 
+import pytest
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.forms.config import forms_settings
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_form_response,
     build_postback_event,
@@ -31,20 +32,30 @@ from tests.integration.helpers import (
     seed_question,
     seed_task_form,
     seed_user_with_line_identity,
+    serve_form,
     sign_signature,
 )
 
 
+@pytest.fixture(autouse=True)
+def _farmer_scoped_plots() -> Iterator[None]:
+    """These tests are about farmer scoping, which is production's default
+    (PLOT_SCOPE_MODE=farmer) -- the test suite as a whole runs with "all"
+    (tests/conftest.py), so switch it back on here."""
+    with patch.object(settings, "PLOT_SCOPE_MODE", "farmer"):
+        yield
+
+
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
     body = build_postback_event(line_user_id=line_user_id, data=data)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with (
         patch(
-            "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+            "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
         ) as reply_message,
-        patch("src.line.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
-        patch("src.line.router.push_flex", new=AsyncMock()),
-        patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="token")),
+        patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
+        patch("src.chat.router.push_flex", new=AsyncMock()),
+        patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),
     ):
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -55,9 +66,9 @@ async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -
 
 async def _send_text(client: AsyncClient, *, line_user_id: str, text_content: str) -> AsyncMock:
     body = build_text_message_event(line_user_id=line_user_id, text_content=text_content)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
@@ -228,9 +239,7 @@ class TestThePickerIsShown:
         )
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             reply_message = await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -256,9 +265,7 @@ class TestThePickerIsShown:
         await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="อะไรก็ได้"
             )
@@ -273,9 +280,7 @@ class TestThePickerIsShown:
         await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="อะไรก็ได้"
             )
@@ -295,9 +300,7 @@ class TestSelecting:
         plot_a, plot_b, plot_c = fixture.plot_ids
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
 
             await _send_postback(
                 client,
@@ -333,7 +336,7 @@ class TestSelecting:
             )
 
             submit = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=submit):
+            with patch("src.chat.service.submit_task", new=submit):
                 reply_message = await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -357,9 +360,7 @@ class TestSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             reply_message = await _send_postback(
                 client, line_user_id=fixture.line_user_id, data=f"multi_done:{conversation_id}"
             )
@@ -374,9 +375,7 @@ class TestSelecting:
         plot_a = fixture.plot_ids[0]
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -387,7 +386,7 @@ class TestSelecting:
             )
 
             submit = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=submit):
+            with patch("src.chat.service.submit_task", new=submit):
                 await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -403,9 +402,7 @@ class TestSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -413,7 +410,7 @@ class TestSelecting:
             )
 
             submit = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=submit):
+            with patch("src.chat.service.submit_task", new=submit):
                 await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -435,9 +432,7 @@ class TestStaleBubble:
         plot_a, plot_b, _ = fixture.plot_ids
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -473,9 +468,7 @@ class TestStaleBubble:
         )
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             reply_message = await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -494,9 +487,7 @@ class TestTypedTextWhileSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="แปลง B"
             )
@@ -512,9 +503,7 @@ class TestTypedTextWhileSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -533,9 +522,7 @@ class TestTypedTextWhileSelecting:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="asdfgh"
             )
@@ -553,9 +540,7 @@ class TestPauseAndResume:
         plot_a = fixture.plot_ids[0]
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             await _send_postback(
                 client,
                 line_user_id=fixture.line_user_id,
@@ -589,9 +574,7 @@ class TestPartialFailureRetry:
         plot_a, plot_b, _ = fixture.plot_ids
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             for plot_id in (plot_a, plot_b):
                 await _send_postback(
                     client,
@@ -603,7 +586,7 @@ class TestPartialFailureRetry:
             )
 
             failing = AsyncMock(side_effect=[None, RuntimeError("go is down")])
-            with patch("src.conversation.service.submit_task", new=failing):
+            with patch("src.chat.service.submit_task", new=failing):
                 reply_message = await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -616,7 +599,7 @@ class TestPartialFailureRetry:
             assert status.scalar_one() == "active"
 
             retry = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=retry):
+            with patch("src.chat.service.submit_task", new=retry):
                 await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -710,14 +693,18 @@ class TestAnyOptionQuestion:
     ) -> None:
         """The plot was only the example. Tick two activity types, answer the
         plot once, confirm -- two rows, split by activity type.
+
+        Runs unscoped (PLOT_SCOPE_MODE=all): the plot is answered from
+        Kotlin's global list, whose only entry belongs to another farmer, and
+        under farmer scoping (US2-13) that is correctly refused. This test is
+        about the fan-out, not scoping -- test_choice_scoping covers that.
         """
+        settings.PLOT_SCOPE_MODE = "all"  # restored by the autouse fixture
         fixture, conversation_id, form_response = await _seed_activity_type_form(db_session)
         plot_a = fixture.plot_ids[0]
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=form_response))
+            serve_form(fixture.task_form_id, form_response)
 
             for choice_id in ("spray", "fertilise"):
                 await _send_postback(
@@ -739,7 +726,7 @@ class TestAnyOptionQuestion:
             await _send_text(client, line_user_id=fixture.line_user_id, text_content="แปลงของคนอื่น")
 
             submit = AsyncMock()
-            with patch("src.conversation.service.submit_task", new=submit):
+            with patch("src.chat.service.submit_task", new=submit):
                 await _send_postback(
                     client, line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
                 )
@@ -758,9 +745,7 @@ class TestAnyOptionQuestion:
         fixture, conversation_id, form_response = await _seed_activity_type_form(db_session)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=form_response))
+            serve_form(fixture.task_form_id, form_response)
             reply_message = await _send_text(
                 client, line_user_id=fixture.line_user_id, text_content="อะไรนะ"
             )
@@ -791,9 +776,7 @@ class TestNoAddAnotherAfterAMultiChoiceConfirm:
         conversation_id = await _start_at_plot_question(db_session, fixture)
 
         with respx.mock:
-            respx.get(
-                f"{forms_settings.KOTLIN_BACKEND_URL}/service/forms/{fixture.task_form_id}"
-            ).mock(return_value=Response(200, json=fixture.form_response))
+            serve_form(fixture.task_form_id, fixture.form_response)
             for plot_id in fixture.plot_ids[:ticks]:
                 await _send_postback(
                     client,
@@ -807,16 +790,16 @@ class TestNoAddAnotherAfterAMultiChoiceConfirm:
             body = build_postback_event(
                 line_user_id=fixture.line_user_id, data=f"confirm:{conversation_id}"
             )
-            signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+            signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
             diary = AsyncMock(return_value="ไดอารี่")
             with (
                 patch(
-                    "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+                    "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
                 ) as reply_message,
-                patch("src.line.router.generate_diary", new=diary),
-                patch("src.line.router.push_flex", new=AsyncMock()),
-                patch("src.line.router.mint_sso_token", new=AsyncMock(return_value="t")),
-                patch("src.conversation.service.submit_task", new=AsyncMock()),
+                patch("src.chat.router.generate_diary", new=diary),
+                patch("src.chat.router.push_flex", new=AsyncMock()),
+                patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="t")),
+                patch("src.chat.service.submit_task", new=AsyncMock()),
             ):
                 response = await client.post(
                     "/line/webhook", content=body, headers={"X-Line-Signature": signature}

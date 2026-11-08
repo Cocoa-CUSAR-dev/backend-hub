@@ -1,0 +1,71 @@
+{
+  "kid": "K-19",
+  "after": "FORM-10",
+  "note": "",
+  "kotlin": {
+    "method": "GET",
+    "path": "/api/v1/reminders/recipient-options/roles"
+  },
+  "hub": {
+    "method": "GET",
+    "path": "/api/v1/forms/reminder-recipients/roles"
+  },
+  "seeds": [
+    "base"
+  ],
+  "recorded_on": "2026-10-23",
+  "cases": [
+    {
+      "name": "researcher",
+      "status": 200,
+      "method": "GET",
+      "path": "/api/v1/reminders/recipient-options/roles",
+      "actor": "researcher",
+      "body": null,
+      "response": [
+        {
+          "roleId": "10000000-0000-4000-8000-000000000001",
+          "roleName": "admin"
+        },
+        {
+          "roleId": "10000000-0000-4000-8000-000000000003",
+          "roleName": "farmer"
+        },
+        {
+          "roleId": "10000000-0000-4000-8000-000000000004",
+          "roleName": "hub_collector"
+        },
+        {
+          "roleId": "10000000-0000-4000-8000-000000000005",
+          "roleName": "processor"
+        },
+        {
+          "roleId": "10000000-0000-4000-8000-000000000002",
+          "roleName": "researcher"
+        }
+      ]
+    },
+    {
+      "name": "forbidden",
+      "status": 403,
+      "method": "GET",
+      "path": "/api/v1/reminders/recipient-options/roles",
+      "actor": "farmer_1",
+      "body": null,
+      "response": "Access Denied: You do not have the required permissions."
+    },
+    {
+      "name": "no token",
+      "status": 401,
+      "method": "GET",
+      "path": "/api/v1/reminders/recipient-options/roles",
+      "body": null,
+      "response": {
+        "timestamp": "2026-10-23T12:37:29.878+00:00",
+        "status": 401,
+        "error": "Unauthorized",
+        "path": "/api/v1/reminders/recipient-options/roles"
+      }
+    }
+  ]
+}

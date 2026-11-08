@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.line.config import line_settings
+from src.config import settings
 from tests.integration.helpers import (
     build_message_event,
     seed_conversation,
@@ -42,9 +42,9 @@ _STICKER = {
 
 async def _send(client: AsyncClient, *, line_user_id: str, message: dict) -> AsyncMock:
     body = build_message_event(line_user_id=line_user_id, message=message)
-    signature = sign_signature(body, line_settings.LINE_CHANNEL_SECRET)
+    signature = sign_signature(body, settings.LINE_CHANNEL_SECRET)
     with patch(
-        "src.line.service.AsyncMessagingApi.reply_message", new_callable=AsyncMock
+        "src.line.client.AsyncMessagingApi.reply_message", new_callable=AsyncMock
     ) as reply_message:
         response = await client.post(
             "/line/webhook", content=body, headers={"X-Line-Signature": signature}
