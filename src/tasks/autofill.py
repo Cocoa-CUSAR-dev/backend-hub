@@ -3,8 +3,7 @@
 Ported from mobile-backend's GetTaskAutofill (GET /tasks/:taskId/autofill),
 GetLastAnswer (GET /service/tasks/last-answer) and SanitizeAutofill
 (POST /service/autofill/sanitize). The mobile app calls `autofill`; the
-chatbot will call `last_answer` and `sanitize` in-process instead of Go
-(docs-and-plan#259). Both end in the same two steps, finding the last
+chatbot calls `last_answer` and `sanitize`. Both end in the same two steps, finding the last
 COMPLETED answer and src/forms/autofill.sanitize, so the two channels offer
 the same thing (US2-5).
 

@@ -1,5 +1,7 @@
 import uuid
-from unittest.mock import AsyncMock, patch
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.chat import reuse, service
 from src.chat.constants import AnswerSource
@@ -46,101 +48,70 @@ def _boolean(field_name: str, *, sort_order: int = 0) -> dict[str, object]:
     }
 
 
-class TestSanitizeForAutofill:
-    """The actual filtering rules (drop task_id/stale-parent-ids, drop a
-    stale OPTION/BOOLEAN value) now live in Go -- mobile-backend's
-    internal/validation/autofill_sanitizer.go (#105, US2-5) -- and are
-    tested there. This module's own job is just: build the right request
-    payload, and return whatever Go sends back. fetch_sanitized_autofill is
-    mocked throughout so these tests don't need a real Go backend.
-    """
+async def _sanitize(raw: dict[str, Any], questions: list[service.Question]) -> dict[str, Any]:
+    with patch(
+        "src.tasks.autofill.registry.current",
+        AsyncMock(return_value=SimpleNamespace(parent_fields={"farm_activity_id"})),
+    ):
+        return await reuse.sanitize_for_autofill(MagicMock(), raw, questions)
 
-    async def test_returns_whatever_go_returns(self) -> None:
-        questions = _form_with(_varchar("note"))
-        go_response = {"note": "hello"}
 
-        with patch(
-            "src.chat.reuse.fetch_sanitized_autofill",
-            new=AsyncMock(return_value=go_response),
+class TestLastAnswer:
+    async def test_returns_the_answer(self) -> None:
+        actor = MagicMock(can=MagicMock(return_value=True))
+        found = SimpleNamespace(answer={"note": "old"})
+        with (
+            patch("src.chat.reuse.load_actor", AsyncMock(return_value=actor)),
+            patch("src.chat.reuse.autofill.last_answer", AsyncMock(return_value=found)),
         ):
-            sanitized = await reuse.sanitize_for_autofill({"note": "hello"}, questions)
+            assert await reuse.last_answer(MagicMock(), uuid.uuid4(), "notes") == {"note": "old"}
 
-        assert sanitized == go_response
+    async def test_no_earlier_answer_is_no_offer(self) -> None:
+        actor = MagicMock(can=MagicMock(return_value=True))
+        with (
+            patch("src.chat.reuse.load_actor", AsyncMock(return_value=actor)),
+            patch("src.chat.reuse.autofill.last_answer", AsyncMock(return_value=None)),
+        ):
+            assert await reuse.last_answer(MagicMock(), uuid.uuid4(), "notes") is None
 
-    async def test_payload_carries_every_question_with_field_and_input_type(self) -> None:
-        questions = _form_with(
-            _varchar("note", sort_order=0), _option("fertilizer_id", [], sort_order=1)
-        )
-        fetch_mock = AsyncMock(return_value={})
+    async def test_without_the_permission_is_no_offer_not_an_error(self) -> None:
+        actor = MagicMock(can=MagicMock(return_value=False))
+        reader = AsyncMock()
+        with (
+            patch("src.chat.reuse.load_actor", AsyncMock(return_value=actor)),
+            patch("src.chat.reuse.autofill.last_answer", reader),
+        ):
+            assert await reuse.last_answer(MagicMock(), uuid.uuid4(), "notes") is None
+        reader.assert_not_awaited()
 
-        with patch("src.chat.reuse.fetch_sanitized_autofill", new=fetch_mock):
-            await reuse.sanitize_for_autofill({}, questions)
 
-        sent_questions = fetch_mock.call_args.kwargs["questions"]
-        assert {q["fieldName"] for q in sent_questions} == {"note", "fertilizer_id"}
-        by_field = {q["fieldName"]: q for q in sent_questions}
-        assert by_field["note"]["inputType"] == "VARCHAR"
-        assert by_field["fertilizer_id"]["inputType"] == "OPTION"
+class TestSanitizeForAutofill:
+    """The chatbot's questions reach the shared rules correctly."""
 
-    async def test_payload_includes_real_choices_for_a_constrained_question(self) -> None:
-        choice_id = str(uuid.uuid4())
-        questions = _form_with(_option("fertilizer_id", [choice_id]))
-        fetch_mock = AsyncMock(return_value={})
+    async def test_plain_text_is_kept(self) -> None:
+        assert await _sanitize({"note": "hello"}, _form_with(_varchar("note"))) == {"note": "hello"}
 
-        with patch("src.chat.reuse.fetch_sanitized_autofill", new=fetch_mock):
-            await reuse.sanitize_for_autofill({}, questions)
+    async def test_task_id_and_parent_ids_are_dropped(self) -> None:
+        raw = {"note": "hello", "task_id": "t-1", "farm_activity_id": "f-1"}
+        assert await _sanitize(raw, _form_with(_varchar("note"))) == {"note": "hello"}
 
-        sent_questions = fetch_mock.call_args.kwargs["questions"]
-        assert sent_questions[0]["choices"] == [{"id": choice_id, "name": f"label-{choice_id}"}]
+    async def test_a_current_choice_is_kept_and_a_stale_one_dropped(self) -> None:
+        keep = str(uuid.uuid4())
+        questions = _form_with(_option("fertilizer_id", [keep]))
+        assert await _sanitize({"fertilizer_id": keep}, questions) == {"fertilizer_id": keep}
+        assert await _sanitize({"fertilizer_id": "stale"}, questions) == {}
 
-    async def test_payload_strips_pause_and_skip_sentinels_from_choices(self) -> None:
-        # Question.choices always has pause (and skip, for non-mandatory)
-        # prepended -- see service.py's _choices_for. Purely a LINE UI
-        # concept, so Go should never see "__pause__"/"__skip__" as if they
-        # were real domain choices.
-        choice_id = str(uuid.uuid4())
-        questions = _form_with(_option("fertilizer_id", [choice_id]))
-        fetch_mock = AsyncMock(return_value={})
+    async def test_pause_and_skip_are_not_real_choices(self) -> None:
+        questions = _form_with(_option("fertilizer_id", [str(uuid.uuid4())]))
+        assert await _sanitize({"fertilizer_id": "__pause__"}, questions) == {}
+        assert await _sanitize({"fertilizer_id": "__skip__"}, questions) == {}
 
-        with patch("src.chat.reuse.fetch_sanitized_autofill", new=fetch_mock):
-            await reuse.sanitize_for_autofill({}, questions)
-
-        sent_choice_ids = {c["id"] for c in fetch_mock.call_args.kwargs["questions"][0]["choices"]}
-        assert sent_choice_ids == {choice_id}
-
-    async def test_payload_includes_synthesized_choices_for_a_boolean_question(self) -> None:
-        # Kotlin never sends `choices` for BOOLEAN -- service.py's
-        # _constrained_choices_for synthesizes true/false locally, and
-        # _real_choices picks that up like any other constrained question.
+    async def test_a_boolean_keeps_true_and_false_only(self) -> None:
         questions = _form_with(_boolean("is_quality_damage"))
-        fetch_mock = AsyncMock(return_value={})
-
-        with patch("src.chat.reuse.fetch_sanitized_autofill", new=fetch_mock):
-            await reuse.sanitize_for_autofill({}, questions)
-
-        sent_choice_ids = {c["id"] for c in fetch_mock.call_args.kwargs["questions"][0]["choices"]}
-        assert sent_choice_ids == {"true", "false"}
-
-    async def test_unconstrained_question_gets_an_empty_choices_list(self) -> None:
-        questions = _form_with(_varchar("note"))
-        fetch_mock = AsyncMock(return_value={})
-
-        with patch("src.chat.reuse.fetch_sanitized_autofill", new=fetch_mock):
-            await reuse.sanitize_for_autofill({}, questions)
-
-        assert fetch_mock.call_args.kwargs["questions"][0]["choices"] == []
-
-    async def test_raw_answer_passed_through_unchanged_as_the_answer_kwarg(self) -> None:
-        questions = _form_with(_varchar("note"))
-        raw = {"note": "hello", "task_id": "t-1"}
-        fetch_mock = AsyncMock(return_value={})
-
-        with patch("src.chat.reuse.fetch_sanitized_autofill", new=fetch_mock):
-            await reuse.sanitize_for_autofill(raw, questions)
-
-        # Go, not this module, decides what to drop -- the raw dict goes
-        # over the wire exactly as received.
-        assert fetch_mock.call_args.kwargs["answer"] == raw
+        assert await _sanitize({"is_quality_damage": "true"}, questions) == {
+            "is_quality_damage": "true"
+        }
+        assert await _sanitize({"is_quality_damage": "maybe"}, questions) == {}
 
 
 class TestBuildAnswerRows:
@@ -230,31 +201,21 @@ class TestFormatAutofillPreview:
 
 
 class TestSanitizeThenBuildIntegration:
-    async def test_full_pipeline_from_go_response_to_answer_rows(self) -> None:
+    async def test_full_pipeline_from_raw_answer_to_answer_rows(self) -> None:
         keep_option_id = str(uuid.uuid4())
         questions = _form_with(
             _varchar("note", sort_order=0),
             _option("fertilizer_id", [keep_option_id], sort_order=1),
         )
-        # What Go would actually return after dropping task_id/farm_activity_id
-        # and the stale fertilizer_id itself -- this test's job is just
-        # confirming build_answer_rows handles that shape correctly, not
-        # re-testing Go's own filtering rules.
-        go_response = {"note": "sprayed at dawn"}
-
-        with patch(
-            "src.chat.reuse.fetch_sanitized_autofill",
-            new=AsyncMock(return_value=go_response),
-        ):
-            sanitized = await reuse.sanitize_for_autofill(
-                {
-                    "task_id": str(uuid.uuid4()),
-                    "farm_activity_id": str(uuid.uuid4()),
-                    "note": "sprayed at dawn",
-                    "fertilizer_id": "stale",
-                },
-                questions,
-            )
+        sanitized = await _sanitize(
+            {
+                "task_id": str(uuid.uuid4()),
+                "farm_activity_id": str(uuid.uuid4()),
+                "note": "sprayed at dawn",
+                "fertilizer_id": "stale",
+            },
+            questions,
+        )
         rows = reuse.build_answer_rows(uuid.uuid4(), sanitized, questions)
 
         assert len(rows) == 1
@@ -263,7 +224,7 @@ class TestSanitizeThenBuildIntegration:
 
 class TestGeodataIsNeverReused:
     """ "ตำแหน่งปัจจุบัน" means where the farmer is now -- a previous visit's
-    location must never be offered or prefilled, even if Go passes it back.
+    location must never be offered or prefilled.
     """
 
     @staticmethod
@@ -279,15 +240,7 @@ class TestGeodataIsNeverReused:
 
     async def test_previous_location_is_dropped_from_the_offer(self) -> None:
         questions = _form_with(_varchar("note"), self._gis())
-        go_response = {"note": "ใส่ปุ๋ย", "gis": [{"lat": 13.75, "lng": 100.5}]}
-
-        with patch(
-            "src.chat.reuse.fetch_sanitized_autofill",
-            new=AsyncMock(return_value=go_response),
-        ):
-            result = await reuse.sanitize_for_autofill(
-                {"note": "ใส่ปุ๋ย", "gis": [{"lat": 13.75, "lng": 100.5}]}, questions
-            )
+        result = await _sanitize({"note": "ใส่ปุ๋ย", "gis": [{"lat": 13.75, "lng": 100.5}]}, questions)
 
         assert result == {"note": "ใส่ปุ๋ย"}
         assert "ตำแหน่ง" not in reuse.format_autofill_preview(result, questions)

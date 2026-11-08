@@ -1,10 +1,8 @@
 """What is safe to prefill from someone's last answer: one sanitizer for every door.
 
 Ported from mobile-backend's SanitizeAutofillAnswer (autofill_sanitizer.go).
-The mobile app's GET /api/v1/tasks/{id}/autofill runs it, and the chatbot
-will call the same function in-process instead of Go's
-POST /service/autofill/sanitize (docs-and-plan#259), so both channels offer
-the same thing (US2-5). Rules:
+The mobile app's GET /api/v1/tasks/{id}/autofill and the chatbot both run
+it, so both channels offer the same thing (US2-5). Rules:
 
 1. task_id and every parent-id field (the registry's parent_field: a
    farm_activity_id / harvest_id / batch_id) are always dropped. Reusing one
