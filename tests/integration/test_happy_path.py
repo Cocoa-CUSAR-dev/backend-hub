@@ -59,7 +59,7 @@ async def _post(client: AsyncClient, body: bytes) -> Any:
             new=AsyncMock(return_value=intent.IntentResult(intent=intent.Intent.GREETING)),
         ),
         # A first-time farmer has no previous answer to offer reusing.
-        patch("src.chat.router.fetch_last_answer", new=AsyncMock(return_value=None)),
+        patch("src.chat.reuse.last_answer", new=AsyncMock(return_value=None)),
         patch("src.chat.router.generate_diary", new=AsyncMock(return_value="ไดอารี่")),
         patch("src.chat.router.push_flex", new=AsyncMock()),
         patch("src.chat.router.mint_sso_token", new=AsyncMock(return_value="token")),

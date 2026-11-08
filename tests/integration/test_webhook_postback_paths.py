@@ -14,7 +14,7 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,9 +32,6 @@ from tests.integration.helpers import (
     serve_form,
     sign_signature,
 )
-
-_LAST_ANSWER = f"{settings.GO_BACKEND_URL}/service/tasks/last-answer"
-_SANITIZE = f"{settings.GO_BACKEND_URL}/service/autofill/sanitize"
 
 
 async def _send_postback(client: AsyncClient, *, line_user_id: str, data: str) -> AsyncMock:
@@ -104,9 +101,8 @@ class TestStartATask:
         user_id = await seed_user_with_line_identity(db_session, line_user_id=line_user_id)
         task_id, task_form_id, question_id, form = await _seed_one_question_task(db_session)
 
-        with respx.mock:
+        with respx.mock, patch("src.chat.reuse.last_answer", new=AsyncMock(return_value=None)):
             _mock_form(task_form_id, form)
-            respx.get(_LAST_ANSWER).mock(return_value=Response(404, json={"error": "none"}))
             reply = await _send_postback(
                 client, line_user_id=line_user_id, data=f"start:{task_id}:{task_form_id}:notes"
             )
@@ -115,48 +111,6 @@ class TestStartATask:
         [conversation] = await _conversations(db_session, user_id)
         assert conversation["status"] == "active"
         assert conversation["current_question_id"] == question_id
-
-    async def test_go_down_while_checking_for_a_last_answer_still_starts_the_form(
-        self, db_session: AsyncSession, client: AsyncClient
-    ) -> None:
-        """A Go outage costs the farmer the reuse offer, never the form."""
-        line_user_id = f"U{uuid.uuid4().hex}"
-        user_id = await seed_user_with_line_identity(db_session, line_user_id=line_user_id)
-        task_id, task_form_id, question_id, form = await _seed_one_question_task(db_session)
-
-        with respx.mock:
-            _mock_form(task_form_id, form)
-            respx.get(_LAST_ANSWER).mock(return_value=Response(500, json={"error": "boom"}))
-            reply = await _send_postback(
-                client, line_user_id=line_user_id, data=f"start:{task_id}:{task_form_id}:notes"
-            )
-
-        assert "บันทึกเพิ่มเติม" in _texts(reply)[0]
-        [conversation] = await _conversations(db_session, user_id)
-        assert conversation["current_question_id"] == question_id
-
-    async def test_sanitizer_down_still_offers_reuse_without_a_preview(
-        self, db_session: AsyncSession, client: AsyncClient
-    ) -> None:
-        line_user_id = f"U{uuid.uuid4().hex}"
-        user_id = await seed_user_with_line_identity(db_session, line_user_id=line_user_id)
-        task_id, task_form_id, _, form = await _seed_one_question_task(db_session)
-
-        with respx.mock:
-            _mock_form(task_form_id, form)
-            respx.get(_LAST_ANSWER).mock(
-                return_value=Response(200, json={"answer": {"notes": "ค่าเดิม"}})
-            )
-            respx.post(_SANITIZE).mock(return_value=Response(500, json={"error": "boom"}))
-            reply = await _send_postback(
-                client, line_user_id=line_user_id, data=f"start:{task_id}:{task_form_id}:notes"
-            )
-
-        offer = _texts(reply)[0]
-        assert "ต้องการนำมาใช้กรอกให้อัตโนมัติ" in offer
-        assert "ค่าเดิม" not in offer
-        # The offer comes before any conversation exists.
-        assert await _conversations(db_session, user_id) == []
 
     async def test_child_form_with_no_parent_to_pick_says_so_and_starts_nothing(
         self, db_session: AsyncSession, client: AsyncClient
@@ -189,58 +143,6 @@ class TestStartATask:
 
 
 class TestUseLastAnswerButton:
-    async def test_yes_with_go_down_starts_a_blank_form(
-        self, db_session: AsyncSession, client: AsyncClient
-    ) -> None:
-        """The farmer said "ใช้ข้อมูลเดิม" but Go can't hand the answer over
-        any more: they get the blank form rather than an error."""
-        line_user_id = f"U{uuid.uuid4().hex}"
-        user_id = await seed_user_with_line_identity(db_session, line_user_id=line_user_id)
-        task_id, task_form_id, question_id, form = await _seed_one_question_task(db_session)
-
-        with respx.mock:
-            _mock_form(task_form_id, form)
-            respx.get(_LAST_ANSWER).mock(return_value=Response(500, json={"error": "boom"}))
-            reply = await _send_postback(
-                client,
-                line_user_id=line_user_id,
-                data=f"start_autofill:yes:{task_id}:{task_form_id}:notes",
-            )
-
-        assert "บันทึกเพิ่มเติม" in _texts(reply)[0]
-        [conversation] = await _conversations(db_session, user_id)
-        assert conversation["current_question_id"] == question_id
-
-    async def test_yes_with_the_sanitizer_down_starts_a_blank_form(
-        self, db_session: AsyncSession, client: AsyncClient
-    ) -> None:
-        """Unsanitized answers are never used: without the sanitizer, nothing
-        is prefilled."""
-        line_user_id = f"U{uuid.uuid4().hex}"
-        user_id = await seed_user_with_line_identity(db_session, line_user_id=line_user_id)
-        task_id, task_form_id, question_id, form = await _seed_one_question_task(db_session)
-
-        with respx.mock:
-            _mock_form(task_form_id, form)
-            respx.get(_LAST_ANSWER).mock(
-                return_value=Response(200, json={"answer": {"notes": "ค่าเดิม"}})
-            )
-            respx.post(_SANITIZE).mock(return_value=Response(500, json={"error": "boom"}))
-            reply = await _send_postback(
-                client,
-                line_user_id=line_user_id,
-                data=f"start_autofill:yes:{task_id}:{task_form_id}:notes",
-            )
-
-        assert "บันทึกเพิ่มเติม" in _texts(reply)[0]
-        [conversation] = await _conversations(db_session, user_id)
-        assert conversation["current_question_id"] == question_id
-        answers = await db_session.execute(
-            text("SELECT COUNT(*) FROM chat.conversation_answer WHERE conversation_id = :c"),
-            {"c": conversation["conversation_id"]},
-        )
-        assert answers.scalar_one() == 0
-
     async def test_an_old_offer_resumes_the_conversation_already_started(
         self, db_session: AsyncSession, client: AsyncClient
     ) -> None:

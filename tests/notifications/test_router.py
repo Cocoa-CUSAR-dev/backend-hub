@@ -31,6 +31,16 @@ async def test_missing_service_key_is_rejected(client: AsyncClient) -> None:
     assert resp.status_code == 401
 
 
+async def test_unset_service_key_refuses_every_caller(client: AsyncClient) -> None:
+    with patch("src.notifications.dependencies.settings.CHATBOT_SERVICE_KEY", ""):
+        resp = await client.post(
+            "/service/notifications",
+            json={"user_ids": [str(uuid4())], "message": "hi"},
+            headers={"X-Service-Key": ""},
+        )
+    assert resp.status_code == 401
+
+
 async def test_wrong_service_key_is_rejected(client: AsyncClient) -> None:
     resp = await client.post(
         "/service/notifications",

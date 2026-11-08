@@ -29,13 +29,11 @@ from src.exceptions import (
     InvalidLiffToken,
     LineAccountNotLinked,
     Unauthorized,
-    UpstreamServiceError,
 )
 from src.forms.detail import load_chat_form
 from src.line import liff, parent_picker
 from src.line.service import push_autofill_offer, push_confirm_prompt, push_text
 from src.tasks import service as tasks_service
-from src.tasks.client import fetch_last_answer
 from src.tasks.schemas import TaskOut
 
 router = APIRouter(prefix="/line/liff", tags=["liff"])
@@ -168,28 +166,13 @@ async def start_task(
             await push_text(to, parent_picker.EMPTY_PROMPT[parent_kind])
             return StartTaskResponse(pushed=True)
     else:
-        try:
-            last_answer = await fetch_last_answer(user_id=str(user_id), handler=body.handler)
-        except UpstreamServiceError:
-            logger.warning(
-                "fetch_last_answer failed for handler=%s on LIFF start -- starting fresh, no offer",
-                body.handler,
-                exc_info=True,
-            )
-            last_answer = None
+        last_answer = await reuse.last_answer(session, user_id, body.handler)
         if last_answer is not None:
-            preview = ""
-            try:
-                offer_questions = service.questions_from_form(form)
-                sanitized_preview = await reuse.sanitize_for_autofill(last_answer, offer_questions)
-                preview = reuse.format_autofill_preview(sanitized_preview, offer_questions)
-            except UpstreamServiceError:
-                logger.warning(
-                    "sanitize_for_autofill failed for handler=%s while building the LIFF "
-                    "offer preview -- showing the offer without one",
-                    body.handler,
-                    exc_info=True,
-                )
+            offer_questions = service.questions_from_form(form)
+            sanitized_preview = await reuse.sanitize_for_autofill(
+                session, last_answer, offer_questions
+            )
+            preview = reuse.format_autofill_preview(sanitized_preview, offer_questions)
             await push_autofill_offer(
                 to,
                 task_id=str(task_id),

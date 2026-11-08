@@ -1,26 +1,21 @@
 """US2-4: "offer reusing my last submission's answers."
 
-sanitize_for_autofill delegates to #105 ("BE - Create: shared autofill
-service used by chat AND any remaining static forms", US2-5) --
-mobile-backend's POST /service/autofill/sanitize
-(internal/validation/autofill_sanitizer.go). That's the ONE shared
-implementation of what's safe to reuse from a farmer's last submission, so
-chat and any remaining static form screen can't drift apart on the rules.
-This module only builds the request payload and turns the result into real
-ConversationAnswer rows (build_answer_rows) -- chatbot-specific concerns
-that have nowhere else to live.
-
-Raw data source: Go's GET /service/tasks/last-answer (src/tasks/client.py's
-fetch_last_answer, #100) -- the most recent COMPLETED answer
-for (farmer, handler), completely unfiltered.
+The rules for what is safe to reuse live in src/forms/autofill.py and the
+last answer comes from src/tasks/autofill.py, the same two the mobile app's
+autofill uses, so the channels can't drift apart. This module adapts them to
+the chatbot's questions and turns the result into real ConversationAnswer
+rows (build_answer_rows).
 """
 
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from src.auth.service import load_actor
 from src.chat.constants import AnswerSource
+from src.database import Session
 from src.db.models import ConversationAnswer
-from src.tasks.client import fetch_sanitized_autofill
+from src.forms.autofill import OfferedQuestion
+from src.tasks import autofill
 
 if TYPE_CHECKING:
     from src.chat.service import Choice, Question
@@ -33,8 +28,8 @@ if TYPE_CHECKING:
 # has pause prepended (and skip too, for non-mandatory) -- see service.py's
 # _choices_for -- so these must be stripped before treating a Question's
 # choices as "the real, storable values for this field." Purely a LINE/
-# guided-flow UI concept, so it's stripped here rather than sent to Go --
-# a static-form caller would never have these ids in the first place.
+# guided-flow UI concept, so it's stripped here -- a static-form caller would
+# never have these ids in the first place.
 _SENTINEL_CHOICE_IDS = frozenset({"__skip__", "__pause__"})
 
 
@@ -44,37 +39,31 @@ def _real_choices(question: "Question") -> list["Choice"]:
     return [c for c in question.choices if c.id not in _SENTINEL_CHOICE_IDS]
 
 
-async def sanitize_for_autofill(
-    raw_answer: dict[str, Any], questions: list["Question"]
-) -> dict[str, Any]:
-    """Builds the request payload for #105 and returns its filtered result.
-
-    `questions` is converted to mobile-backend's internal/validation.Question
-    JSON shape (fieldName/inputType/choices, choices as {id, name}) --
-    Go applies the actual rules (drop task_id and the 3 stale parent-id
-    fields; drop an OPTION/BOOLEAN value that no longer matches a real
-    choice on the current form; pass everything else through unchanged).
+async def last_answer(session: Session, user_id: UUID, handler: str) -> dict[str, Any] | None:
+    """This farmer's most recent COMPLETED answer for `handler`, unfiltered, or
+    None. Someone without read:response:own just gets no offer: reuse is a
+    convenience and must never stop them starting the form.
     """
-    questions_payload = [
-        {
-            "fieldName": q.field_name,
-            "inputType": q.input_type,
-            "choices": [{"id": c.id, "name": c.label} for c in _real_choices(q)],
-        }
+    actor = await load_actor(session, user_id, "line")
+    if not actor.can("read:response:own"):
+        return None
+    found = await autofill.last_answer(session, actor, handler)
+    return found.answer if found is not None else None
+
+
+async def sanitize_for_autofill(
+    session: Session, raw_answer: dict[str, Any], questions: list["Question"]
+) -> dict[str, Any]:
+    """`raw_answer` cut down to what is safe to offer on `questions`."""
+    offered = [
+        OfferedQuestion(
+            field_name=q.field_name,
+            input_type=q.input_type,
+            choice_ids=tuple(c.id for c in _real_choices(q)),
+        )
         for q in questions
     ]
-    sanitized = await fetch_sanitized_autofill(answer=raw_answer, questions=questions_payload)
-
-    # GEODATA is never reused. The question is "ตำแหน่งปัจจุบัน" -- where the
-    # farmer is NOW -- so last visit's coordinate offered as today's would be
-    # quietly wrong on every record it lands in. Dropped here, on the chatbot
-    # side, rather than in Go: #105's sanitizer is shared with mobile-app,
-    # and changing what the app's own autofill does is outside this change.
-    # (It also matters mechanically: build_answer_rows stores non-choice
-    # values as str(value), which would turn the [{"lat", "lng"}] list into
-    # a string that Go's isValidGeodata then rejects at submit.)
-    geodata_fields = {q.field_name for q in questions if q.input_type == "GEODATA"}
-    return {field: value for field, value in sanitized.items() if field not in geodata_fields}
+    return await autofill.sanitize(session, raw_answer, offered)
 
 
 def format_autofill_preview(sanitized_answer: dict[str, Any], questions: list["Question"]) -> str:
@@ -125,7 +114,7 @@ def build_answer_rows(
     for field_name, value in sanitized_answer.items():
         question = question_by_field.get(field_name)
         if question is None:
-            continue  # a field name Go echoed back that isn't a real question anymore
+            continue  # a field the current form no longer asks
         answer: dict[str, Any] = {"text": str(value)}
         if question.has_constrained_choices:
             # OPTION/BOOLEAN -- value is already the resolved id (matched

@@ -16,7 +16,7 @@ from src.config import settings
 from src.database import Session, async_session_maker
 from src.db.models import Conversation
 from src.diary import service as diary_service
-from src.exceptions import ConversationNotFound, Forbidden, UpstreamServiceError
+from src.exceptions import ConversationNotFound, Forbidden
 from src.forms.detail import load_chat_form
 from src.line import parent_picker, temp_task_picker
 from src.line.client import (
@@ -42,7 +42,6 @@ from src.line.service import (
     reply_text,
 )
 from src.sso.client import mint_sso_token
-from src.tasks.client import fetch_last_answer
 
 router = APIRouter(prefix="/line", tags=["line"])
 logger = logging.getLogger(__name__)
@@ -692,35 +691,17 @@ async def _handle_postback(event: PostbackEvent) -> None:
                 # submission for this handler -- never for the 5
                 # parent-picker handlers above (which farm/harvest/batch a
                 # submission belongs to must always be picked fresh, never
-                # reused). A Go hiccup here must not block starting a plain
-                # conversation -- worst case, just no offer.
-                try:
-                    last_answer = await fetch_last_answer(user_id=str(user_id), handler=handler)
-                except UpstreamServiceError:
-                    logger.warning(
-                        "fetch_last_answer failed for handler=%s -- starting fresh, no offer",
-                        handler,
-                        exc_info=True,
-                    )
-                    last_answer = None
+                # reused).
+                last_answer = await reuse.last_answer(session, user_id, handler)
                 if last_answer is not None:
                     # Preview-only: router.py's own "start_autofill" branch
                     # re-fetches and re-sanitizes on "yes" rather than
                     # trusting this -- see reply_autofill_offer's docstring.
-                    preview = ""
-                    try:
-                        offer_questions = service.questions_from_form(form)
-                        sanitized_preview = await reuse.sanitize_for_autofill(
-                            last_answer, offer_questions
-                        )
-                        preview = reuse.format_autofill_preview(sanitized_preview, offer_questions)
-                    except UpstreamServiceError:
-                        logger.warning(
-                            "sanitize_for_autofill failed for handler=%s while building the "
-                            "offer preview -- showing the offer without one",
-                            handler,
-                            exc_info=True,
-                        )
+                    offer_questions = service.questions_from_form(form)
+                    sanitized_preview = await reuse.sanitize_for_autofill(
+                        session, last_answer, offer_questions
+                    )
+                    preview = reuse.format_autofill_preview(sanitized_preview, offer_questions)
                     await reply_autofill_offer(
                         event.reply_token,
                         task_id=task_id,
@@ -769,47 +750,23 @@ async def _handle_postback(event: PostbackEvent) -> None:
                 # Re-fetched rather than trusting the offer's own check --
                 # see reply_autofill_offer's docstring: no state is
                 # persisted between the offer and this tap.
-                try:
-                    last_answer = await fetch_last_answer(user_id=str(user_id), handler=handler)
-                except UpstreamServiceError:
-                    logger.warning(
-                        "fetch_last_answer failed for handler=%s on start_autofill -- "
-                        "starting fresh instead",
-                        handler,
-                        exc_info=True,
-                    )
-                    last_answer = None
+                last_answer = await reuse.last_answer(session, user_id, handler)
                 if last_answer is not None:
                     questions = service.questions_from_form(form)
-                    try:
-                        sanitized = await reuse.sanitize_for_autofill(last_answer, questions)
-                    except UpstreamServiceError:
-                        # #105 (Go's /service/autofill/sanitize) hiccuped --
-                        # same "never block a plain start" reasoning as the
-                        # fetch_last_answer failure above. Nothing was
-                        # created yet, so falling through to a plain start
-                        # below is safe.
-                        logger.warning(
-                            "fetch_sanitized_autofill failed for handler=%s on "
-                            "start_autofill -- starting fresh instead",
-                            handler,
-                            exc_info=True,
-                        )
-                    else:
-                        reply = await service.start_conversation_with_autofill(
-                            session,
-                            user_id=user_id,
-                            task_id=UUID(task_id),
-                            task_form_id=UUID(task_form_id),
-                            form=form,
-                            sanitized_answer=sanitized,
-                        )
-                        await _reply(event.reply_token, reply)
-                        return
+                    sanitized = await reuse.sanitize_for_autofill(session, last_answer, questions)
+                    reply = await service.start_conversation_with_autofill(
+                        session,
+                        user_id=user_id,
+                        task_id=UUID(task_id),
+                        task_form_id=UUID(task_form_id),
+                        form=form,
+                        sanitized_answer=sanitized,
+                    )
+                    await _reply(event.reply_token, reply)
+                    return
                 # The last answer disappeared between the offer and this
-                # tap (race, or a second Go hiccup) -- fall through to a
-                # plain start below rather than leaving the farmer stuck
-                # on a "yes" that can no longer be honored.
+                # tap: fall through to a plain start below rather than
+                # leaving the farmer stuck on a "yes" that can't be honored.
 
             reply = await service.start_conversation(
                 session,

@@ -9,7 +9,7 @@ def test_only_staging_and_production_are_deployed() -> None:
 
 
 def test_settings_default_values() -> None:
-    # DATABASE_URL/KOTLIN_BACKEND_URL/GO_BACKEND_URL have no default -- they
+    # DATABASE_URL and the other required settings have no default -- they
     # come from tests/conftest.py's os.environ.setdefault calls, required
     # before `import src.main` (and therefore this settings instance) works.
     assert settings.CORS_ORIGINS == ["http://localhost:5173"]

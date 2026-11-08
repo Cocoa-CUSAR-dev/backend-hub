@@ -41,8 +41,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # ---- auth (src/auth, CONVENTIONS.md §5) -----------------------------
-    # Signs every access token. Must be the same value web-backend and
-    # mobile-backend use while they still run, so they accept hub tokens.
+    # Signs every access token.
     JWT_KEY: str
     # Access tokens are short because roles live inside them; clients refresh
     # automatically. The refresh token slides: each use issues a new one with
@@ -56,16 +55,10 @@ class Settings(BaseSettings):
     # Empty disables researcher self sign-up.
     RESEARCHER_SIGNUP_CODE: str = ""
 
-    # ---- old backends (until the merge is finished) ---------------------
-    # Only Go is left: the chatbot's "use last answer" reads (src/tasks/
-    # client.py) until tasks.service.autofill exists (docs-and-plan#264).
-    GO_BACKEND_URL: str
-    # Outbound key this service presents to Go. Must match its own
-    # CHATBOT_SERVICE_KEY -- see mobile-backend's service_auth_middleware.go.
-    GO_SERVICE_KEY: str
-    # Inbound key: first-party callers (web-backend) present this as the
-    # X-Service-Key header on /service/* routes here.
-    CHATBOT_SERVICE_KEY: str
+    # ---- service key --------------------------------------------------
+    # First-party callers present this as the X-Service-Key header on
+    # POST /service/notifications. Empty = the route refuses every caller.
+    CHATBOT_SERVICE_KEY: str = ""
 
     # ---- jobs -----------------------------------------------------------
     # Gates /internal/cron/* -- the external trigger (cron-job.org, a manual

@@ -2,9 +2,8 @@
 where the edited field happens to be one that was autofilled rather than
 typed) against a real Postgres session.
 
-Go itself isn't run here -- its two endpoints (last-answer, autofill/sanitize)
-are mocked at the HTTP boundary via respx, same as Kotlin's forms endpoint
-already is elsewhere in this test suite. What's worth a REAL DB round-trip
+The last answer is stubbed (src.chat.reuse.last_answer); the sanitizer is the
+real one. What's worth a REAL DB round-trip
 is start_conversation_with_autofill's own writes: it session.add()s multiple
 ConversationAnswer rows in one go before a single commit, each with a real
 FK to form.question -- exactly the class of bug a mocked session can't
@@ -16,7 +15,7 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import respx
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -202,16 +201,12 @@ class TestReuseLastSubmission:
             "submitted_at": "2026-08-01T10:00:00Z",
             "answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"},
         }
-        sanitized = {"answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"}}
 
-        with respx.mock:
+        with (
+            respx.mock,
+            patch("src.chat.reuse.last_answer", new=AsyncMock(return_value=last_answer["answer"])),
+        ):
             serve_form(task_form_id, form_response)
-            respx.get(f"{settings.GO_BACKEND_URL}/service/tasks/last-answer").mock(
-                return_value=Response(200, json=last_answer)
-            )
-            respx.post(f"{settings.GO_BACKEND_URL}/service/autofill/sanitize").mock(
-                return_value=Response(200, json=sanitized)
-            )
 
             # 1. "start" -- a prior COMPLETED submission exists, so expect
             # the autofill offer, not straight into the guided flow.
@@ -271,16 +266,12 @@ class TestAutofillDecline:
             "submitted_at": "2026-08-01T10:00:00Z",
             "answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"},
         }
-        sanitized = {"answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"}}
 
-        with respx.mock:
+        with (
+            respx.mock,
+            patch("src.chat.reuse.last_answer", new=AsyncMock(return_value=last_answer["answer"])),
+        ):
             serve_form(task_form_id, form_response)
-            respx.get(f"{settings.GO_BACKEND_URL}/service/tasks/last-answer").mock(
-                return_value=Response(200, json=last_answer)
-            )
-            respx.post(f"{settings.GO_BACKEND_URL}/service/autofill/sanitize").mock(
-                return_value=Response(200, json=sanitized)
-            )
 
             # 1. "start" -- same offer as the accept-flow test above;
             # declining is a choice made AFTER seeing exactly the same
@@ -336,16 +327,12 @@ class TestEditingAnAutofilledField:
             "submitted_at": "2026-08-01T10:00:00Z",
             "answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"},
         }
-        sanitized = {"answer": {"field_0": "ค่าเดิม 1", "field_1": "ค่าเดิม 2"}}
 
-        with respx.mock:
+        with (
+            respx.mock,
+            patch("src.chat.reuse.last_answer", new=AsyncMock(return_value=last_answer["answer"])),
+        ):
             serve_form(task_form_id, form_response)
-            respx.get(f"{settings.GO_BACKEND_URL}/service/tasks/last-answer").mock(
-                return_value=Response(200, json=last_answer)
-            )
-            respx.post(f"{settings.GO_BACKEND_URL}/service/autofill/sanitize").mock(
-                return_value=Response(200, json=sanitized)
-            )
 
             # 1-2. Offer, then accept -- straight to AWAITING_CONFIRMATION
             # with both fields prefilled (same as TestReuseLastSubmission's

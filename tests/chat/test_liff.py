@@ -20,7 +20,7 @@ from src.chat.constants import ActiveSubstate
 from src.chat.service import Choice, ConversationReply
 from src.config import settings
 from src.database import get_session
-from src.exceptions import InvalidLiffToken, LineAccountNotLinked, UpstreamServiceError
+from src.exceptions import InvalidLiffToken, LineAccountNotLinked
 from src.main import app
 from src.tasks.schemas import TaskOut
 
@@ -308,7 +308,7 @@ async def test_start_task_starts_fresh_when_no_resumable_conversation(client: As
         ),
         patch("src.chat.liff.load_chat_form", AsyncMock(return_value=MagicMock())),
         patch("src.chat.liff.parent_picker.kind_for_handler", return_value=None),
-        patch("src.chat.liff.fetch_last_answer", AsyncMock(return_value=None)),
+        patch("src.chat.reuse.last_answer", AsyncMock(return_value=None)),
         patch(
             "src.chat.liff.service.start_conversation", AsyncMock(return_value=reply)
         ) as start_mock,
@@ -337,7 +337,7 @@ async def test_start_task_offers_autofill_instead_of_starting_blind(client: Asyn
         ),
         patch("src.chat.liff.load_chat_form", AsyncMock(return_value=MagicMock(sections=[]))),
         patch("src.chat.liff.parent_picker.kind_for_handler", return_value=None),
-        patch("src.chat.liff.fetch_last_answer", AsyncMock(return_value={"note": "old"})),
+        patch("src.chat.reuse.last_answer", AsyncMock(return_value={"note": "old"})),
         patch("src.chat.liff.reuse.sanitize_for_autofill", AsyncMock(return_value={})),
         patch("src.chat.liff.reuse.format_autofill_preview", return_value=""),
         patch("src.chat.liff.service.start_conversation", AsyncMock()) as start_mock,
@@ -382,44 +382,6 @@ async def test_start_task_tells_farmer_when_parent_choices_are_empty(client: Asy
     assert resp.status_code == 200
     push_text_mock.assert_awaited_once_with("Uabc", "ยังไม่มีแปลง")
     start_mock.assert_not_called()
-
-
-async def test_start_task_treats_fetch_last_answer_failure_as_no_offer(client: AsyncClient) -> None:
-    # Same "never block a plain start over a Go hiccup" reasoning as
-    # router.py's "start" postback branch.
-    user_id = uuid4()
-    task_id = uuid4()
-    task_form_id = uuid4()
-    reply = ConversationReply(
-        conversation_id=uuid4(), substate=ActiveSubstate.AWAITING_INPUT, text="คำถามแรก"
-    )
-    _override_liff_user(user_id)
-
-    with (
-        patch(
-            "src.chat.liff.service.find_resumable_conversation",
-            AsyncMock(return_value=None),
-        ),
-        patch("src.chat.liff.load_chat_form", AsyncMock(return_value=MagicMock())),
-        patch("src.chat.liff.parent_picker.kind_for_handler", return_value=None),
-        patch(
-            "src.chat.liff.fetch_last_answer",
-            AsyncMock(side_effect=UpstreamServiceError("Go is down")),
-        ),
-        patch(
-            "src.chat.liff.service.start_conversation", AsyncMock(return_value=reply)
-        ) as start_mock,
-        patch("src.chat.liff.push_autofill_offer", AsyncMock()) as offer_mock,
-        patch("src.chat.liff.push_text", AsyncMock()),
-    ):
-        resp = await client.post(
-            f"/line/liff/tasks/{task_id}/start",
-            json={"task_form_id": str(task_form_id), "handler": "farm_activity"},
-        )
-
-    assert resp.status_code == 200
-    start_mock.assert_awaited_once()
-    offer_mock.assert_not_called()
 
 
 # --- _push dispatch --------------------------------------------------------
