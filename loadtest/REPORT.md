@@ -94,7 +94,7 @@ cross the Pacific. **To check:** the Vercel project's Function Region and the Ne
 
 ## Follow-ups
 
-1. Run bcrypt in a thread: findings 1. Small, and checked above.
+1. Run bcrypt in a thread (finding 1): **done in backend-hub#32**. At 100 farmers, p95/p99 went from 1,400/3,600 ms to 36/240 ms.
 2. Cut the cold start: finding 2.
 3. Check the Vercel and Neon regions: finding 3.
 4. Run this test on staging once a Neon test branch exists.
