@@ -29,6 +29,7 @@ _CLEANUP_TABLES = (
     "form.task",
     "auth.refresh_token",
     "auth.sso_used_token",
+    "auth.password_reset_code",
     "agriculture.farmer",
     "processing.processor",
     "processing.hub_collector",

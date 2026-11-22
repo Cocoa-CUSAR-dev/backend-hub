@@ -25,6 +25,22 @@ class ResetPasswordIn(BaseModel):
     new_password: str
 
 
+class ForgotPasswordIn(BaseModel):
+    login: str = Field(
+        min_length=1, description="The username or the email.", examples=["0812345678"]
+    )
+
+
+class ForgotPasswordOut(BaseModel):
+    message: str = Field(description="The same text whether or not the account exists.")
+
+
+class ForgotPasswordConfirmIn(BaseModel):
+    login: str = Field(min_length=1, description="The username or the email.")
+    code: str = Field(min_length=1, description="The 6-digit code sent by LINE or email.")
+    new_password: str
+
+
 class LineLoginIn(BaseModel):
     id_token: str = Field(min_length=1, description="liff.getIDToken()")
 
