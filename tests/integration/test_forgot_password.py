@@ -156,20 +156,49 @@ async def test_the_code_comes_by_email_when_the_account_has_one(
     assert body.count(outbox.last_code()) >= 1
 
 
-async def test_an_account_with_both_gets_the_same_code_on_both(
+async def test_an_account_with_both_is_sent_the_email_only(
     client: AsyncClient, db_session: AsyncSession, outbox: Outbox
 ) -> None:
     await _seed(db_session, "0811111111", line="U-farmer-1", email="a@example.com")
 
     await _ask(client, "0811111111")
 
-    assert len(outbox.line) == len(outbox.emails) == 1
-    assert (
-        re.search(r"\d{6}", outbox.line[0][1]).group()
-        == re.search(  # type: ignore[union-attr]
-            r"\d{6}", outbox.emails[0][2]
-        ).group()
-    )  # type: ignore[union-attr]
+    assert outbox.line == []  # a LINE push costs quota, so not when email will do
+    assert [to for to, _, _ in outbox.emails] == ["a@example.com"]
+    assert (await _confirm(client, "0811111111", outbox.last_code())).status_code == 204
+
+
+async def test_line_is_the_fallback_when_the_email_cannot_be_sent(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    outbox: Outbox,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def broken(to: str, subject: str, body: str) -> None:
+        raise RuntimeError("smtp down")
+
+    monkeypatch.setattr("src.mailer.client.send_email", broken)
+    await _seed(db_session, "0811111111", line="U-farmer-1", email="a@example.com")
+
+    await _ask(client, "0811111111")
+
+    assert [to for to, _ in outbox.line] == ["U-farmer-1"]
+    assert (await _confirm(client, "0811111111", outbox.last_code())).status_code == 204
+
+
+async def test_line_is_used_when_email_is_not_set_up_on_the_server(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    outbox: Outbox,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "SMTP_HOST", "")
+    await _seed(db_session, "0811111111", line="U-farmer-1", email="a@example.com")
+
+    await _ask(client, "0811111111")
+
+    assert outbox.emails == []
+    assert [to for to, _ in outbox.line] == ["U-farmer-1"]
 
 
 async def test_an_account_with_neither_is_answered_and_sent_nothing(

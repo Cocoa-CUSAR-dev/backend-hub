@@ -90,18 +90,14 @@ async def request_code(session: Session, login: str) -> Delivery | None:
 
 
 async def deliver(delivery: Delivery) -> None:
-    """Send the code through every channel the account has. A channel that
-    fails is logged and skipped: the answer has already gone out, and the
-    person can ask again.
+    """Send the code by email if the account has one, and through LINE only
+    when there is no email or the email could not be sent (a LINE push counts
+    against the monthly quota of the Official Account; an email costs
+    nothing). A channel that fails is logged: the answer has already gone out,
+    and the person can ask again.
     """
     minutes = settings.RESET_CODE_TTL_SECONDS // 60
     sent = False
-    if delivery.line_user_id:
-        try:
-            await line_service.push_text(delivery.line_user_id, _line_text(delivery.code, minutes))
-            sent = True
-        except Exception:
-            logger.exception("password reset: could not push the code through LINE")
     if delivery.email and settings.email_configured:
         try:
             await mailer.send_email(
@@ -110,6 +106,12 @@ async def deliver(delivery: Delivery) -> None:
             sent = True
         except Exception:
             logger.exception("password reset: could not email the code")
+    if not sent and delivery.line_user_id:
+        try:
+            await line_service.push_text(delivery.line_user_id, _line_text(delivery.code, minutes))
+            sent = True
+        except Exception:
+            logger.exception("password reset: could not push the code through LINE")
     if not sent and settings.ENVIRONMENT == Environment.LOCAL:
         # Only on a developer's machine, so the flow can be tried with no mail
         # server and no LINE account.
