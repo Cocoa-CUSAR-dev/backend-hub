@@ -105,6 +105,15 @@ class LineAccountNotLinked(Forbidden):
     detail = "บัญชี LINE นี้ยังไม่ได้เชื่อมกับบัญชีในระบบ"
 
 
+class InvalidResetCode(AppError):
+    """The forgot-password code is wrong, expired or already used. One message
+    for all three (and for an unknown account), so the answer says nothing
+    about which."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    detail = "รหัสไม่ถูกต้องหรือหมดอายุ กรุณาขอรหัสใหม่"
+
+
 class InvalidCronSecret(Unauthorized):
     detail = "Invalid or missing cron secret"
 

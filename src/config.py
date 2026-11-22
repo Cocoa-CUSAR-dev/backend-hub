@@ -115,6 +115,20 @@ class Settings(BaseSettings):
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET: str = ""
 
+    # ---- email (forgot-password codes) ------------------------------------
+    # Any SMTP provider. Leave SMTP_HOST or MAIL_FROM blank and no email is
+    # sent; the code still goes through LINE, and an admin can still reset a
+    # password by hand. SMTP_PORT 465 means TLS from the start, any other port
+    # means STARTTLS. SMTP_USER / SMTP_PASSWORD are optional (a relay may not
+    # ask for a login).
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    MAIL_FROM: str = ""
+    # How long a forgot-password code can be used.
+    RESET_CODE_TTL_SECONDS: int = 900
+
     # ---- error tracking (X-2d) ------------------------------------------
     # Blank DSN disables the SDK entirely. No separate SENTRY_ENVIRONMENT:
     # main.py passes ENVIRONMENT.value straight through.
@@ -126,6 +140,10 @@ class Settings(BaseSettings):
         return all(
             (self.R2_ACCOUNT_ID, self.R2_ACCESS_KEY_ID, self.R2_SECRET_ACCESS_KEY, self.R2_BUCKET)
         )
+
+    @property
+    def email_configured(self) -> bool:
+        return bool(self.SMTP_HOST and self.MAIL_FROM)
 
     @property
     def docs_enabled(self) -> bool:

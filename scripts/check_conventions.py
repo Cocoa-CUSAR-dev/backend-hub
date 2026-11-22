@@ -11,7 +11,7 @@ Rules (CONVENTIONS.md §12):
   reports-writes    INSERT / UPDATE / DELETE / TRUNCATE SQL in src/db/reports.py
   owner-conflict    two src/db/ files claim the same table
   lib-outside-client
-                    linebot / litellm / boto3 / httpx imported outside their client file
+                    linebot / litellm / boto3 / smtplib / httpx imported outside their client file
   env-outside-config
                     os.environ / os.getenv outside src/config.py
   clock-outside     datetime.now / date.today / utcnow outside src/clock.py
@@ -47,6 +47,7 @@ CLIENT_ONLY = {
     "linebot": {"src/line/client.py"},
     "litellm": {"src/llm/client.py"},
     "boto3": {"src/r2/client.py"},
+    "smtplib": {"src/mailer/client.py"},
     "httpx": {"src/line/client.py", "src/llm/client.py", "src/r2/client.py"},
 }
 SQL_ALLOWED = {"src/database.py"}

@@ -1,8 +1,11 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, BackgroundTasks, status
 
-from src.auth import service
+from src.auth import password_reset, service
 from src.auth.dependencies import CurrentActor, SessionDep
 from src.auth.schemas import (
+    ForgotPasswordConfirmIn,
+    ForgotPasswordIn,
+    ForgotPasswordOut,
     LineLinkIn,
     LineLoginIn,
     LoginIn,
@@ -52,6 +55,25 @@ async def reset_password(
     body: ResetPasswordIn, actor: CurrentActor, session: SessionDep
 ) -> TokenPairOut:
     return await service.reset_password(session, actor, body.new_password)
+
+
+@router.post(
+    "/forgot-password",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Ask for a code to reset a forgotten password (sent by LINE or email)",
+)
+async def forgot_password(body: ForgotPasswordIn, background: BackgroundTasks) -> ForgotPasswordOut:
+    background.add_task(password_reset.send_code, body.login)
+    return ForgotPasswordOut(message=password_reset.NEUTRAL_MESSAGE)
+
+
+@router.post(
+    "/forgot-password/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Set a new password with the code; signs out every device",
+)
+async def forgot_password_confirm(body: ForgotPasswordConfirmIn, session: SessionDep) -> None:
+    await password_reset.confirm(session, body.login, body.code, body.new_password)
 
 
 @router.post("/line/login", summary="LIFF: swap a LINE ID token for a token pair")

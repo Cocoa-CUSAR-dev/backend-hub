@@ -9,6 +9,7 @@ docs-and-plan#322: p99 3.6 s at 100 users, 250 ms in a thread).
 """
 
 import asyncio
+import secrets
 
 import bcrypt
 
@@ -16,6 +17,15 @@ from src.exceptions import Invalid
 
 MIN_LENGTH = 6  # same rule mobile-backend enforced
 _MAX_BYTES = 72  # bcrypt ignores anything longer
+
+
+# No 0/O, 1/l/I: an admin reads this out or types it into a chat.
+_TEMPORARY_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+TEMPORARY_LENGTH = 10
+
+
+def new_temporary_password() -> str:
+    return "".join(secrets.choice(_TEMPORARY_ALPHABET) for _ in range(TEMPORARY_LENGTH))
 
 
 def check_strength(password: str) -> None:

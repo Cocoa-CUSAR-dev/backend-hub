@@ -91,6 +91,22 @@ CREATE TABLE auth.sso_used_token (
     CONSTRAINT pk_sso_used_token PRIMARY KEY (jti)
 );
 
+-- docs-and-plan#321 (forgot password): as in the database repo's V37.
+CREATE TABLE auth.password_reset_code (
+    password_reset_code_id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    code_hash character varying NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    attempts integer NOT NULL DEFAULT 0,
+    used_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL DEFAULT now(),
+    CONSTRAINT pk_password_reset_code PRIMARY KEY (password_reset_code_id),
+    CONSTRAINT fk_password_reset_code_user FOREIGN KEY (user_id)
+        REFERENCES auth.user_account (user_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_password_reset_code_user_created
+    ON auth.password_reset_code (user_id, created_at DESC);
+
 -- Role profiles: one row per user per role (multi-role). FKs to ref.* geo
 -- tables are left out -- this schema has no ref.* tables.
 CREATE TABLE agriculture.farmer (

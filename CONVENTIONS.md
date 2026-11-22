@@ -38,6 +38,7 @@ src/
 ├── line/client.py       # the ONLY file that imports linebot          (to be created)
 ├── llm/client.py        # the ONLY file that imports litellm
 ├── r2/client.py         # the ONLY file that imports boto3             (to be created)
+├── mailer/client.py     # the ONLY file that imports smtplib
 │
 ├── <feature>/           # auth/ me/ forms/ tasks/ agriculture/ collection/ processing/
 │   │                    # ref/ analytics/ reports/ diary/ reminders/ notifications/ admin/
@@ -135,6 +136,7 @@ Several writes that must succeed together go inside `async with transaction(sess
   | `read:profile:own` | read my own profile | admin, researcher, farmer, hub_collector, processor | baseline, V24, V32 |
   | `update:profile:own` | edit my profiles | admin, researcher, farmer, hub_collector, processor | baseline, V32 |
   | `create:user:any` | create researcher/admin accounts | admin | baseline |
+  | `update:password:any` | set a temporary password for any account | admin | V37 |
   | `update:role:any` | grant/remove researcher, admin | admin | V32 |
   | `read:researcher:all` / `update:researcher:any` / `delete:researcher:any` | manage researchers | admin | baseline |
   | `read:researcher:own` / `create:researcher:own` | my researcher record | researcher | baseline |
@@ -232,7 +234,7 @@ Several writes that must succeed together go inside `async with transaction(sess
 |---|---|
 | SQL / `sqlalchemy` only in `src/db/` (+ `database.py`) | `scripts/check_conventions.py` |
 | A `schema.table` in SQL appears only in the `src/db/` file that owns it, and no two files claim the same table | `scripts/check_conventions.py` |
-| `linebot` / `litellm` / `boto3` / `httpx` only in their client file | `scripts/check_conventions.py` |
+| `linebot` / `litellm` / `boto3` / `smtplib` / `httpx` only in their client file | `scripts/check_conventions.py` |
 | `os.environ` only in `config.py`; clock reads only in `clock.py`; `HTTPException` only in `router.py` | `scripts/check_conventions.py` |
 | Lint, format, types, tests | ruff · mypy · pytest |
 

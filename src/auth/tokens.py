@@ -1,9 +1,11 @@
-"""Access tokens (JWT), refresh tokens (opaque) and one-time SSO tokens.
+"""Access tokens (JWT), refresh tokens (opaque), one-time SSO tokens and
+forgot-password codes.
 
 Pure functions: no DB, no HTTP. src/auth/service.py decides when to issue.
 """
 
 import hashlib
+import hmac
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -124,3 +126,34 @@ def hash_refresh_token(raw: str) -> str:
 
 def refresh_expires_at() -> datetime:
     return utc_now() + timedelta(days=settings.REFRESH_TOKEN_TTL_DAYS)
+
+
+# ---- forgot-password codes ---------------------------------------------------
+# A short number the person types, so a link is not needed (the app has no deep
+# link). Only an HMAC is stored (auth.password_reset_code), keyed with JWT_KEY
+# and tied to the user: a copy of the table cannot be turned back into codes
+# without the key, and one account's hash means nothing for another.
+
+RESET_CODE_DIGITS = 6
+_THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
+
+
+def new_reset_code() -> str:
+    return f"{secrets.randbelow(10**RESET_CODE_DIGITS):0{RESET_CODE_DIGITS}d}"
+
+
+def normalize_reset_code(code: str) -> str:
+    """What the person typed, as digits: no spaces, Thai digits as Arabic."""
+    return "".join(code.split()).translate(_THAI_DIGITS)
+
+
+def hash_reset_code(user_id: UUID, code: str) -> str:
+    return hmac.new(
+        settings.JWT_KEY.encode(),
+        f"password-reset:{user_id}:{normalize_reset_code(code)}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def reset_code_matches(stored_hash: str, user_id: UUID, code: str) -> bool:
+    return hmac.compare_digest(stored_hash, hash_reset_code(user_id, code))

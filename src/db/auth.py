@@ -10,6 +10,7 @@ Owns:
     auth.line_link_code
     auth.refresh_token
     auth.sso_used_token
+    auth.password_reset_code
 
 All SQL for these tables lives in this file and nowhere else (CONVENTIONS.md §2).
 Other code calls the functions here.
@@ -46,6 +47,13 @@ class RefreshTokenRow:
     expires_at: datetime
     used_at: datetime | None
     revoked_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class ResetCodeRow:
+    password_reset_code_id: UUID
+    code_hash: str
+    attempts: int
 
 
 _USER_COLUMNS = """
@@ -155,6 +163,91 @@ async def set_password(session: AsyncSession, user_id: UUID, password_hash: str)
             " updated_at = now() WHERE user_id = :id"
         ),
         {"p": password_hash, "id": user_id},
+    )
+
+
+async def set_temporary_password(session: AsyncSession, user_id: UUID, password_hash: str) -> None:
+    """An admin hands over a password: the person must pick their own at the
+    next sign-in (must_reset_password)."""
+    await session.execute(
+        text(
+            "UPDATE auth.user_account SET password_hash = :p, is_password_reset = false,"
+            " is_requires_password_reset = true, updated_at = now() WHERE user_id = :id"
+        ),
+        {"p": password_hash, "id": user_id},
+    )
+
+
+# ---- forgot-password codes ---------------------------------------------------
+
+
+async def insert_reset_code(
+    session: AsyncSession,
+    user_id: UUID,
+    code_hash: str,
+    expires_at: datetime,
+    now: datetime,
+) -> None:
+    """A new code replaces any code of this user that is still live."""
+    await use_up_reset_codes(session, user_id, now)
+    await session.execute(
+        text(
+            "INSERT INTO auth.password_reset_code (user_id, code_hash, expires_at, created_at)"
+            " VALUES (:u, :h, :e, :now)"
+        ),
+        {"u": user_id, "h": code_hash, "e": expires_at, "now": now},
+    )
+
+
+async def count_reset_codes_since(session: AsyncSession, user_id: UUID, since: datetime) -> int:
+    count = (
+        await session.execute(
+            text(
+                "SELECT count(*) FROM auth.password_reset_code"
+                " WHERE user_id = :u AND created_at >= :since"
+            ),
+            {"u": user_id, "since": since},
+        )
+    ).scalar_one()
+    return int(count)
+
+
+async def live_reset_code(
+    session: AsyncSession, user_id: UUID, now: datetime
+) -> ResetCodeRow | None:
+    """The newest code of this user that is not used and not expired, locked."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT password_reset_code_id, code_hash, attempts"
+                " FROM auth.password_reset_code"
+                " WHERE user_id = :u AND used_at IS NULL AND expires_at > :now"
+                " ORDER BY created_at DESC LIMIT 1 FOR UPDATE"
+            ),
+            {"u": user_id, "now": now},
+        )
+    ).first()
+    return ResetCodeRow(**row._mapping) if row is not None else None
+
+
+async def count_reset_attempt(session: AsyncSession, code_id: UUID) -> None:
+    await session.execute(
+        text(
+            "UPDATE auth.password_reset_code SET attempts = attempts + 1"
+            " WHERE password_reset_code_id = :id"
+        ),
+        {"id": code_id},
+    )
+
+
+async def use_up_reset_codes(session: AsyncSession, user_id: UUID, now: datetime) -> None:
+    """Every code of this user that is still live can no longer be used."""
+    await session.execute(
+        text(
+            "UPDATE auth.password_reset_code SET used_at = :now"
+            " WHERE user_id = :u AND used_at IS NULL"
+        ),
+        {"u": user_id, "now": now},
     )
 
 
