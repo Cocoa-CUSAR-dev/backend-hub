@@ -7,6 +7,7 @@ from src import db
 from src.actor import Actor, require
 from src.auth import passwords
 from src.auth.service import create_account
+from src.clock import utc_now_naive
 from src.database import Session, transaction
 from src.exceptions import Conflict, Forbidden, Invalid, NotFound
 
@@ -41,6 +42,25 @@ async def create_user(
             await db.research.create_researcher_profile(session, user_id, profile)
         roles, _ = await db.auth.roles_and_permissions(session, user_id)
     return user_id, sorted(roles)
+
+
+async def reset_password(session: Session, actor: Actor, login: str) -> tuple[str, str]:
+    """Give someone who has neither email nor LINE a new temporary password
+    (forgot-password has nowhere to send a code). Returns (username, password)
+    for the admin to pass on. The old password, their sessions and any pending
+    reset code stop working now, and they must pick their own at next sign-in.
+    """
+    require(actor, "update:password:any")
+    password = passwords.new_temporary_password()
+    password_hash = await passwords.hash_password(password)
+    async with transaction(session):
+        user = await db.auth.user_by_login(session, login.strip())
+        if user is None:
+            raise NotFound("User not found")
+        await db.auth.set_temporary_password(session, user.user_id, password_hash)
+        await db.auth.revoke_all_refresh_tokens(session, user.user_id)
+        await db.auth.use_up_reset_codes(session, user.user_id, utc_now_naive())
+    return user.username, password
 
 
 async def grant_role(session: Session, actor: Actor, user_id: UUID, role: str) -> list[str]:

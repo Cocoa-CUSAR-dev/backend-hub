@@ -42,6 +42,29 @@ async def create_user(body: CreateUserIn, actor: CurrentActor, session: SessionD
     return UserRolesOut(user_id=user_id, roles=roles)
 
 
+class PasswordResetIn(BaseModel):
+    login: str = Field(min_length=1, description="Username, phone number or email.")
+
+
+class PasswordResetOut(BaseModel):
+    username: str
+    temporary_password: str = Field(
+        description="Shown once. The person must change it at their next sign-in."
+    )
+
+
+@router.post(
+    "/password-resets",
+    status_code=status.HTTP_201_CREATED,
+    summary="Reset someone's password by hand (they have no email or LINE)",
+)
+async def reset_password(
+    body: PasswordResetIn, actor: CurrentActor, session: SessionDep
+) -> PasswordResetOut:
+    username, password = await service.reset_password(session, actor, body.login)
+    return PasswordResetOut(username=username, temporary_password=password)
+
+
 @router.post(
     "/users/{user_id}/roles/{role}",
     summary="Grant researcher or admin to a user",

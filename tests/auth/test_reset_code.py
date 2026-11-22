@@ -37,3 +37,15 @@ def test_the_hash_depends_on_the_secret_key(monkeypatch) -> None:  # type: ignor
 
     assert tokens.hash_reset_code(USER, "123456") != before
     assert not tokens.reset_code_matches(before, USER, "123456")
+
+
+def test_a_temporary_password_is_ten_readable_characters_and_never_repeats() -> None:
+    from src.auth import passwords
+
+    seen = {passwords.new_temporary_password() for _ in range(50)}
+
+    assert len(seen) == 50
+    for password in seen:
+        assert len(password) == passwords.TEMPORARY_LENGTH
+        assert not set(password) & set("0OIl1")
+        passwords.check_strength(password)
