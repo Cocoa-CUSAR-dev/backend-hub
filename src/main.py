@@ -8,6 +8,11 @@ from contextlib import asynccontextmanager
 import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.httpx import HttpxIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src import api_docs
@@ -27,6 +32,18 @@ sentry_sdk.init(
     # The diary card's deep link carries an SSO token, and Sentry attaches
     # stack-frame locals to exceptions -- see src/sentry_scrub.py.
     before_send=scrub_sso_token,
+    # Only the integrations this app uses. By default Sentry imports every
+    # library it has an integration for, at start-up: openai (3.8 s),
+    # aiohttp, huggingface_hub and boto3 among them, on every Vercel cold
+    # start (docs-and-plan#326). LLM failures still reach Sentry as errors.
+    auto_enabling_integrations=False,
+    integrations=[
+        StarletteIntegration(),
+        FastApiIntegration(),
+        SqlalchemyIntegration(),
+        AsyncPGIntegration(),
+        HttpxIntegration(),
+    ],
 )
 
 from src.admin.router import router as admin_router

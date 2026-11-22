@@ -4,15 +4,14 @@ Farm photos live here. Objects are private: callers store the key and hand
 out short-lived presigned GET links, never a public URL.
 
 boto3 is synchronous, so each call runs in a worker thread to keep the event
-loop free. One client is created on first use and shared.
+loop free. One client is created on first use and shared. boto3 is imported
+then too, not with this module: only photo uploads and links use it, and
+every route paid for it on a cold start (docs-and-plan#326).
 """
 
 import asyncio
 from functools import cache
 from typing import Any
-
-import boto3
-from botocore.config import Config
 
 from src.config import settings
 from src.exceptions import Unavailable
@@ -25,6 +24,9 @@ def configured() -> bool:
 
 @cache
 def _client() -> Any:
+    import boto3  # noqa: PLC0415
+    from botocore.config import Config  # noqa: PLC0415
+
     return boto3.client(
         "s3",
         endpoint_url=f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com",

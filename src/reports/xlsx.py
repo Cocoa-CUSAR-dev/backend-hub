@@ -11,9 +11,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from openpyxl import Workbook
-from openpyxl.cell import WriteOnlyCell
-
 from src.db.reports import FarmExportRow, HarvestExportRow
 
 FARM_SHEET = "Farm Registry"
@@ -112,6 +109,10 @@ class Writer:
     each page as it reads it instead of holding every row first."""
 
     def __init__(self) -> None:
+        # openpyxl is imported here, not with the module: only the export uses
+        # it, and every route paid for it on a cold start (docs-and-plan#326).
+        from openpyxl import Workbook  # noqa: PLC0415
+
         self._wb = Workbook(write_only=True)
         self._ws: Any = None
 
@@ -128,6 +129,8 @@ class Writer:
         # named =HYPERLINK(...) would run when a researcher opens the file.
         # Kotlin (POI setCellValue(String)) always wrote text as text; so do we.
         if isinstance(value, str) and value.startswith("="):
+            from openpyxl.cell import WriteOnlyCell  # noqa: PLC0415
+
             cell = WriteOnlyCell(self._ws, value=value)
             cell.data_type = "s"
             return cell

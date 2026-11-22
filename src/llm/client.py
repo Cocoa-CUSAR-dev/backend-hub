@@ -7,15 +7,26 @@ plus complete(), a plain prompt -> text call (the daily diary's polish).
 
 Both go through this one client so the provider/model is swappable in one
 place (ADR 0004).
+
+litellm is imported on the first call, not with this module: importing it
+(with openai, aiohttp and huggingface_hub behind it) takes ~7 s, and every
+route paid that on a cold start although only the chatbot uses the LLM
+(docs-and-plan#326).
 """
 
-from typing import cast
+from typing import Any, cast
 
-import litellm
 from pydantic import BaseModel
 
 from src.config import settings
 from src.exceptions import LLMUnavailable
+
+
+async def _acompletion(**kwargs: Any) -> Any:
+    """litellm.acompletion, importing litellm the first time it's needed."""
+    import litellm  # noqa: PLC0415 -- deliberately lazy, see the module docstring
+
+    return await litellm.acompletion(**kwargs)
 
 
 async def extract_slots[SchemaT: BaseModel](
@@ -34,7 +45,7 @@ async def extract_slots[SchemaT: BaseModel](
     if instructions:
         messages.insert(0, {"role": "system", "content": instructions})
     try:
-        response = await litellm.acompletion(
+        response = await _acompletion(
             model=settings.LLM_MODEL,
             api_key=settings.LLM_API_KEY,
             messages=messages,
@@ -62,7 +73,7 @@ async def generate_follow_up(missing_field: str, context: str) -> str:
         f"for: {missing_field}. Just the question, nothing else."
     )
     try:
-        response = await litellm.acompletion(
+        response = await _acompletion(
             model=settings.LLM_MODEL,
             api_key=settings.LLM_API_KEY,
             messages=[{"role": "user", "content": prompt}],
@@ -81,7 +92,7 @@ async def complete(prompt: str, *, timeout: float, retries: int = 0) -> str:
     seconds later). Raises LLMUnavailable on failure, timeout or an empty
     answer."""
     try:
-        response = await litellm.acompletion(
+        response = await _acompletion(
             model=settings.LLM_MODEL,
             api_key=settings.LLM_API_KEY,
             messages=[{"role": "user", "content": prompt}],
