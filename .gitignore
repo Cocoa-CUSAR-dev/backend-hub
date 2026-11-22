@@ -13,3 +13,7 @@ out.json
 .coverage
 .coverage.*
 coverage.json
+
+# Load-test accounts and results (loadtest/seed.py, locust --csv)
+loadtest/users.json
+loadtest/results/

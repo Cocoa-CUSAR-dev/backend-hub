@@ -94,7 +94,7 @@ async def create_account(
     user_id = await db.auth.create_user(
         session,
         username,
-        passwords.hash_password(password),
+        await passwords.hash_password(password),
         requires_reset=requires_reset,
         email=email,
     )
@@ -118,7 +118,7 @@ async def register(
 async def login(session: Session, username: str, password: str) -> TokenPairOut:
     """`username` is the username or the email."""
     user = await db.auth.user_by_login(session, username.strip())
-    if user is None or not passwords.verify_password(password, user.password_hash):
+    if user is None or not await passwords.verify_password(password, user.password_hash):
         raise Unauthorized(_WRONG_LOGIN)
     async with transaction(session):
         return await issue_session(session, user)
@@ -168,8 +168,10 @@ async def reset_password(session: Session, actor: Actor, new_password: str) -> T
     if actor.user_id is None:
         raise Unauthorized("Not signed in")
     passwords.check_strength(new_password)
+    # Hashed before the transaction, so it isn't held open for bcrypt.
+    new_hash = await passwords.hash_password(new_password)
     async with transaction(session):
-        await db.auth.set_password(session, actor.user_id, passwords.hash_password(new_password))
+        await db.auth.set_password(session, actor.user_id, new_hash)
         await db.auth.revoke_all_refresh_tokens(session, actor.user_id)
         user = await db.auth.user_by_id(session, actor.user_id)
         if user is None:
@@ -202,7 +204,7 @@ async def line_link(session: Session, id_token: str, username: str, password: st
     then sign in. Replaces mobile-backend's POST /public/liff/link.
     """
     user = await db.auth.user_by_login(session, username.strip())
-    if user is None or not passwords.verify_password(password, user.password_hash):
+    if user is None or not await passwords.verify_password(password, user.password_hash):
         raise Unauthorized(_WRONG_LOGIN)
     claims = await liff.verify_for_any_channel(id_token)
     line_user_id = claims.get("sub")
