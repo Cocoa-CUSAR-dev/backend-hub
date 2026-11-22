@@ -1,7 +1,14 @@
 """Password hashing. bcrypt, compatible with hashes written by Go
 (golang.org/x/crypto/bcrypt) and Spring (BCryptPasswordEncoder), so every
 existing account keeps its password.
+
+hash_password and verify_password are async and run bcrypt in a worker
+thread. A bcrypt call takes about 250 ms of CPU; on the event loop it
+stalled every other request while anyone signed in (the load test in
+docs-and-plan#322: p99 3.6 s at 100 users, 250 ms in a thread).
 """
+
+import asyncio
 
 import bcrypt
 
@@ -21,13 +28,21 @@ def check_strength(password: str) -> None:
         raise Invalid("รหัสผ่านยาวเกินไป", fields={"password": "ยาวเกินไป"})
 
 
-def hash_password(password: str) -> str:
+async def hash_password(password: str) -> str:
+    return await asyncio.to_thread(_hash, password)
+
+
+async def verify_password(password: str, password_hash: str | None) -> bool:
+    if not password_hash:
+        return False  # LINE-only accounts have no password
+    return await asyncio.to_thread(_check, password, password_hash)
+
+
+def _hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
-def verify_password(password: str, password_hash: str | None) -> bool:
-    if not password_hash:
-        return False  # LINE-only accounts have no password
+def _check(password: str, password_hash: str) -> bool:
     try:
         return bcrypt.checkpw(password.encode()[:_MAX_BYTES], password_hash.encode())
     except ValueError:
