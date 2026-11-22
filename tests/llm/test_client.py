@@ -20,7 +20,7 @@ def _mock_completion(content: str) -> MagicMock:
 
 async def test_extract_slots_parses_the_model_response_into_the_schema() -> None:
     response = _mock_completion('{"farm_name": "สวนทดสอบ", "plot_id": null}')
-    with patch("src.llm.client.litellm.acompletion", new=AsyncMock(return_value=response)):
+    with patch("src.llm.client._acompletion", new=AsyncMock(return_value=response)):
         result = await extract_slots("ฉันทำงานที่สวนทดสอบ", _FarmSlots)
 
     assert result.farm_name == "สวนทดสอบ"
@@ -30,7 +30,7 @@ async def test_extract_slots_parses_the_model_response_into_the_schema() -> None
 async def test_extract_slots_sends_instructions_as_system_message_and_a_timeout() -> None:
     response = _mock_completion('{"farm_name": null, "plot_id": null}')
     mock = AsyncMock(return_value=response)
-    with patch("src.llm.client.litellm.acompletion", new=mock):
+    with patch("src.llm.client._acompletion", new=mock):
         await extract_slots("ข้อความ", _FarmSlots, instructions="be careful")
 
     kwargs = mock.await_args.kwargs
@@ -42,7 +42,7 @@ async def test_extract_slots_sends_instructions_as_system_message_and_a_timeout(
 async def test_extract_slots_raises_llm_unavailable_on_provider_failure() -> None:
     with (
         patch(
-            "src.llm.client.litellm.acompletion",
+            "src.llm.client._acompletion",
             new=AsyncMock(side_effect=TimeoutError("provider timed out")),
         ),
         pytest.raises(LLMUnavailable),
@@ -52,7 +52,7 @@ async def test_extract_slots_raises_llm_unavailable_on_provider_failure() -> Non
 
 async def test_generate_follow_up_returns_the_models_text() -> None:
     response = _mock_completion("คุณทำกิจกรรมที่แปลงไหนครับ?")
-    with patch("src.llm.client.litellm.acompletion", new=AsyncMock(return_value=response)):
+    with patch("src.llm.client._acompletion", new=AsyncMock(return_value=response)):
         question = await generate_follow_up("plot_id", context="ฉันใส่ปุ๋ยวันนี้")
 
     assert question == "คุณทำกิจกรรมที่แปลงไหนครับ?"
@@ -61,7 +61,7 @@ async def test_generate_follow_up_returns_the_models_text() -> None:
 async def test_generate_follow_up_raises_llm_unavailable_on_provider_failure() -> None:
     with (
         patch(
-            "src.llm.client.litellm.acompletion",
+            "src.llm.client._acompletion",
             new=AsyncMock(side_effect=RuntimeError("boom")),
         ),
         pytest.raises(LLMUnavailable),
@@ -71,7 +71,7 @@ async def test_generate_follow_up_raises_llm_unavailable_on_provider_failure() -
 
 async def test_complete_returns_the_stripped_text_with_timeout_and_retries() -> None:
     mock = AsyncMock(return_value=_mock_completion("  วันนี้ไปสวน \n"))
-    with patch("src.llm.client.litellm.acompletion", new=mock):
+    with patch("src.llm.client._acompletion", new=mock):
         assert await complete("เกลา", timeout=20.0, retries=2) == "วันนี้ไปสวน"
 
     kwargs = mock.await_args.kwargs
@@ -83,7 +83,7 @@ async def test_complete_returns_the_stripped_text_with_timeout_and_retries() -> 
 async def test_complete_treats_no_text_as_unavailable(content: str | None) -> None:
     with (
         patch(
-            "src.llm.client.litellm.acompletion",
+            "src.llm.client._acompletion",
             new=AsyncMock(return_value=_mock_completion(content)),  # type: ignore[arg-type]
         ),
         pytest.raises(LLMUnavailable),
@@ -93,7 +93,7 @@ async def test_complete_treats_no_text_as_unavailable(content: str | None) -> No
 
 async def test_complete_turns_a_provider_error_into_unavailable() -> None:
     with (
-        patch("src.llm.client.litellm.acompletion", new=AsyncMock(side_effect=RuntimeError)),
+        patch("src.llm.client._acompletion", new=AsyncMock(side_effect=RuntimeError)),
         pytest.raises(LLMUnavailable),
     ):
         await complete("เกลา", timeout=1.0)
